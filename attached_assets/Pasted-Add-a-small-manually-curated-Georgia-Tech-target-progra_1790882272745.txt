@@ -1,0 +1,354 @@
+Add a small, manually curated Georgia Tech target-program dataset to Verifee.
+
+The purpose of this dataset is to provide authoritative target requirements for preliminary academic mapping. The AI must compare the uploaded student's academic record against these stored requirements rather than inventing or independently guessing Georgia Tech admission requirements.
+
+Create a file such as:
+
+`/data/georgia-tech-programs.json`
+
+Use the following data structure.
+
+```json
+{
+  "institution": {
+    "id": "georgia-tech",
+    "name": "Georgia Institute of Technology",
+    "shortName": "Georgia Tech",
+    "country": "United States"
+  },
+  "programs": [
+    {
+      "id": "ms-analytics",
+      "name": "Master of Science in Analytics",
+      "shortName": "MS Analytics",
+      "school": "Georgia Tech",
+      "requirementType": "published_prerequisite_background",
+      "description": "Applicants should have a basic background in mathematics and computing. Georgia Tech identifies college-level coursework or equivalent knowledge in calculus, probability/statistics, basic linear algebra, and a high-level programming language.",
+      "requirements": [
+        {
+          "id": "msa-calculus",
+          "name": "Calculus",
+          "category": "mathematics",
+          "importance": "expected",
+          "evidenceTypes": [
+            "coursework",
+            "equivalent_academic_knowledge"
+          ],
+          "matchingConcepts": [
+            "calculus",
+            "differentiation",
+            "integration",
+            "derivatives",
+            "integrals",
+            "single-variable calculus",
+            "multivariable calculus"
+          ]
+        },
+        {
+          "id": "msa-probability-statistics",
+          "name": "Probability / Statistics",
+          "category": "mathematics",
+          "importance": "expected",
+          "evidenceTypes": [
+            "coursework",
+            "equivalent_academic_knowledge"
+          ],
+          "matchingConcepts": [
+            "probability",
+            "statistics",
+            "probability distributions",
+            "statistical inference",
+            "random variables",
+            "descriptive statistics"
+          ]
+        },
+        {
+          "id": "msa-linear-algebra",
+          "name": "Basic Linear Algebra",
+          "category": "mathematics",
+          "importance": "expected",
+          "evidenceTypes": [
+            "coursework",
+            "equivalent_academic_knowledge"
+          ],
+          "matchingConcepts": [
+            "linear algebra",
+            "matrices",
+            "vectors",
+            "systems of linear equations",
+            "eigenvalues",
+            "eigenvectors"
+          ]
+        },
+        {
+          "id": "msa-programming",
+          "name": "High-Level Programming",
+          "category": "computing",
+          "importance": "expected",
+          "evidenceTypes": [
+            "coursework",
+            "equivalent_academic_knowledge"
+          ],
+          "matchingConcepts": [
+            "programming",
+            "computer programming",
+            "Python",
+            "C",
+            "C++",
+            "Java",
+            "FORTRAN",
+            "algorithms",
+            "computational thinking"
+          ]
+        }
+      ],
+      "source": {
+        "title": "Georgia Tech MS Analytics Admissions",
+        "lastChecked": "2026-10-01"
+      }
+    },
+
+    {
+      "id": "ms-computer-science",
+      "name": "Master of Science in Computer Science",
+      "shortName": "MS Computer Science",
+      "school": "College of Computing",
+      "requirementType": "recommended_expected_background",
+      "description": "Georgia Tech reviews MSCS applicants holistically. The College of Computing recommends a strong undergraduate computer science background and identifies programming and several core computer science areas as expected preparation.",
+      "requirements": [
+        {
+          "id": "mscs-programming",
+          "name": "Programming Proficiency",
+          "category": "computing",
+          "importance": "strongly_recommended",
+          "matchingConcepts": [
+            "programming",
+            "software development",
+            "C",
+            "Java",
+            "Python",
+            "object-oriented programming"
+          ]
+        },
+        {
+          "id": "mscs-algorithms",
+          "name": "Algorithms",
+          "category": "computer_science",
+          "importance": "strongly_recommended",
+          "matchingConcepts": [
+            "algorithms",
+            "data structures",
+            "design and analysis of algorithms",
+            "algorithmic complexity",
+            "computational complexity"
+          ]
+        },
+        {
+          "id": "mscs-operating-systems",
+          "name": "Operating Systems",
+          "category": "computer_science",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "operating systems",
+            "systems programming",
+            "processes",
+            "threads",
+            "memory management",
+            "concurrency"
+          ]
+        },
+        {
+          "id": "mscs-networking",
+          "name": "Networking and Communications",
+          "category": "computer_science",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "computer networks",
+            "networking",
+            "communications",
+            "TCP/IP",
+            "distributed networking"
+          ]
+        },
+        {
+          "id": "mscs-theory",
+          "name": "Theory / Formal Languages",
+          "category": "computer_science",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "theory of computation",
+            "formal languages",
+            "automata theory",
+            "computability",
+            "complexity theory"
+          ]
+        },
+        {
+          "id": "mscs-computer-architecture",
+          "name": "Computer Architecture",
+          "category": "computer_science",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "computer architecture",
+            "computer organization",
+            "processor architecture",
+            "memory hierarchy",
+            "digital systems"
+          ]
+        }
+      ],
+      "source": {
+        "title": "Georgia Tech MS Computer Science Admissions FAQ",
+        "lastChecked": "2026-10-01"
+      }
+    },
+
+    {
+      "id": "ms-industrial-engineering",
+      "name": "Master of Science in Industrial Engineering",
+      "shortName": "MS Industrial Engineering",
+      "school": "H. Milton Stewart School of Industrial and Systems Engineering",
+      "requirementType": "expected_quantitative_background",
+      "description": "Applicants commonly come from engineering, mathematics, science, or computing. ISyE graduate preparation assumes substantial quantitative preparation, including calculus, linear algebra, computing, and calculus-based probability and statistics.",
+      "requirements": [
+        {
+          "id": "msie-calculus",
+          "name": "Calculus",
+          "category": "mathematics",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "calculus",
+            "differential calculus",
+            "integral calculus",
+            "multivariable calculus"
+          ]
+        },
+        {
+          "id": "msie-linear-algebra",
+          "name": "Linear Algebra",
+          "category": "mathematics",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "linear algebra",
+            "matrices",
+            "vectors",
+            "eigenvalues",
+            "linear systems"
+          ]
+        },
+        {
+          "id": "msie-probability-statistics",
+          "name": "Calculus-Based Probability and Statistics",
+          "category": "mathematics",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "probability",
+            "calculus-based probability",
+            "statistics",
+            "random variables",
+            "statistical inference"
+          ]
+        },
+        {
+          "id": "msie-programming",
+          "name": "Computer Programming",
+          "category": "computing",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "programming",
+            "computer programming",
+            "Python",
+            "MATLAB",
+            "C",
+            "C++",
+            "Java"
+          ]
+        },
+        {
+          "id": "msie-quantitative-preparation",
+          "name": "General Quantitative Preparation",
+          "category": "quantitative",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "engineering mathematics",
+            "optimization",
+            "operations research",
+            "mathematical modeling",
+            "quantitative methods"
+          ]
+        }
+      ],
+      "source": {
+        "title": "Georgia Tech ISyE MS Industrial Engineering / Graduate Preparation",
+        "lastChecked": "2026-10-01"
+      }
+    }
+  ]
+}
+```
+
+### Application behavior
+
+Update Step 3, "Select Target", so the user can select:
+
+1. MS Analytics
+2. MS Computer Science
+3. MS Industrial Engineering
+
+After a program is selected, show its stored background requirements underneath the dropdown.
+
+The mapping engine must use ONLY these stored requirements as the target criteria.
+
+For each requirement, compare the student's extracted academic record against:
+- course titles;
+- course descriptions if available;
+- course codes;
+- credits;
+- grades;
+- learning outcomes or syllabus information if available.
+
+Return one of:
+
+- Covered
+- Partially Covered
+- Potential Gap
+- Insufficient Evidence
+
+Also return:
+- matching student course(s);
+- evidence;
+- concise rationale;
+- confidence: High / Medium / Low.
+
+### Important distinction
+
+Do not describe all stored criteria as mandatory admissions prerequisites.
+
+Respect the `requirementType` and `importance` fields.
+
+For example:
+
+- MS Analytics has specifically published prerequisite/background expectations.
+- MS Computer Science describes recommended/expected preparation and uses holistic admissions.
+- MS Industrial Engineering describes expected quantitative preparation.
+
+The UI must preserve these distinctions.
+
+### Source transparency
+
+On the mapping results page, show:
+
+"Target criteria sourced from Georgia Tech program materials."
+
+Provide the stored source title and `lastChecked` date in a small expandable "Source details" section.
+
+Do not allow the AI to invent additional Georgia Tech requirements.
+
+### Demo scope
+
+Do not scrape Georgia Tech dynamically.
+
+Do not add more programs yet.
+
+Keep this JSON manually editable so the dataset can be reviewed and corrected before the competition demo.
+```

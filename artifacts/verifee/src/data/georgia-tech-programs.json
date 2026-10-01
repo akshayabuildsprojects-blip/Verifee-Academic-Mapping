@@ -1,0 +1,262 @@
+{
+  "institution": {
+    "id": "georgia-tech",
+    "name": "Georgia Institute of Technology",
+    "shortName": "Georgia Tech",
+    "country": "United States"
+  },
+  "programs": [
+    {
+      "id": "ms-analytics",
+      "name": "Master of Science in Analytics",
+      "shortName": "MS Analytics",
+      "school": "Georgia Tech",
+      "requirementType": "published_prerequisite_background",
+      "description": "Applicants should have a basic background in mathematics and computing. Georgia Tech identifies college-level coursework or equivalent knowledge in calculus, probability/statistics, basic linear algebra, and a high-level programming language.",
+      "requirements": [
+        {
+          "id": "msa-calculus",
+          "name": "Calculus",
+          "category": "mathematics",
+          "importance": "expected",
+          "evidenceTypes": ["coursework", "equivalent_academic_knowledge"],
+          "matchingConcepts": [
+            "calculus",
+            "differentiation",
+            "integration",
+            "derivatives",
+            "integrals",
+            "single-variable calculus",
+            "multivariable calculus"
+          ]
+        },
+        {
+          "id": "msa-probability-statistics",
+          "name": "Probability / Statistics",
+          "category": "mathematics",
+          "importance": "expected",
+          "evidenceTypes": ["coursework", "equivalent_academic_knowledge"],
+          "matchingConcepts": [
+            "probability",
+            "statistics",
+            "probability distributions",
+            "statistical inference",
+            "random variables",
+            "descriptive statistics"
+          ]
+        },
+        {
+          "id": "msa-linear-algebra",
+          "name": "Basic Linear Algebra",
+          "category": "mathematics",
+          "importance": "expected",
+          "evidenceTypes": ["coursework", "equivalent_academic_knowledge"],
+          "matchingConcepts": [
+            "linear algebra",
+            "matrices",
+            "vectors",
+            "systems of linear equations",
+            "eigenvalues",
+            "eigenvectors"
+          ]
+        },
+        {
+          "id": "msa-programming",
+          "name": "High-Level Programming",
+          "category": "computing",
+          "importance": "expected",
+          "evidenceTypes": ["coursework", "equivalent_academic_knowledge"],
+          "matchingConcepts": [
+            "programming",
+            "computer programming",
+            "Python",
+            "C",
+            "C++",
+            "Java",
+            "FORTRAN",
+            "algorithms",
+            "computational thinking"
+          ]
+        }
+      ],
+      "source": {
+        "title": "Georgia Tech MS Analytics Admissions",
+        "lastChecked": "2026-10-01"
+      }
+    },
+    {
+      "id": "ms-computer-science",
+      "name": "Master of Science in Computer Science",
+      "shortName": "MS Computer Science",
+      "school": "College of Computing",
+      "requirementType": "recommended_expected_background",
+      "description": "Georgia Tech reviews MSCS applicants holistically. The College of Computing recommends a strong undergraduate computer science background and identifies programming and several core computer science areas as expected preparation.",
+      "requirements": [
+        {
+          "id": "mscs-programming",
+          "name": "Programming Proficiency",
+          "category": "computing",
+          "importance": "strongly_recommended",
+          "matchingConcepts": [
+            "programming",
+            "software development",
+            "C",
+            "Java",
+            "Python",
+            "object-oriented programming"
+          ]
+        },
+        {
+          "id": "mscs-algorithms",
+          "name": "Algorithms",
+          "category": "computer_science",
+          "importance": "strongly_recommended",
+          "matchingConcepts": [
+            "algorithms",
+            "data structures",
+            "design and analysis of algorithms",
+            "algorithmic complexity",
+            "computational complexity"
+          ]
+        },
+        {
+          "id": "mscs-operating-systems",
+          "name": "Operating Systems",
+          "category": "computer_science",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "operating systems",
+            "systems programming",
+            "processes",
+            "threads",
+            "memory management",
+            "concurrency"
+          ]
+        },
+        {
+          "id": "mscs-networking",
+          "name": "Networking and Communications",
+          "category": "computer_science",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "computer networks",
+            "networking",
+            "communications",
+            "TCP/IP",
+            "distributed networking"
+          ]
+        },
+        {
+          "id": "mscs-theory",
+          "name": "Theory / Formal Languages",
+          "category": "computer_science",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "theory of computation",
+            "formal languages",
+            "automata theory",
+            "computability",
+            "complexity theory"
+          ]
+        },
+        {
+          "id": "mscs-computer-architecture",
+          "name": "Computer Architecture",
+          "category": "computer_science",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "computer architecture",
+            "computer organization",
+            "processor architecture",
+            "memory hierarchy",
+            "digital systems"
+          ]
+        }
+      ],
+      "source": {
+        "title": "Georgia Tech MS Computer Science Admissions FAQ",
+        "lastChecked": "2026-10-01"
+      }
+    },
+    {
+      "id": "ms-industrial-engineering",
+      "name": "Master of Science in Industrial Engineering",
+      "shortName": "MS Industrial Engineering",
+      "school": "H. Milton Stewart School of Industrial and Systems Engineering",
+      "requirementType": "expected_quantitative_background",
+      "description": "Applicants commonly come from engineering, mathematics, science, or computing. ISyE graduate preparation assumes substantial quantitative preparation, including calculus, linear algebra, computing, and calculus-based probability and statistics.",
+      "requirements": [
+        {
+          "id": "msie-calculus",
+          "name": "Calculus",
+          "category": "mathematics",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "calculus",
+            "differential calculus",
+            "integral calculus",
+            "multivariable calculus"
+          ]
+        },
+        {
+          "id": "msie-linear-algebra",
+          "name": "Linear Algebra",
+          "category": "mathematics",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "linear algebra",
+            "matrices",
+            "vectors",
+            "eigenvalues",
+            "linear systems"
+          ]
+        },
+        {
+          "id": "msie-probability-statistics",
+          "name": "Calculus-Based Probability and Statistics",
+          "category": "mathematics",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "probability",
+            "calculus-based probability",
+            "statistics",
+            "random variables",
+            "statistical inference"
+          ]
+        },
+        {
+          "id": "msie-programming",
+          "name": "Computer Programming",
+          "category": "computing",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "programming",
+            "computer programming",
+            "Python",
+            "MATLAB",
+            "C",
+            "C++",
+            "Java"
+          ]
+        },
+        {
+          "id": "msie-quantitative-preparation",
+          "name": "General Quantitative Preparation",
+          "category": "quantitative",
+          "importance": "expected_background",
+          "matchingConcepts": [
+            "engineering mathematics",
+            "optimization",
+            "operations research",
+            "mathematical modeling",
+            "quantitative methods"
+          ]
+        }
+      ],
+      "source": {
+        "title": "Georgia Tech ISyE MS Industrial Engineering / Graduate Preparation",
+        "lastChecked": "2026-10-01"
+      }
+    }
+  ]
+}
