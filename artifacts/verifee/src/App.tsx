@@ -5,7 +5,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter, Link } from 'wouter';
-import { AlertCircle, ArrowLeft, ArrowRight, BookOpen, ChevronRight, FileText, LoaderCircle, RotateCcw, ShieldAlert, Upload, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, ArrowDown, ArrowUpRight, BookOpen, Check, ChevronRight, FileText, GraduationCap, Landmark, LoaderCircle, RotateCcw, ScanText, ShieldAlert, Upload, X } from 'lucide-react';
 import { checkVerification, extractMockRecord, georgiaTechDataset, mapStoredProgramRequirements, sampleCourses, sampleCredential, uploadSchema, type CredentialVerification, type ProgramRequirementMapping } from '@/lib/mock-analysis';
 
 const queryClient = new QueryClient();
@@ -56,7 +56,7 @@ function Stepper({ current }: { current: number }) {
     </div>)}
   </nav>;
 }
-function Home() {
+function UploadStep() {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [drag, setDrag] = useState(false);
@@ -115,10 +115,83 @@ function Home() {
     <Disclaimer />
   </main></div>;
 }
+function Landing() {
+  return <div className="landing-shell" id="top">
+    <header className="landing-header">
+      <div className="landing-nav-wrap">
+        <Link href="/" className="brand" data-testid="link-brand-home"><span className="brand-mark"><BookOpen size={16} strokeWidth={2.1} /></span><span>verifee</span></Link>
+        <nav className="landing-nav" aria-label="Main navigation">
+          <a href="#how-it-works" data-testid="link-how-it-works">How it works</a>
+          <Link href="/start" className="nav-cta" data-testid="link-try-verifee-nav">Try Verifee <ArrowUpRight size={14} /></Link>
+        </nav>
+      </div>
+    </header>
+    <main>
+      <section className="landing-hero">
+        <div className="landing-hero-inner">
+          <div className="hero-copy-block">
+            <div className="landing-eyebrow"><span className="eyebrow-rule" /> Academic records, made legible</div>
+            <h1>Understand academic credentials <em>across borders.</em></h1>
+            <p className="landing-lede">Verifee interprets international academic records, verifies supported digital credential formats where possible, and maps prior coursework against target university requirements.</p>
+            <div className="hero-actions">
+              <Link href="/start" className="landing-primary" data-testid="link-try-verifee-hero">Try Verifee <ArrowRight size={16} /></Link>
+              <a href="#how-it-works" className="landing-text-link" data-testid="link-see-how-it-works">See how it works <ArrowDown size={14} /></a>
+            </div>
+            <div className="hero-assurance"><span className="assurance-mark"><Check size={13} /></span> A clearer first look before formal review</div>
+          </div>
+          <div className="hero-document" aria-label="Illustrative academic record interpretation preview">
+            <div className="document-topline"><span>RECORD OVERVIEW</span><span className="document-ref">VF—0248</span></div>
+            <div className="document-rule" />
+            <div className="document-institution"><span className="institution-seal"><Landmark size={19} /></span><div><span className="doc-label">ISSUING INSTITUTION</span><strong>University of Cape Coast</strong><small>Ghana · 4-year bachelor’s degree</small></div></div>
+            <div className="document-field-grid"><div><span className="doc-label">QUALIFICATION</span><strong>BSc, Computer Science</strong></div><div><span className="doc-label">RECORD TYPE</span><strong>Academic transcript</strong></div></div>
+            <div className="document-course-head"><span>COURSEWORK</span><span>INTERPRETATION</span></div>
+            <div className="document-course"><span>Calculus II</span><span className="document-status"><i /> Identified</span></div>
+            <div className="document-course"><span>Data Structures</span><span className="document-status"><i /> Identified</span></div>
+            <div className="document-course"><span>Probability &amp; Statistics</span><span className="document-status"><i /> Identified</span></div>
+            <div className="document-foot"><span><ScanText size={14} /> Academic interpretation</span><span>Preliminary</span></div>
+            <div className="document-caption"><span className="caption-line" />A record, with context.</div>
+          </div>
+        </div>
+        <div className="hero-bottomline"><span>FOR STUDENTS &amp; UNIVERSITY TEAMS</span><span>Clarity across education systems <span className="bottomline-dot">·</span> Careful by design</span></div>
+      </section>
+      <section className="landing-capabilities" id="how-it-works" aria-labelledby="capabilities-heading">
+        <div className="section-intro">
+          <div className="landing-eyebrow"><span className="eyebrow-rule" /> A thoughtful first pass</div>
+          <h2 id="capabilities-heading">From records to <em>understanding.</em></h2>
+          <p>Academic systems differ. The questions students and reviewers need answered are often the same.</p>
+        </div>
+        <div className="capability-list">
+          <article className="capability-item">
+            <div className="capability-index">01</div><div className="capability-icon"><ShieldAlert size={19} /></div>
+            <div className="capability-copy"><h3>Verify where possible</h3><p>Check supported digital credentials such as OpenCerts and European Digital Credentials.</p></div><span className="capability-note">SUPPORTED FORMATS</span>
+          </article>
+          <article className="capability-item">
+            <div className="capability-index">02</div><div className="capability-icon"><ScanText size={19} /></div>
+            <div className="capability-copy"><h3>Interpret academic records</h3><p>Normalize degrees, courses, credits, grades, and education-system information.</p></div><span className="capability-note">RECORD CONTEXT</span>
+          </article>
+          <article className="capability-item">
+            <div className="capability-index">03</div><div className="capability-icon"><GraduationCap size={20} /></div>
+            <div className="capability-copy"><h3>Map academic preparation</h3><p>Compare prior coursework against a target graduate program and identify covered areas, partial matches, potential gaps, and insufficient evidence.</p></div><span className="capability-note">PROGRAM ALIGNMENT</span>
+          </article>
+        </div>
+      </section>
+      <section className="landing-positioning">
+        <div className="positioning-label"><span className="positioning-emblem"><BookOpen size={17} /></span><span>THE ROLE OF VERIFEE</span></div>
+        <div className="positioning-content"><h2>Built for preliminary academic review</h2><p>Verifee helps students and university teams understand academic preparation before formal credential evaluation or final admissions review.</p><div className="positioning-boundary"><span className="boundary-mark">i</span><span>Verifee does not replace official credential evaluators or university admissions decisions.</span></div></div>
+        <div className="positioning-side-note">CONTEXT BEFORE<br />CONCLUSIONS</div>
+      </section>
+      <section className="landing-bottom-cta">
+        <div><div className="landing-eyebrow"><span className="eyebrow-rule" /> Begin with a credential</div><h2>Make the next review<br /><em>more informed.</em></h2></div>
+        <div className="bottom-cta-action"><p>Start with an academic record and a program in mind.</p><Link href="/start" className="landing-primary" data-testid="link-try-verifee-bottom">Try Verifee <ArrowRight size={16} /></Link></div>
+      </section>
+    </main>
+    <footer className="landing-footer"><Link href="/" className="brand"><span className="brand-mark"><BookOpen size={15} /></span><span>verifee</span></Link><span>Preliminary academic interpretation, with care.</span><a href="#top" onClick={(event) => { event.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Back to top <ArrowUpRight size={13} /></a></footer>
+  </div>;
+}
 function Review() {
   const [, setLocation] = useLocation();
   const fileName = sessionStorage.getItem('verifee-file-name');
-  useEffect(() => { if (!fileName || sessionStorage.getItem('verifee-started') !== 'yes') setLocation('/'); }, [fileName, setLocation]);
+  useEffect(() => { if (!fileName || sessionStorage.getItem('verifee-started') !== 'yes') setLocation('/start'); }, [fileName, setLocation]);
   const format = sessionStorage.getItem('verifee-file-format') || 'PDF transcript';
   const verificationStatus = (sessionStorage.getItem('verifee-verification-status') || 'Verification unavailable') as CredentialVerification['status'];
   const verificationExplanation = sessionStorage.getItem('verifee-verification-explanation') || 'No independent verification source is connected in this demonstration.';
@@ -145,7 +218,7 @@ function Review() {
         <div className="section-title"><h2 id="courses-heading">Courses detected</h2><span className="small-label">{sampleCourses.length} in sample record</span></div>
         <div className="course-preview">{sampleCourses.map((course) => <div className="course-preview-row" key={course.code}><span className="course-code">{course.code}</span><span>{course.title}</span><span>{course.credits} {course.unitsLabel}</span></div>)}</div>
       </section>
-      <div className="wizard-actions"><button className="secondary-btn" type="button" onClick={() => setLocation('/')}><ArrowLeft size={14} /> Back to upload</button><button className="cta wizard-next" type="button" onClick={() => setLocation('/target')} data-testid="button-continue-target"><span>Continue to target selection</span><ArrowRight size={16} /></button></div>
+      <div className="wizard-actions"><button className="secondary-btn" type="button" onClick={() => setLocation('/start')}><ArrowLeft size={14} /> Back to upload</button><button className="cta wizard-next" type="button" onClick={() => setLocation('/target')} data-testid="button-continue-target"><span>Continue to target selection</span><ArrowRight size={16} /></button></div>
     </section>
     <Disclaimer />
   </main></div>;
@@ -157,7 +230,7 @@ function TargetSelection() {
     return georgiaTechDataset.programs.some((item) => item.id === saved) ? saved! : georgiaTechDataset.programs[0].id;
   });
   const program = georgiaTechDataset.programs.find((item) => item.id === programId) || georgiaTechDataset.programs[0];
-  useEffect(() => { if (sessionStorage.getItem('verifee-started') !== 'yes') setLocation('/'); }, [setLocation]);
+  useEffect(() => { if (sessionStorage.getItem('verifee-started') !== 'yes') setLocation('/start'); }, [setLocation]);
   const changeProgram = (value: string) => {
     setProgramId(value);
     sessionStorage.setItem('verifee-program', value);
@@ -213,10 +286,10 @@ function Report() {
   const program = georgiaTechDataset.programs.find((item) => item.id === savedProgramId) || georgiaTechDataset.programs[0];
   const mapping = mapStoredProgramRequirements(program.id, sampleCourses);
   const visible = filter === 'All requirements' ? mapping : mapping.filter((item) => item.result === filter);
-  useEffect(() => { if (sessionStorage.getItem('verifee-started') !== 'yes') setLocation('/'); }, [setLocation]);
+  useEffect(() => { if (sessionStorage.getItem('verifee-started') !== 'yes') setLocation('/start'); }, [setLocation]);
   const reset = () => {
     ['verifee-file-name', 'verifee-file-format', 'verifee-target', 'verifee-program', 'verifee-started', 'verifee-verification-status', 'verifee-verification-explanation'].forEach((key) => sessionStorage.removeItem(key));
-    setLocation('/');
+    setLocation('/start');
   };
   const covered = mapping.filter((item) => item.result === 'Covered').length;
   const reviewCount = mapping.length - covered;
@@ -266,7 +339,7 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 function Router() {
-  return <RoutedErrorBoundary><Switch><Route path="/" component={Home} /><Route path="/analysis" component={Review} /><Route path="/target" component={TargetSelection} /><Route path="/report" component={Report} /><Route component={NotFound} /></Switch></RoutedErrorBoundary>;
+  return <RoutedErrorBoundary><Switch><Route path="/" component={Landing} /><Route path="/start" component={UploadStep} /><Route path="/analysis" component={Review} /><Route path="/target" component={TargetSelection} /><Route path="/report" component={Report} /><Route component={NotFound} /></Switch></RoutedErrorBoundary>;
 }
 function App() {
   return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>;

@@ -1,0 +1,104 @@
+Add a polished landing page before the existing Verifee four-step workflow.
+
+Do not redesign the existing stepper workflow. Keep its current visual style and functionality.
+
+### Landing page goal
+
+The landing page should quickly explain what Verifee does and provide a clear CTA into the existing credential-analysis flow.
+
+### Hero section
+
+Use this headline:
+
+**Understand academic credentials across borders.**
+
+Supporting text:
+
+"Verifee interprets international academic records, verifies supported digital credential formats where possible, and maps prior coursework against target university requirements."
+
+Primary CTA:
+
+**Try Verifee**
+
+Secondary CTA:
+
+**See how it works**
+
+Clicking **Try Verifee** should navigate directly to Step 1 of the existing workflow.
+
+### Value proposition section
+
+Create three concise cards:
+
+#### Verify where possible
+"Check supported digital credentials such as OpenCerts and European Digital Credentials."
+
+#### Interpret academic records
+"Normalize degrees, courses, credits, grades, and education-system information."
+
+#### Map academic preparation
+"Compare prior coursework against a target graduate program and identify covered areas, partial matches, potential gaps, and insufficient evidence."
+
+### Positioning section
+
+Add a short section titled:
+
+**Built for preliminary academic review**
+
+Copy:
+
+"Verifee helps students and university teams understand academic preparation before formal credential evaluation or final admissions review."
+
+Add a small supporting statement:
+
+"Verifee does not replace official credential evaluators or university admissions decisions."
+
+### CTA near bottom
+
+Add another button:
+
+**Try Verifee**
+
+This should open the existing Step 1 upload workflow.
+
+### Navigation
+
+Use the existing Verifee branding.
+
+Simple top navigation:
+
+- How it works
+- Try Verifee
+
+Do not add authentication, pricing, login, dashboards, or unnecessary pages.
+
+### Design
+
+Keep the current:
+- serif headline style
+- muted green palette
+- clean white space
+- high-trust academic/fintech feel
+- subtle borders
+- restrained use of color
+
+The landing page should feel credible enough for a university administrator while still being understandable to a prospective student.
+
+Avoid generic startup illustrations and gradients.
+
+### Existing workflow
+
+Preserve the current four-step flow exactly:
+
+1. Upload Credential
+2. Verify & Review
+3. Select Target
+4. Academic Mapping
+
+Do not remove or materially redesign these steps in this task.
+
+### Demo mode
+
+If the application is still using mock data, keep the existing unobtrusive Demo mode badge.
+
+Do not place large demo disclaimers on the landing page.
