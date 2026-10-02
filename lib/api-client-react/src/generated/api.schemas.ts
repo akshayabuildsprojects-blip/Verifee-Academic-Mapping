@@ -59,6 +59,125 @@ export interface AcademicRecord {
   academicRecord: AcademicRecordDetails;
 }
 
+export type AcademicMappingInputProgramId = typeof AcademicMappingInputProgramId[keyof typeof AcademicMappingInputProgramId];
+
+
+export const AcademicMappingInputProgramId = {
+  'ms-analytics': 'ms-analytics',
+  'ms-computer-science': 'ms-computer-science',
+  'ms-industrial-engineering': 'ms-industrial-engineering',
+} as const;
+
+export interface AcademicMappingInput {
+  programId: AcademicMappingInputProgramId;
+  record: AcademicRecord;
+}
+
+export interface CourseEvidenceSource {
+  /** @nullable */
+  title: string | null;
+  url: string;
+}
+
+export type AcademicCourseEvidenceResearchStatus = typeof AcademicCourseEvidenceResearchStatus[keyof typeof AcademicCourseEvidenceResearchStatus];
+
+
+export const AcademicCourseEvidenceResearchStatus = {
+  OFFICIAL_SOURCES_FOUND: 'OFFICIAL_SOURCES_FOUND',
+  TRANSCRIPT_DESCRIPTION_ONLY: 'TRANSCRIPT_DESCRIPTION_ONLY',
+  NO_AUTHORITATIVE_SOURCE: 'NO_AUTHORITATIVE_SOURCE',
+  DEMO_DESCRIPTION: 'DEMO_DESCRIPTION',
+} as const;
+
+export interface AcademicCourseEvidence {
+  /** @minimum 0 */
+  courseIndex: number;
+  /** @nullable */
+  code: string | null;
+  /** @nullable */
+  title: string | null;
+  /** @nullable */
+  transcriptDescription: string | null;
+  researchStatus: AcademicCourseEvidenceResearchStatus;
+  findings: string[];
+  sources: CourseEvidenceSource[];
+}
+
+export type AcademicCourseCandidateRelevance = typeof AcademicCourseCandidateRelevance[keyof typeof AcademicCourseCandidateRelevance];
+
+
+export const AcademicCourseCandidateRelevance = {
+  LIKELY_RELEVANT: 'LIKELY_RELEVANT',
+  POSSIBLY_RELEVANT: 'POSSIBLY_RELEVANT',
+} as const;
+
+export interface AcademicCourseCandidate {
+  /** @minimum 0 */
+  courseIndex: number;
+  /** @nullable */
+  code: string | null;
+  /** @nullable */
+  title: string | null;
+  relevance: AcademicCourseCandidateRelevance;
+  evidence: string[];
+  sources: CourseEvidenceSource[];
+}
+
+export type AcademicRequirementMappingStatus = typeof AcademicRequirementMappingStatus[keyof typeof AcademicRequirementMappingStatus];
+
+
+export const AcademicRequirementMappingStatus = {
+  COVERED: 'COVERED',
+  PARTIALLY_COVERED: 'PARTIALLY_COVERED',
+  INSUFFICIENT_EVIDENCE: 'INSUFFICIENT_EVIDENCE',
+  POTENTIAL_GAP: 'POTENTIAL_GAP',
+} as const;
+
+export type AcademicRequirementMappingConfidence = typeof AcademicRequirementMappingConfidence[keyof typeof AcademicRequirementMappingConfidence];
+
+
+export const AcademicRequirementMappingConfidence = {
+  HIGH: 'HIGH',
+  MEDIUM: 'MEDIUM',
+  LOW: 'LOW',
+} as const;
+
+export interface AcademicRequirementMapping {
+  requirementId: string;
+  requirementName: string;
+  category: string;
+  importance: string;
+  matchingConcepts: string[];
+  status: AcademicRequirementMappingStatus;
+  confidence: AcademicRequirementMappingConfidence;
+  candidateCourses: AcademicCourseCandidate[];
+  evidence: string[];
+  rationale: string;
+  sources: CourseEvidenceSource[];
+}
+
+export type AcademicMappingResultProgramId = typeof AcademicMappingResultProgramId[keyof typeof AcademicMappingResultProgramId];
+
+
+export const AcademicMappingResultProgramId = {
+  'ms-analytics': 'ms-analytics',
+  'ms-computer-science': 'ms-computer-science',
+  'ms-industrial-engineering': 'ms-industrial-engineering',
+} as const;
+
+export interface AcademicMappingResult {
+  programId: AcademicMappingResultProgramId;
+  programName: string;
+  /** @nullable */
+  institutionName: string | null;
+  /** @nullable */
+  officialUniversityDomain: string | null;
+  /** True when a mapping or source-research step failed but partial results were returned. */
+  retryable: boolean;
+  courseEvidence: AcademicCourseEvidence[];
+  requirements: AcademicRequirementMapping[];
+}
+
 export interface ErrorResponse {
   error: string;
 }

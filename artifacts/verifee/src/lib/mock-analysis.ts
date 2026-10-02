@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import georgiaTechData from '@/data/georgia-tech-programs.json';
 
 export const uploadSchema = z.object({
   file: z.instanceof(File)
@@ -16,21 +15,6 @@ export type CredentialVerification = {
 export type Requirement = { id: string; targetName: string; courseCode: string; description: string; prerequisiteConcepts: string[]; courseDescription: string };
 export type MappingResult = 'Covered' | 'Partially covered' | 'Potential gap' | 'Insufficient evidence';
 export type Mapping = { requirementId: string; matchedCourses: string[]; result: MappingResult; rationale: string; evidence: string; confidence: 'High' | 'Medium' | 'Low' };
-export type StoredMappingResult = 'Covered' | 'Partially Covered' | 'Potential Gap' | 'Insufficient Evidence';
-export type ProgramRequirementMapping = {
-  requirementId: string;
-  requirementName: string;
-  category: string;
-  importance: string;
-  matchingConcepts: string[];
-  matchedCourses: string[];
-  result: StoredMappingResult;
-  rationale: string;
-  evidence: string;
-  confidence: 'High' | 'Medium' | 'Low';
-};
-export const georgiaTechDataset = georgiaTechData;
-
 export const requirements: Requirement[] = [
   { id: 'cs-1331', targetName: 'Introduction to Object-Oriented Programming', courseCode: 'CS 1331', description: 'Object-oriented programming, data abstraction, classes, inheritance, and testing.', prerequisiteConcepts: ['Programming fundamentals', 'Object-oriented design'], courseDescription: 'Introduction to object-oriented programming with Java. Topics include classes, inheritance, polymorphism, interfaces, exceptions, and testing.' },
   { id: 'cs-1332', targetName: 'Data Structures and Algorithms', courseCode: 'CS 1332', description: 'Implementation and analysis of fundamental data structures and algorithms.', prerequisiteConcepts: ['Data structures', 'Algorithm analysis', 'Recursion'], courseDescription: 'Covers data structures, including lists, stacks, queues, trees, heaps, hash tables and graphs, with algorithm analysis.' },
@@ -40,19 +24,19 @@ export const requirements: Requirement[] = [
 ];
 
 export const sampleCredential: Credential = {
-  institution: 'Universidad Nacional de Colombia',
-  country: 'Colombia',
+  institution: 'Verifee Demo University',
+  country: 'Not applicable (synthetic sample)',
   qualification: 'Bachelor of Science',
   major: 'Computer Science',
   graduationDate: 'June 2023',
 };
 
 export const sampleCourses: AcademicCourse[] = [
-  { code: 'CS-201', title: 'Object-Oriented Programming', grade: '4.3 / 5.0', credits: 4, unitsLabel: 'local credits' },
-  { code: 'CS-305', title: 'Data Structures', grade: '4.0 / 5.0', credits: 4, unitsLabel: 'local credits' },
-  { code: 'MAT-204', title: 'Integral Calculus', grade: '3.8 / 5.0', credits: 4, unitsLabel: 'local credits' },
-  { code: 'PHY-101', title: 'General Physics: Mechanics', grade: '3.6 / 5.0', credits: 3, unitsLabel: 'local credits' },
-  { code: 'HUM-110', title: 'Academic Writing', grade: '4.1 / 5.0', credits: 2, unitsLabel: 'local credits' },
+  { code: 'CS-201', title: 'Object-Oriented Programming', grade: '4.3 / 5.0', credits: 4, unitsLabel: 'local credits', description: 'Introduction to object-oriented programming with classes, inheritance, polymorphism, interfaces, exception handling, and testing.' },
+  { code: 'CS-305', title: 'Data Structures', grade: '4.0 / 5.0', credits: 4, unitsLabel: 'local credits', description: 'Covers arrays, linked lists, stacks, queues, trees, heaps, hash tables, graphs, recursion, and algorithm analysis.' },
+  { code: 'MAT-204', title: 'Integral Calculus', grade: '3.8 / 5.0', credits: 4, unitsLabel: 'local credits', description: 'Integral calculus of one variable, including integration techniques, applications, improper integrals, and sequences and series.' },
+  { code: 'PHY-101', title: 'General Physics: Mechanics', grade: '3.6 / 5.0', credits: 3, unitsLabel: 'local credits', description: 'Mechanics covering motion, forces, work and energy, momentum, and rotational motion.' },
+  { code: 'HUM-110', title: 'Academic Writing', grade: '4.1 / 5.0', credits: 2, unitsLabel: 'local credits', description: 'Critical reading, academic argument, research writing, and composing for varied audiences.' },
 ];
 
 export async function extractMockRecord() {
@@ -88,69 +72,4 @@ function containsConcept(text: string, concept: string) {
   const normalizedConcept = normalizeSearchText(concept);
   if (!normalizedText || !normalizedConcept) return false;
   return ` ${normalizedText} `.includes(` ${normalizedConcept} `);
-}
-
-export function mapStoredProgramRequirements(programId: string, courses: AcademicCourse[]): ProgramRequirementMapping[] {
-  const program = georgiaTechData.programs.find((item) => item.id === programId);
-  if (!program) throw new Error(`Unknown Georgia Tech target program: ${programId}`);
-
-  return program.requirements.map((requirement) => {
-    const concepts = requirement.matchingConcepts || [];
-    const matches = courses.map((course) => {
-      const availableText = [
-        course.code,
-        course.title,
-        course.description,
-        course.syllabusText,
-        ...(course.learningOutcomes || []),
-      ].filter(Boolean).join(' ');
-      const matchedConcepts = concepts.filter((concept) => containsConcept(availableText, concept));
-      const detailedText = [course.description, course.syllabusText, ...(course.learningOutcomes || [])].filter(Boolean).join(' ');
-      const detailedConcepts = concepts.filter((concept) => containsConcept(detailedText, concept));
-      return { course, matchedConcepts, detailedConcepts };
-    }).filter((entry) => entry.matchedConcepts.length > 0);
-
-    const matchedCourses = matches.map(({ course }) =>
-      `${course.code} · ${course.title} (${course.grade}; ${course.credits} ${course.unitsLabel})`,
-    );
-    const matchedConcepts = [...new Set(matches.flatMap((entry) => entry.matchedConcepts))];
-    const hasDetailedCoverage = matches.some((entry) => entry.detailedConcepts.length >= Math.min(2, concepts.length));
-
-    let result: StoredMappingResult;
-    let rationale: string;
-    let evidence: string;
-    let confidence: ProgramRequirementMapping['confidence'];
-
-    if (courses.length === 0) {
-      result = 'Insufficient Evidence';
-      rationale = 'No course entries are available to compare with this stored program requirement.';
-      evidence = 'The student record contains no course codes, titles, credits, grades, descriptions, or learning outcomes.';
-      confidence = 'Low';
-    } else if (matches.length === 0) {
-      result = 'Potential Gap';
-      rationale = 'No available student-record field matched the stored program concepts. This is a potential gap to review, not proof that the applicant lacks the preparation.';
-      evidence = `No course code, title, or available course detail matched these stored concepts: ${concepts.join(', ')}. Equivalent academic knowledge is not represented by a course-title match.`;
-      confidence = 'Low';
-    } else {
-      result = hasDetailedCoverage ? 'Covered' : 'Partially Covered';
-      rationale = hasDetailedCoverage
-        ? 'Available course descriptions or learning outcomes match multiple stored concepts. This remains a preliminary comparison, not an admissions decision.'
-        : 'One or more stored concepts match the listed coursework, but the available evidence does not establish the full scope of preparation.';
-      evidence = `Matched stored concepts: ${matchedConcepts.join(', ')}. Student-record evidence: ${matchedCourses.join('; ')}. ${hasDetailedCoverage ? 'Course descriptions or learning outcomes supplied the additional detail.' : 'Course descriptions, learning outcomes, and syllabi are not available to confirm full coverage.'}`;
-      confidence = hasDetailedCoverage ? 'High' : 'Medium';
-    }
-
-    return {
-      requirementId: requirement.id,
-      requirementName: requirement.name,
-      category: requirement.category,
-      importance: requirement.importance,
-      matchingConcepts: concepts,
-      matchedCourses,
-      result,
-      rationale,
-      evidence,
-      confidence,
-    };
-  });
 }

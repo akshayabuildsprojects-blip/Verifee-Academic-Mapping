@@ -13,6 +13,9 @@
       "path": "./lib/api-zod"
     },
     {
+      "path": "./lib/georgia-tech-programs"
+    },
+    {
       "path": "./lib/integrations-openai-ai-server"
     }
   ]

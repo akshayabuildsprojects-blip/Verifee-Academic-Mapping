@@ -1,1 +1,2 @@
 - [Transcript PDF fidelity](transcript-pdf-fidelity.md) — pair the PDF with embedded text when available to preserve fine characters such as A-.
+- [Academic mapping boundaries](academic-mapping-scope.md) — map only extracted records against stored Georgia Tech requirements and use official university course sources.

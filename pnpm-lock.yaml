@@ -177,6 +177,9 @@ importers:
       '@workspace/db':
         specifier: workspace:*
         version: link:../../lib/db
+      '@workspace/georgia-tech-programs':
+        specifier: workspace:*
+        version: link:../../lib/georgia-tech-programs
       '@workspace/integrations-openai-ai-server':
         specifier: workspace:*
         version: link:../../lib/integrations-openai-ai-server
@@ -526,6 +529,12 @@ importers:
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
+      '@workspace/api-zod':
+        specifier: workspace:*
+        version: link:../../lib/api-zod
+      '@workspace/georgia-tech-programs':
+        specifier: workspace:*
+        version: link:../../lib/georgia-tech-programs
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -641,6 +650,8 @@ importers:
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
+
+  lib/georgia-tech-programs: {}
 
   lib/integrations-openai-ai-server:
     dependencies:

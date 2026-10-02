@@ -46,3 +46,87 @@ export const ExtractAcademicTranscriptResponse = zod.object({
 })
 
 
+/**
+ * Uses only the extracted academic JSON and one of the stored Georgia Tech program definitions. No PDF bytes are accepted.
+ * @summary Compare an extracted academic record with a stored Georgia Tech program
+ */
+export const RunAcademicMappingBody = zod.object({
+  "programId": zod.enum(['ms-analytics', 'ms-computer-science', 'ms-industrial-engineering']),
+  "record": zod.object({
+  "institution": zod.object({
+  "name": zod.string().nullable(),
+  "country": zod.string().nullable()
+}),
+  "credential": zod.object({
+  "degree": zod.string().nullable(),
+  "program": zod.string().nullable(),
+  "fieldOfStudy": zod.string().nullable(),
+  "graduationDate": zod.string().nullable()
+}),
+  "academicRecord": zod.object({
+  "creditSystem": zod.string().nullable(),
+  "cumulativeGPA": zod.string().nullable(),
+  "courses": zod.array(zod.object({
+  "code": zod.string().nullable(),
+  "title": zod.string().nullable(),
+  "credits": zod.string().nullable(),
+  "grade": zod.string().nullable(),
+  "description": zod.string().nullable()
+}))
+})
+})
+})
+
+export const runAcademicMappingResponseCourseEvidenceItemCourseIndexMin = 0;
+
+export const runAcademicMappingResponseRequirementsItemCandidateCoursesItemCourseIndexMin = 0;
+
+
+
+export const RunAcademicMappingResponse = zod.object({
+  "programId": zod.enum(['ms-analytics', 'ms-computer-science', 'ms-industrial-engineering']),
+  "programName": zod.string(),
+  "institutionName": zod.string().nullable(),
+  "officialUniversityDomain": zod.string().nullable(),
+  "retryable": zod.boolean().describe('True when a mapping or source-research step failed but partial results were returned.'),
+  "courseEvidence": zod.array(zod.object({
+  "courseIndex": zod.number().int().min(runAcademicMappingResponseCourseEvidenceItemCourseIndexMin),
+  "code": zod.string().nullable(),
+  "title": zod.string().nullable(),
+  "transcriptDescription": zod.string().nullable(),
+  "researchStatus": zod.enum(['OFFICIAL_SOURCES_FOUND', 'TRANSCRIPT_DESCRIPTION_ONLY', 'NO_AUTHORITATIVE_SOURCE', 'DEMO_DESCRIPTION']),
+  "findings": zod.array(zod.string()),
+  "sources": zod.array(zod.object({
+  "title": zod.string().nullable(),
+  "url": zod.string().url()
+}))
+})),
+  "requirements": zod.array(zod.object({
+  "requirementId": zod.string(),
+  "requirementName": zod.string(),
+  "category": zod.string(),
+  "importance": zod.string(),
+  "matchingConcepts": zod.array(zod.string()),
+  "status": zod.enum(['COVERED', 'PARTIALLY_COVERED', 'INSUFFICIENT_EVIDENCE', 'POTENTIAL_GAP']),
+  "confidence": zod.enum(['HIGH', 'MEDIUM', 'LOW']),
+  "candidateCourses": zod.array(zod.object({
+  "courseIndex": zod.number().int().min(runAcademicMappingResponseRequirementsItemCandidateCoursesItemCourseIndexMin),
+  "code": zod.string().nullable(),
+  "title": zod.string().nullable(),
+  "relevance": zod.enum(['LIKELY_RELEVANT', 'POSSIBLY_RELEVANT']),
+  "evidence": zod.array(zod.string()),
+  "sources": zod.array(zod.object({
+  "title": zod.string().nullable(),
+  "url": zod.string().url()
+}))
+})),
+  "evidence": zod.array(zod.string()),
+  "rationale": zod.string(),
+  "sources": zod.array(zod.object({
+  "title": zod.string().nullable(),
+  "url": zod.string().url()
+}))
+}))
+})
+
+

@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: credential-extraction
     description: Academic transcript PDF interpretation
+  - name: academic-mapping
+    description: Preliminary course-to-requirement mapping
 paths:
   /healthz:
     get:
@@ -83,6 +85,49 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "503":
           description: The extraction provider is temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /academic-mappings/run:
+    post:
+      operationId: runAcademicMapping
+      tags: [academic-mapping]
+      summary: Compare an extracted academic record with a stored Georgia Tech program
+      description: Uses only the extracted academic JSON and one of the stored Georgia Tech program definitions. No PDF bytes are accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcademicMappingInput"
+      responses:
+        "200":
+          description: Structured preliminary mapping and course evidence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcademicMappingResult"
+        "400":
+          description: The mapping request is invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The academic mapping request is too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: The mapping request limit was reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: The mapping service is temporarily unavailable
           content:
             application/json:
               schema:
@@ -178,6 +223,190 @@ components:
         - credits
         - grade
         - description
+    AcademicMappingInput:
+      type: object
+      additionalProperties: false
+      properties:
+        programId:
+          type: string
+          enum:
+            - ms-analytics
+            - ms-computer-science
+            - ms-industrial-engineering
+        record:
+          $ref: "#/components/schemas/AcademicRecord"
+      required:
+        - programId
+        - record
+    CourseEvidenceSource:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: ["string", "null"]
+        url:
+          type: string
+          format: uri
+      required:
+        - title
+        - url
+    AcademicCourseEvidence:
+      type: object
+      additionalProperties: false
+      properties:
+        courseIndex:
+          type: integer
+          minimum: 0
+        code:
+          type: ["string", "null"]
+        title:
+          type: ["string", "null"]
+        transcriptDescription:
+          type: ["string", "null"]
+        researchStatus:
+          type: string
+          enum:
+            - OFFICIAL_SOURCES_FOUND
+            - TRANSCRIPT_DESCRIPTION_ONLY
+            - NO_AUTHORITATIVE_SOURCE
+            - DEMO_DESCRIPTION
+        findings:
+          type: array
+          items:
+            type: string
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseEvidenceSource"
+      required:
+        - courseIndex
+        - code
+        - title
+        - transcriptDescription
+        - researchStatus
+        - findings
+        - sources
+    AcademicCourseCandidate:
+      type: object
+      additionalProperties: false
+      properties:
+        courseIndex:
+          type: integer
+          minimum: 0
+        code:
+          type: ["string", "null"]
+        title:
+          type: ["string", "null"]
+        relevance:
+          type: string
+          enum:
+            - LIKELY_RELEVANT
+            - POSSIBLY_RELEVANT
+        evidence:
+          type: array
+          items:
+            type: string
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseEvidenceSource"
+      required:
+        - courseIndex
+        - code
+        - title
+        - relevance
+        - evidence
+        - sources
+    AcademicRequirementMapping:
+      type: object
+      additionalProperties: false
+      properties:
+        requirementId:
+          type: string
+        requirementName:
+          type: string
+        category:
+          type: string
+        importance:
+          type: string
+        matchingConcepts:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum:
+            - COVERED
+            - PARTIALLY_COVERED
+            - INSUFFICIENT_EVIDENCE
+            - POTENTIAL_GAP
+        confidence:
+          type: string
+          enum:
+            - HIGH
+            - MEDIUM
+            - LOW
+        candidateCourses:
+          type: array
+          items:
+            $ref: "#/components/schemas/AcademicCourseCandidate"
+        evidence:
+          type: array
+          items:
+            type: string
+        rationale:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: "#/components/schemas/CourseEvidenceSource"
+      required:
+        - requirementId
+        - requirementName
+        - category
+        - importance
+        - matchingConcepts
+        - status
+        - confidence
+        - candidateCourses
+        - evidence
+        - rationale
+        - sources
+    AcademicMappingResult:
+      type: object
+      additionalProperties: false
+      properties:
+        programId:
+          type: string
+          enum:
+            - ms-analytics
+            - ms-computer-science
+            - ms-industrial-engineering
+        programName:
+          type: string
+        institutionName:
+          type: ["string", "null"]
+        officialUniversityDomain:
+          type: ["string", "null"]
+        retryable:
+          type: boolean
+          description: True when a mapping or source-research step failed but partial results were returned.
+        courseEvidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/AcademicCourseEvidence"
+        requirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/AcademicRequirementMapping"
+      required:
+        - programId
+        - programName
+        - institutionName
+        - officialUniversityDomain
+        - retryable
+        - courseEvidence
+        - requirements
     ErrorResponse:
       type: object
       additionalProperties: false

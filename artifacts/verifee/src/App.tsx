@@ -1,13 +1,15 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter, Link } from 'wouter';
-import { AlertCircle, ArrowLeft, ArrowRight, ArrowDown, ArrowUpRight, BookOpen, Check, ChevronRight, FileText, GraduationCap, Landmark, LoaderCircle, RotateCcw, ScanText, ShieldAlert, Upload, X } from 'lucide-react';
-import { extractAcademicTranscript, type AcademicRecord } from '@workspace/api-client-react';
-import { checkVerification, extractMockRecord, georgiaTechDataset, mapStoredProgramRequirements, sampleCourses, sampleCredential, uploadSchema, type CredentialVerification, type ProgramRequirementMapping } from '@/lib/mock-analysis';
+import { AlertCircle, ArrowLeft, ArrowRight, ArrowDown, ArrowUpRight, BookOpen, Check, ChevronRight, ExternalLink, FileText, GraduationCap, Landmark, LoaderCircle, RotateCcw, ScanText, ShieldAlert, Upload, X } from 'lucide-react';
+import { extractAcademicTranscript, runAcademicMapping, type AcademicMappingInput, type AcademicMappingResult, type AcademicRecord } from '@workspace/api-client-react';
+import { ExtractAcademicTranscriptResponse, RunAcademicMappingResponse } from '@workspace/api-zod';
+import { georgiaTechDataset } from '@workspace/georgia-tech-programs';
+import { checkVerification, extractMockRecord, sampleCourses, sampleCredential, uploadSchema, type CredentialVerification } from '@/lib/mock-analysis';
 
 const queryClient = new QueryClient();
 const wizardSteps = ['Upload Credential', 'Verify & Review', 'Select Target', 'Academic Mapping'];
@@ -45,16 +47,51 @@ function isPdfFile(file: File) {
   return file.name.toLowerCase().endsWith('.pdf');
 }
 
-function readExtractedRecord(): AcademicRecord | null {
+function readAcademicRecord(): AcademicRecord | null {
   const serialized = sessionStorage.getItem('verifee-extracted-record');
   if (!serialized) return null;
   try {
-    const candidate = JSON.parse(serialized) as AcademicRecord;
-    if (!candidate?.institution || !candidate.credential || !Array.isArray(candidate.academicRecord?.courses)) return null;
-    return candidate;
+    const candidate: unknown = JSON.parse(serialized);
+    const parsed = ExtractAcademicTranscriptResponse.safeParse(candidate);
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
+}
+
+function readStoredMapping(programId: string): AcademicMappingResult | null {
+  const serialized = sessionStorage.getItem('verifee-mapping-result');
+  if (!serialized) return null;
+  try {
+    const candidate: unknown = JSON.parse(serialized);
+    const parsed = RunAcademicMappingResponse.safeParse(candidate);
+    return parsed.success && parsed.data.programId === programId ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function createSampleAcademicRecord(): AcademicRecord {
+  return {
+    institution: { name: sampleCredential.institution, country: sampleCredential.country },
+    credential: {
+      degree: sampleCredential.qualification,
+      program: null,
+      fieldOfStudy: sampleCredential.major,
+      graduationDate: sampleCredential.graduationDate,
+    },
+    academicRecord: {
+      creditSystem: "Local credits",
+      cumulativeGPA: null,
+      courses: sampleCourses.map((course) => ({
+        code: course.code,
+        title: course.title,
+        credits: `${course.credits} ${course.unitsLabel}`,
+        grade: course.grade,
+        description: course.description ?? null,
+      })),
+    },
+  };
 }
 
 function displayTranscriptValue(value: string | null | undefined) {
@@ -84,6 +121,8 @@ function UploadStep() {
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [, setLocation] = useLocation();
+  const savedFileName = sessionStorage.getItem('verifee-file-name');
+  const hasSavedAnalysis = sessionStorage.getItem('verifee-started') === 'yes' && Boolean(savedFileName);
   const chooseFile = (candidate?: File) => {
     setError('');
     if (!candidate) return;
@@ -100,6 +139,8 @@ function UploadStep() {
     sessionStorage.setItem('verifee-verification-explanation', verification.explanation);
     if (record) sessionStorage.setItem('verifee-extracted-record', JSON.stringify(record));
     else sessionStorage.removeItem('verifee-extracted-record');
+    sessionStorage.removeItem('verifee-mapping-result');
+    sessionStorage.removeItem('verifee-visible-course-count');
     sessionStorage.removeItem('verifee-target');
     sessionStorage.removeItem('verifee-program');
     sessionStorage.setItem('verifee-started', 'yes');
@@ -112,7 +153,7 @@ function UploadStep() {
     try {
       await extractMockRecord();
       const verification = await checkVerification();
-      saveReviewState('demo', verification);
+      saveReviewState('demo', verification, createSampleAcademicRecord());
     } catch {
       setError('We could not prepare the sample credential record. Please try again.');
     } finally {
@@ -133,7 +174,7 @@ function UploadStep() {
       } else {
         await extractMockRecord();
         const verification = await checkVerification();
-        saveReviewState('demo', verification);
+        saveReviewState('demo', verification, createSampleAcademicRecord());
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'We could not extract this transcript. Try again or use the demo sample.');
@@ -146,7 +187,7 @@ function UploadStep() {
     <section className="wizard-card">
       <div className="eyebrow">Step 1 of 4</div>
       <h1 className="wizard-title">Upload an academic credential</h1>
-      <p className="wizard-intro">Upload an English-language transcript PDF to extract its academic details for review. Other accepted formats continue through the sample-data demo path.</p>
+      <p className="wizard-intro">Upload an English-language transcript PDF to extract its academic details for review and preliminary mapping. Other accepted formats continue through the sample-data demo path.</p>
       <div className="format-grid" aria-label="Accepted credential formats">
         <div className="format-option"><span className="format-name">PDF</span><span>AI academic extraction for Step 2</span></div>
         <div className="format-option"><span className="format-name">OpenCerts <span className="format-ext">.opencert</span></span><span>Sample-data demo only; not verified</span></div>
@@ -157,11 +198,12 @@ function UploadStep() {
       </div>
       <input ref={inputRef} className="file-control" type="file" accept=".pdf,.opencert,.jsonld,application/pdf,application/ld+json" aria-label="Choose a credential file" data-testid="input-credential" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} />
       {file && <div className="file-chip" data-testid="text-selected-file"><div className="chip-file"><FileText size={17} color="#55766c" /><div><strong>{file.name}</strong><div className="file-meta">{(file.size / (1024 * 1024)).toFixed(2)} MB · {formatForFileName(file.name)}</div></div></div><button className="remove-file" aria-label="Remove selected file" data-testid="button-remove-file" onClick={() => { setFile(null); setError(''); if (inputRef.current) inputRef.current.value = ''; }}><X size={16} /></button></div>}
-      <p className="upload-note">PDF contents are sent to the configured AI service for academic interpretation and are not stored by Verifee. Reading a PDF does not verify that it is authentic. OpenCerts and JSON-LD are not verified in this version.</p>
-      <div className="demo-disclosure"><strong>Current scope:</strong> PDF extraction is available for Step 2. Course mapping still uses a built-in sample record. If PDF extraction fails, you can explicitly continue with the demo sample instead.</div>
+      <p className="upload-note">PDF contents are sent to the configured AI service for academic extraction. The extracted record is kept in this browser session; mapping sends only that academic JSON, not the PDF. Reading a PDF does not verify that it is authentic. OpenCerts and JSON-LD are not verified in this version.</p>
+      <div className="demo-disclosure"><strong>Current scope:</strong> PDF extraction and preliminary mapping use the academic details extracted from your transcript. If extraction fails, you can explicitly continue with the synthetic demo sample instead.</div>
       {error && <div className="error-message" role="alert" data-testid="status-upload-error">{error}</div>}
       <button className="cta" type="button" onClick={() => void submit()} disabled={!file || busy} data-testid="button-continue-upload"><span>{busy ? file && isPdfFile(file) ? 'Reading transcript…' : 'Preparing sample record…' : 'Continue to verify & review'}</span>{busy ? <LoaderCircle size={16} className="animate-spin" /> : <ArrowRight size={16} />}</button>
       {file && isPdfFile(file) && error && <button className="secondary-btn" type="button" onClick={() => void continueWithDemo()} disabled={busy} data-testid="button-use-demo-fallback">Continue with demo sample instead</button>}
+      {hasSavedAnalysis && !file && <button className="secondary-btn resume-analysis" type="button" onClick={() => setLocation('/analysis')} data-testid="button-resume-analysis"><ArrowRight size={14} /> Continue saved analysis · {savedFileName}</button>}
     </section>
     <Disclaimer />
   </main></div>;
@@ -244,39 +286,36 @@ function Review() {
   const [, setLocation] = useLocation();
   const fileName = sessionStorage.getItem('verifee-file-name');
   const isExtracted = sessionStorage.getItem('verifee-analysis-mode') === 'extracted';
-  const extractedRecord = isExtracted ? readExtractedRecord() : null;
+  const academicRecord = useMemo(() => readAcademicRecord(), []);
+  const extractedRecord = isExtracted ? academicRecord : null;
+  const reviewRecord = academicRecord || createSampleAcademicRecord();
+  const [visibleCourseCount, setVisibleCourseCount] = useState(() => {
+    const saved = Number(sessionStorage.getItem('verifee-visible-course-count'));
+    return Number.isInteger(saved) && saved >= 10 ? saved : 10;
+  });
   useEffect(() => { if (!fileName || sessionStorage.getItem('verifee-started') !== 'yes') setLocation('/start'); }, [fileName, setLocation]);
   useEffect(() => { if (isExtracted && !extractedRecord) setLocation('/start'); }, [isExtracted, extractedRecord, setLocation]);
   const format = sessionStorage.getItem('verifee-file-format') || 'PDF transcript';
   const verificationStatus = (sessionStorage.getItem('verifee-verification-status') || 'Verification unavailable') as CredentialVerification['status'];
   const verificationExplanation = sessionStorage.getItem('verifee-verification-explanation') || 'No independent verification source is connected in this demonstration.';
-  const credentialFields: [string, string][] = isExtracted && extractedRecord ? [
-    ['Institution', displayTranscriptValue(extractedRecord.institution.name)],
-    ['Country', displayTranscriptValue(extractedRecord.institution.country)],
-    ['Degree / qualification', displayTranscriptValue(extractedRecord.credential.degree)],
-    ['Program', displayTranscriptValue(extractedRecord.credential.program)],
-    ['Field of study', displayTranscriptValue(extractedRecord.credential.fieldOfStudy)],
-    ['Graduation date', displayTranscriptValue(extractedRecord.credential.graduationDate)],
-    ['Credit / unit system', displayTranscriptValue(extractedRecord.academicRecord.creditSystem)],
-    ['Cumulative GPA', displayTranscriptValue(extractedRecord.academicRecord.cumulativeGPA)],
-  ] : [
-    ['Institution', sampleCredential.institution],
-    ['Country', sampleCredential.country],
-    ['Degree / qualification', sampleCredential.qualification],
-    ['Program', 'Not present in sample'],
-    ['Field of study', sampleCredential.major],
-    ['Graduation date', sampleCredential.graduationDate],
-    ['Credit / unit system', 'Not present in sample'],
-    ['Cumulative GPA', 'Not present in sample'],
+  const credentialFields: [string, string][] = [
+    ['Institution', displayTranscriptValue(reviewRecord.institution.name)],
+    ['Country', displayTranscriptValue(reviewRecord.institution.country)],
+    ['Degree / qualification', displayTranscriptValue(reviewRecord.credential.degree)],
+    ['Program', displayTranscriptValue(reviewRecord.credential.program)],
+    ['Field of study', displayTranscriptValue(reviewRecord.credential.fieldOfStudy)],
+    ['Graduation date', displayTranscriptValue(reviewRecord.credential.graduationDate)],
+    ['Credit / unit system', displayTranscriptValue(reviewRecord.academicRecord.creditSystem)],
+    ['Cumulative GPA', displayTranscriptValue(reviewRecord.academicRecord.cumulativeGPA)],
   ];
-  const courseRows = isExtracted && extractedRecord ? extractedRecord.academicRecord.courses : sampleCourses.map((course) => ({
-    code: course.code,
-    title: course.title,
-    credits: `${course.credits} ${course.unitsLabel}`,
-    grade: course.grade,
-    description: null,
-  }));
-  const courseCount = isExtracted && extractedRecord ? extractedRecord.academicRecord.courses.length : sampleCourses.length;
+  const courseRows = reviewRecord.academicRecord.courses;
+  const courseCount = courseRows.length;
+  const visibleCourseRows = courseRows.slice(0, visibleCourseCount);
+  const showMoreCourses = () => {
+    const nextCount = Math.min(visibleCourseCount + 10, courseCount);
+    setVisibleCourseCount(nextCount);
+    sessionStorage.setItem('verifee-visible-course-count', String(nextCount));
+  };
   return <div className="shell"><Header /><main className="page-wrap wizard-wrap">
     <Stepper current={2} />
     <section className="wizard-card">
@@ -305,7 +344,7 @@ function Review() {
       <section className="review-section" aria-labelledby="courses-heading">
         <div className="section-title"><h2 id="courses-heading">Courses detected</h2><span className="small-label">{courseCount} {isExtracted ? 'extracted' : 'in sample record'}</span></div>
         {courseRows.length > 0
-          ? <div style={{overflowX:'auto'}}><table className="course-table"><thead><tr><th>Code</th><th>Course title</th><th>Credits / units</th><th>Grade</th><th>Description / outcomes</th></tr></thead><tbody>{courseRows.map((course, index) => <tr key={`${course.code || 'course'}-${index}`}><td className="course-code">{course.code || '—'}</td><td>{course.title || (isExtracted ? 'Not shown in transcript' : '—')}</td><td>{course.credits || '—'}</td><td>{course.grade || '—'}</td><td>{course.description || '—'}</td></tr>)}</tbody></table></div>
+          ? <><div style={{overflowX:'auto'}}><table className="course-table"><thead><tr><th>Code</th><th>Course title</th><th>Credits / units</th><th>Grade</th><th>Description / outcomes</th></tr></thead><tbody>{visibleCourseRows.map((course, index) => <tr key={`${course.code || 'course'}-${index}`}><td className="course-code">{course.code || '—'}</td><td>{course.title || (isExtracted ? 'Not shown in transcript' : '—')}</td><td>{course.credits || '—'}</td><td>{course.grade || '—'}</td><td>{course.description || '—'}</td></tr>)}</tbody></table></div><div className="course-pagination"><span>Showing {Math.min(visibleCourseCount, courseCount)} of {courseCount} courses</span>{visibleCourseCount < courseCount && <button className="secondary-btn" type="button" onClick={showMoreCourses} data-testid="button-show-more-courses">Show next 10 courses</button>}</div></>
           : <p className="form-note">No course rows were readable in this transcript. Review the other extracted fields before proceeding.</p>}
       </section>
       <div className="wizard-actions"><button className="secondary-btn" type="button" onClick={() => setLocation('/start')}><ArrowLeft size={14} /> Back to upload</button><button className="cta wizard-next" type="button" onClick={() => setLocation('/target')} data-testid="button-continue-target"><span>Continue to target selection</span><ArrowRight size={16} /></button></div>
@@ -325,6 +364,10 @@ function TargetSelection() {
   const changeProgram = (value: string) => {
     setProgramId(value);
     sessionStorage.setItem('verifee-program', value);
+    if (sessionStorage.getItem('verifee-mapping-result')) {
+      const saved = readStoredMapping(value);
+      if (!saved) sessionStorage.removeItem('verifee-mapping-result');
+    }
   };
   const continueToMapping = () => {
     sessionStorage.setItem('verifee-program', program.id);
@@ -335,7 +378,7 @@ function TargetSelection() {
     <section className="wizard-card target-card">
       <div className="eyebrow">Step 3 of 4</div>
       <h1 className="wizard-title">Choose what you want to compare against</h1>
-        <p className="wizard-intro">{isExtracted ? 'Choose a target for the mapping demonstration. The extracted PDF courses are not mapped in this version.' : 'Verifee compares evidence from the uploaded academic record against the selected target requirements.'}</p>
+        <p className="wizard-intro">{isExtracted ? 'Choose the Georgia Tech program to compare with the complete extracted academic record. The mapping request uses the extracted JSON, not the PDF file.' : 'Choose the Georgia Tech program to compare with the synthetic sample academic record.'}</p>
       <div className="target-form">
         <div className="target-field"><span className="field-label">Institution</span><div className="institution-value"><span className="institution-mark">GT</span><span>{georgiaTechDataset.institution.name}</span></div></div>
         <div className="target-field"><label className="field-label" htmlFor="target-program">Target program</label><select id="target-program" className="target-select" value={program.id} onChange={(event) => changeProgram(event.target.value)} data-testid="select-program">{georgiaTechDataset.programs.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></div>
@@ -356,76 +399,248 @@ function TargetSelection() {
           </article>;
         })}</div>
       </section>
-        <p className="form-note">Program requirement type and importance are preserved from the stored Georgia Tech data; not every criterion is a mandatory admissions prerequisite. {isExtracted ? 'This demo mapping uses built-in sample courses, not the courses extracted from the uploaded PDF.' : 'This demo compares the sample academic record shown in Verify &amp; Review, not the uploaded file.'}</p>
+        <p className="form-note">Program requirements, importance, and matching concepts come only from the stored Georgia Tech definition; not every criterion is a mandatory admissions prerequisite. The mapping will use all course rows in the reviewed academic record.</p>
       <div className="wizard-actions"><button className="secondary-btn" type="button" onClick={() => setLocation('/analysis')}><ArrowLeft size={14} /> Back to review</button><button className="cta wizard-next" type="button" onClick={continueToMapping} data-testid="button-generate-mapping"><span>Generate preliminary mapping</span><ArrowRight size={16} /></button></div>
     </section>
     <Disclaimer />
   </main></div>;
 }
-function Status({ result }: { result: ProgramRequirementMapping['result'] }) {
-  const cls = result === 'Covered' ? 'good' : result === 'Potential Gap' ? 'gap' : 'review';
-  return <span className={`status-pill ${cls}`} data-testid={`status-mapping-${result.toLowerCase().replaceAll(' ', '-')}`}>{result}</span>;
+const mappingStatusLabels: Record<AcademicMappingResult['requirements'][number]['status'], string> = {
+  COVERED: 'Covered',
+  PARTIALLY_COVERED: 'Partially covered',
+  INSUFFICIENT_EVIDENCE: 'Insufficient evidence',
+  POTENTIAL_GAP: 'Potential gap',
+};
+
+function Status({ status }: { status: AcademicMappingResult['requirements'][number]['status'] }) {
+  const cls = status === 'COVERED' ? 'good' : status === 'POTENTIAL_GAP' ? 'gap' : 'review';
+  return <span className={`status-pill ${cls}`} data-testid={`status-mapping-${status.toLowerCase().replaceAll('_', '-')}`}>{mappingStatusLabels[status]}</span>;
 }
+
+function sourceHost(url: string) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+function SourceLinks({ sources }: { sources: AcademicMappingResult['courseEvidence'][number]['sources'] }) {
+  if (sources.length === 0) return null;
+  return <ul className="mapping-sources">{sources.map((source) => <li key={source.url}>
+    <a href={source.url} target="_blank" rel="noreferrer" data-testid="link-official-course-source">
+      <ExternalLink size={12} /> {source.title || sourceHost(source.url)}
+    </a>
+  </li>)}</ul>;
+}
+
 function Report() {
   const [, setLocation] = useLocation();
-  const [filter, setFilter] = useState('All requirements');
+  const [filter, setFilter] = useState('ALL');
   const [expanded, setExpanded] = useState(true);
   const fileName = sessionStorage.getItem('verifee-file-name') || 'Selected credential';
   const isExtracted = sessionStorage.getItem('verifee-analysis-mode') === 'extracted';
+  const started = sessionStorage.getItem('verifee-started') === 'yes';
+  const academicRecord = useMemo(
+    () => readAcademicRecord() ?? (isExtracted ? null : createSampleAcademicRecord()),
+    [isExtracted],
+  );
   const verificationStatus = (sessionStorage.getItem('verifee-verification-status') || 'Verification unavailable') as CredentialVerification['status'];
   const verificationExplanation = sessionStorage.getItem('verifee-verification-explanation') || 'No independent verification source is connected in this demonstration.';
   const savedProgramId = sessionStorage.getItem('verifee-program');
   const program = georgiaTechDataset.programs.find((item) => item.id === savedProgramId) || georgiaTechDataset.programs[0];
-  const mapping = mapStoredProgramRequirements(program.id, sampleCourses);
-  const visible = filter === 'All requirements' ? mapping : mapping.filter((item) => item.result === filter);
-  useEffect(() => { if (sessionStorage.getItem('verifee-started') !== 'yes') setLocation('/start'); }, [setLocation]);
+  const [mapping, setMapping] = useState<AcademicMappingResult | null>(() => readStoredMapping(program.id));
+  const [loading, setLoading] = useState(() => !readStoredMapping(program.id));
+  const [mappingError, setMappingError] = useState('');
+  const currentMapping = mapping?.programId === program.id ? mapping : null;
+  const courseEvidenceByIndex = new Map((currentMapping?.courseEvidence ?? []).map((item) => [item.courseIndex, item]));
+
+  useEffect(() => {
+    if (!started || !sessionStorage.getItem('verifee-file-name') || !academicRecord) setLocation('/start');
+  }, [academicRecord, started, setLocation]);
+
+  const requestMapping = async (cancelled: () => boolean = () => false) => {
+    if (!academicRecord) return;
+    setLoading(true);
+    setMappingError('');
+    try {
+      const request: AcademicMappingInput = {
+        programId: program.id as AcademicMappingInput['programId'],
+        record: academicRecord,
+      };
+      const result = await runAcademicMapping(request);
+      const parsed = RunAcademicMappingResponse.safeParse(result);
+      if (!parsed.success || parsed.data.programId !== program.id) {
+        throw new Error('The mapping response did not match the selected program.');
+      }
+      if (cancelled()) return;
+      sessionStorage.setItem('verifee-mapping-result', JSON.stringify(parsed.data));
+      setMapping(parsed.data);
+    } catch {
+      if (!cancelled()) {
+        setMappingError('The preliminary mapping could not be completed. Your academic record is still saved in this browser session; retry without uploading the PDF again.');
+      }
+    } finally {
+      if (!cancelled()) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!started || !academicRecord) return;
+    let cancelled = false;
+    const cached = readStoredMapping(program.id);
+    if (cached) {
+      setMapping(cached);
+      setMappingError('');
+      setLoading(false);
+    } else {
+      setMapping(null);
+      void requestMapping(() => cancelled);
+    }
+    return () => { cancelled = true; };
+  }, [academicRecord, program.id, started]);
+
+  const retryMapping = () => {
+    sessionStorage.removeItem('verifee-mapping-result');
+    void requestMapping();
+  };
+
   const reset = () => {
-    ['verifee-file-name', 'verifee-file-format', 'verifee-target', 'verifee-program', 'verifee-started', 'verifee-verification-status', 'verifee-verification-explanation', 'verifee-analysis-mode', 'verifee-extracted-record'].forEach((key) => sessionStorage.removeItem(key));
+    [
+      'verifee-file-name',
+      'verifee-file-format',
+      'verifee-target',
+      'verifee-program',
+      'verifee-started',
+      'verifee-verification-status',
+      'verifee-verification-explanation',
+      'verifee-analysis-mode',
+      'verifee-extracted-record',
+      'verifee-mapping-result',
+      'verifee-visible-course-count',
+    ].forEach((key) => sessionStorage.removeItem(key));
     setLocation('/start');
   };
-  const covered = mapping.filter((item) => item.result === 'Covered').length;
-  const reviewCount = mapping.length - covered;
+
+  const requirements = currentMapping?.requirements ?? [];
+  const visibleRequirements = requirements.filter((item) => filter === 'ALL' || item.status === filter);
+  const counts = {
+    covered: requirements.filter((item) => item.status === 'COVERED').length,
+    partial: requirements.filter((item) => item.status === 'PARTIALLY_COVERED').length,
+    potentialGap: requirements.filter((item) => item.status === 'POTENTIAL_GAP').length,
+    insufficient: requirements.filter((item) => item.status === 'INSUFFICIENT_EVIDENCE').length,
+  };
+  const demoRecord = academicRecord?.institution.name?.trim().toLowerCase() === 'verifee demo university';
+  const sourceSummary = demoRecord
+    ? 'The synthetic demo record uses embedded course descriptions; web research is skipped for this institution.'
+    : currentMapping?.courseEvidence.length === 0
+      ? 'No courses were shortlisted, so course-source research was not started.'
+    : currentMapping?.officialUniversityDomain
+      ? `Course research was restricted to university-controlled pages on ${currentMapping.officialUniversityDomain}.`
+      : 'An official issuing-institution domain could not be confirmed. Available transcript descriptions are used without third-party course sources.';
+
+  const statusFilters = [
+    { value: 'ALL', label: 'All requirements' },
+    { value: 'COVERED', label: 'Covered' },
+    { value: 'PARTIALLY_COVERED', label: 'Partially covered' },
+    { value: 'POTENTIAL_GAP', label: 'Potential gap' },
+    { value: 'INSUFFICIENT_EVIDENCE', label: 'Insufficient evidence' },
+  ];
+
   return <div className="shell"><Header /><main className="page-wrap report-page">
     <Stepper current={4} />
-     <div className="report-top"><div><div className="eyebrow">Step 4 of 4 · Preliminary report</div><h1 className="report-title">Academic mapping</h1><p className="report-lede">{isExtracted ? `This mapping demonstration uses built-in sample courses against stored ${program.shortName} background criteria; it does not map the uploaded PDF.` : `A transparent first look at the sample academic record against stored ${program.shortName} background criteria.`}</p></div><div className="report-actions"><button className="secondary-btn" type="button" onClick={() => setLocation('/target')}><ArrowLeft size={14} /> Change target</button><button className="secondary-btn" type="button" onClick={reset} data-testid="button-new-analysis"><RotateCcw size={14} /> New analysis</button></div></div>
-    <section className="report-verification" data-testid="card-verification"><div className="report-verification-top"><p className="verify-heading"><ShieldAlert size={16} color="#8a764d" /> Overall credential verification</p><span className="status-pill" data-testid="status-verification">{verificationStatus}</span></div><p className="verify-copy">{verificationExplanation} Verification is separate from academic interpretation and course mapping.</p></section>
-     <div className="preliminary" data-testid="notice-preliminary"><AlertCircle size={16} /><span>{isExtracted
-       ? <><strong>Preliminary mapping demo using sample data.</strong> “{fileName}” was interpreted for Step 2, but the extracted courses are not used below. This report does not assess the uploaded transcript.</>
-       : <><strong>Preliminary, mock-data report.</strong> The selected file “{fileName}” was not parsed or saved. This report uses the sample record below and does not represent an analysis of the uploaded file.</>}</span></div>
+    <div className="report-top">
+      <div>
+        <div className="eyebrow">Step 4 of 4 · Preliminary report</div>
+        <h1 className="report-title">Academic mapping</h1>
+        <p className="report-lede">Course-by-course evidence compared with the stored {program.shortName} background requirements.</p>
+      </div>
+      <div className="report-actions">
+        <button className="secondary-btn" type="button" onClick={() => setLocation('/target')}><ArrowLeft size={14} /> Change target</button>
+        <button className="secondary-btn" type="button" onClick={reset} data-testid="button-new-analysis"><RotateCcw size={14} /> New analysis</button>
+      </div>
+    </div>
+    <section className="report-verification" data-testid="card-verification">
+      <div className="report-verification-top"><p className="verify-heading"><ShieldAlert size={16} color="#8a764d" /> Overall credential verification</p><span className="status-pill" data-testid="status-verification">{verificationStatus}</span></div>
+      <p className="verify-copy">{verificationExplanation} Verification is separate from academic interpretation and course mapping.</p>
+    </section>
+    <div className="preliminary" data-testid="notice-preliminary"><AlertCircle size={16} /><span>
+      <strong>{isExtracted ? 'Preliminary mapping of extracted academic details.' : 'Preliminary mapping of the synthetic demo record.'}</strong>{' '}
+      {isExtracted
+        ? `“${fileName}” was used only for extraction. This mapping request contains the extracted academic JSON, not the PDF.`
+        : `“${fileName}” was not parsed; this mapping uses only the separately labeled synthetic sample record.`}
+    </span></div>
     <div className="report-grid">
       <div className="report-main">
         <section className="panel section-card">
-           <div className="section-title"><h2>{isExtracted ? 'Sample record used for mapping' : 'Credential interpretation'}</h2><span className="small-label">Sample record</span></div>
-          <div className="credential-grid">{Object.entries(sampleCredential).map(([key, value]) => <div key={key}><span className="data-label">{({institution:'Institution',country:'Country',qualification:'Qualification',major:'Field of study',graduationDate:'Graduation date'} as Record<string,string>)[key]}</span><span className="data-value" data-testid={`text-credential-${key}`}>{value}</span></div>)}</div>
+          <div className="section-title"><h2>{isExtracted ? 'Extracted academic record' : 'Synthetic sample record'}</h2><span className="small-label">{academicRecord?.academicRecord.courses.length ?? 0} courses</span></div>
+          {academicRecord && <div className="credential-grid">
+            <div><span className="data-label">Institution</span><span className="data-value">{displayTranscriptValue(academicRecord.institution.name)}</span></div>
+            <div><span className="data-label">Country</span><span className="data-value">{displayTranscriptValue(academicRecord.institution.country)}</span></div>
+            <div><span className="data-label">Qualification</span><span className="data-value">{displayTranscriptValue(academicRecord.credential.degree)}</span></div>
+            <div><span className="data-label">Program</span><span className="data-value">{displayTranscriptValue(academicRecord.credential.program)}</span></div>
+            <div><span className="data-label">Field of study</span><span className="data-value">{displayTranscriptValue(academicRecord.credential.fieldOfStudy)}</span></div>
+            <div><span className="data-label">Graduation date</span><span className="data-value">{displayTranscriptValue(academicRecord.credential.graduationDate)}</span></div>
+          </div>}
         </section>
-        <section className="panel section-card">
-           <div className="section-title"><h2>{isExtracted ? 'Sample courses used for mapping' : 'Normalized courses'}</h2><span className="small-label">As shown in sample</span></div>
-          <div style={{overflowX:'auto'}}><table className="course-table"><thead><tr><th>Course</th><th>Title</th><th>Grade</th><th>Credits</th></tr></thead><tbody>{sampleCourses.map((course) => <tr key={course.code} data-testid={`row-course-${course.code}`}><td className="course-code">{course.code}</td><td>{course.title}</td><td>{course.grade}</td><td>{course.credits} {course.unitsLabel}</td></tr>)}</tbody></table></div>
-          <p className="form-note">Grades and credit values are presented as reported in the sample record. No conversion to Georgia Tech credits or grading scale has been made.</p>
-        </section>
-        <section className="panel section-card">
-          <div className="section-title"><div><h2>Program requirement mapping</h2><div className="form-note" style={{marginTop:5}}>The comparison uses only the selected program’s stored requirements.</div></div><button className="remove-file" onClick={() => setExpanded((value) => !value)} aria-label={expanded ? 'Collapse program mappings' : 'Expand program mappings'} data-testid="button-toggle-mappings"><ChevronRight size={18} style={{transform:expanded?'rotate(90deg)':'none',transition:'transform .2s'}} /></button></div>
+
+        <section className="panel section-card" aria-live="polite">
+          <div className="section-title">
+            <div><h2>Program requirement mapping</h2><p className="form-note mapping-section-note">The selected program’s stored requirements are compared with extracted courses and available evidence.</p></div>
+            <button className="remove-file" type="button" onClick={() => setExpanded((value) => !value)} aria-label={expanded ? 'Collapse program mappings' : 'Expand program mappings'} data-testid="button-toggle-mappings"><ChevronRight size={18} style={{ transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }} /></button>
+          </div>
           {expanded && <>
-            <p className="source-claim">Target criteria sourced from Georgia Tech program materials.</p>
-            <details className="source-details"><summary>Source details</summary><p>{program.source.title}</p><span>Last checked: {program.source.lastChecked}</span></details>
-            <div className="mapping-filter">{['All requirements','Covered','Partially Covered','Potential Gap','Insufficient Evidence'].map((value) => <button key={value} type="button" onClick={() => setFilter(value)} className="secondary-btn" style={{padding:'7px 10px',fontSize:10,background:filter===value?'#eaf1ed':'#fff',borderColor:filter===value?'#a9c1b6':undefined}} data-testid={`filter-${value.toLowerCase().replaceAll(' ','-')}`}>{value}</button>)}</div>
-            <div className="mapping-list">{visible.map((match) => <article className="mapping-row" key={match.requirementId} data-testid={`mapping-${match.requirementId}`}>
-              <div className="mapping-head"><div><p className="mapping-course">{match.requirementName}</p><p className="mapping-desc">{match.category.replaceAll('_', ' ')} · {formatImportance(match.importance)}</p></div><Status result={match.result} /></div>
-              <p className="mapping-desc mapping-match-courses"><strong>Matched student course(s):</strong> {match.matchedCourses.join(', ') || 'No clearly corresponding course identified'}</p>
-              <p className="mapping-desc mapping-rationale"><strong>Rationale:</strong> {match.rationale}</p>
-              <div className="mapping-evidence"><strong>Evidence &amp; limits</strong> — {match.evidence}<br /><span><strong>Stored matching concepts:</strong> {match.matchingConcepts.join(', ')}</span></div>
-              <span className="confidence">Confidence: {match.confidence} · Preliminary</span>
-            </article>)}{visible.length === 0 && <p className="form-note">No requirements have this result.</p>}</div>
+            <details className="source-details"><summary>Stored program source</summary><p>{program.source.title}</p><span>Last checked: {program.source.lastChecked}</span></details>
+            {loading && <div className="mapping-loading" role="status" data-testid="status-mapping-loading"><LoaderCircle size={18} className="animate-spin" /><div><strong>Mapping academic evidence…</strong><p>Shortlisting courses, checking official course sources where available, and comparing each stored requirement.</p></div></div>}
+            {mappingError && <div className="mapping-error" role="alert" data-testid="status-mapping-error"><div><strong>Mapping did not finish</strong><p>{mappingError}</p></div><button className="secondary-btn" type="button" onClick={retryMapping} disabled={loading} data-testid="button-retry-mapping"><RotateCcw size={14} /> Retry mapping</button></div>}
+            {currentMapping && <>
+              <p className="source-claim">{sourceSummary}</p>
+              {currentMapping.retryable && !mappingError && <div className="mapping-error mapping-partial-error" role="status" data-testid="status-partial-mapping">
+                <div><strong>Some mapping steps were incomplete</strong><p>Results for other requirements are still shown. Retry using the saved academic record; no re-upload is needed.</p></div>
+                <button className="secondary-btn" type="button" onClick={retryMapping} disabled={loading} data-testid="button-retry-partial-mapping"><RotateCcw size={14} /> Retry mapping</button>
+              </div>}
+              <div className="mapping-filter" role="group" aria-label="Filter requirement results">{statusFilters.map((item) => <button key={item.value} type="button" onClick={() => setFilter(item.value)} className="secondary-btn" style={{ padding: '7px 10px', fontSize: 10, background: filter === item.value ? '#eaf1ed' : '#fff', borderColor: filter === item.value ? '#a9c1b6' : undefined }} data-testid={`filter-${item.label.toLowerCase().replaceAll(' ', '-')}`}>{item.label}</button>)}</div>
+              <div className="mapping-list">{visibleRequirements.map((match) => <article className="mapping-row" key={match.requirementId} data-testid={`mapping-${match.requirementId}`}>
+                <div className="mapping-head"><div><p className="mapping-course">{match.requirementName}</p><p className="mapping-desc">{match.category.replaceAll('_', ' ')} · {formatImportance(match.importance)}</p></div><Status status={match.status} /></div>
+                <p className="mapping-desc mapping-rationale"><strong>Rationale:</strong> {match.rationale}</p>
+                {match.candidateCourses.length > 0
+                  ? <div className="candidate-course-list"><strong className="candidate-list-heading">Shortlisted student courses</strong>{match.candidateCourses.map((candidate) => {
+                    const evidence = courseEvidenceByIndex.get(candidate.courseIndex);
+                    return <div className="candidate-course" key={`${match.requirementId}-${candidate.courseIndex}`}>
+                      <div className="candidate-course-head"><strong>{candidate.code || 'Course code not shown'}{candidate.title ? ` · ${candidate.title}` : ''}</strong><span className={`relevance-pill ${candidate.relevance === 'LIKELY_RELEVANT' ? 'likely' : 'possible'}`}>{candidate.relevance === 'LIKELY_RELEVANT' ? 'Likely relevant' : 'Possibly relevant'}</span></div>
+                      {evidence?.transcriptDescription && <p><strong>Transcript description:</strong> {evidence.transcriptDescription}</p>}
+                      {candidate.evidence.length > 0 && <ul>{candidate.evidence.map((item, index) => <li key={`${candidate.courseIndex}-fact-${index}`}>{item}</li>)}</ul>}
+                      {!evidence?.transcriptDescription && candidate.evidence.length === 0 && <p>No detailed course description or official course findings were available.</p>}
+                      {evidence && <span className="research-status">{evidence.researchStatus.replaceAll('_', ' ').toLowerCase()}</span>}
+                      <SourceLinks sources={candidate.sources} />
+                    </div>;
+                  })}</div>
+                  : <p className="mapping-desc mapping-match-courses">No course was shortlisted for this stored requirement.</p>}
+                {match.evidence.length > 0 && <div className="mapping-evidence"><strong>Evidence &amp; limits</strong><ul>{match.evidence.map((item, index) => <li key={`${match.requirementId}-evidence-${index}`}>{item}</li>)}</ul></div>}
+                <div className="stored-concepts"><strong>Stored matching concepts:</strong> {match.matchingConcepts.join(', ')}</div>
+                <span className="confidence">Confidence: {match.confidence.toLowerCase()} · Preliminary only</span>
+              </article>)}{visibleRequirements.length === 0 && <p className="form-note">No requirements have this result.</p>}</div>
+            </>}
           </>}
         </section>
       </div>
       <aside className="report-side">
-        <section className="panel section-card"><p className="report-aside-title">Mapping overview</p><div className="summary-number">{mapping.length}</div><div className="summary-caption">Stored {program.shortName} criteria reviewed</div><div className="summary-split"><div><strong>{covered}</strong><span>Covered</span></div><div><strong>{reviewCount}</strong><span>Needs review</span></div></div></section>
+        <section className="panel section-card">
+          <p className="report-aside-title">Mapping overview</p>
+          <div className="summary-number">{requirements.length}</div>
+          <div className="summary-caption">Stored {program.shortName} criteria reviewed</div>
+          {currentMapping && <div className="result-counts">
+            <div><strong>{counts.covered}</strong><span>Covered</span></div>
+            <div><strong>{counts.partial}</strong><span>Partial</span></div>
+            <div><strong>{counts.potentialGap}</strong><span>Potential gaps</span></div>
+            <div><strong>{counts.insufficient}</strong><span>Insufficient evidence</span></div>
+          </div>}
+        </section>
         <section className="panel section-card"><p className="report-aside-title">Selected target program</p><p className="mapping-course">{program.name}</p><span className="data-label">{program.school}</span><p className="form-note"><strong>Requirement type:</strong> {formatRequirementType(program.requirementType)}</p><p className="form-note">{program.description}</p></section>
-        <section className="panel section-card"><p className="report-aside-title">Items requiring review</p><ul className="review-list"><li><span className="review-dot" />Obtain course descriptions, syllabi, or learning outcomes for topic-level comparison.</li><li><span className="review-dot" />Confirm grading scale, credit units, and instructional hours with the issuing institution.</li><li><span className="review-dot" />Verify the credential independently; no verification was performed here.</li><li><span className="review-dot" />Program background requirements are not admissions or transfer-credit decisions.</li></ul></section>
+        <section className="panel section-card"><p className="report-aside-title">Items requiring review</p><ul className="review-list"><li><span className="review-dot" />Confirm detailed course coverage with official catalog pages, syllabi, or learning outcomes.</li><li><span className="review-dot" />Confirm grading scale, credit units, and instructional hours with the issuing institution.</li><li><span className="review-dot" />Verify the credential independently; no verification was performed here.</li><li><span className="review-dot" />These preliminary mappings are not admissions, approval, equivalency, or transfer-credit decisions.</li></ul></section>
       </aside>
     </div>
-    <div className="report-disclaimer">Verifee provides preliminary academic interpretation and mapping. It is not an official admissions, credential-equivalency, or transfer-credit determination.</div>
+    <div className="report-disclaimer">Verifee provides preliminary academic interpretation and mapping. It is not an official admissions decision, credential equivalency, or transfer-credit determination.</div>
   </main></div>;
 }
 function RoutedErrorBoundary({ children }: { children: ReactNode }) {

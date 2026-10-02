@@ -7,10 +7,22 @@
  */
 
 export * from './academicCourse';
+export * from './academicCourseCandidate';
+export * from './academicCourseCandidateRelevance';
+export * from './academicCourseEvidence';
+export * from './academicCourseEvidenceResearchStatus';
 export * from './academicCredential';
 export * from './academicInstitution';
+export * from './academicMappingInput';
+export * from './academicMappingInputProgramId';
+export * from './academicMappingResult';
+export * from './academicMappingResultProgramId';
 export * from './academicRecord';
 export * from './academicRecordDetails';
+export * from './academicRequirementMapping';
+export * from './academicRequirementMappingConfidence';
+export * from './academicRequirementMappingStatus';
 export * from './academicTranscriptPdf';
+export * from './courseEvidenceSource';
 export * from './errorResponse';
 export * from './healthStatus';
