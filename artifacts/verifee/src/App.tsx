@@ -124,6 +124,7 @@ function Landing() {
           <a href="#how-it-works" data-testid="link-how-it-works">How it works</a>
           <Link href="/start" className="nav-cta" data-testid="link-try-verifee-nav">Try Verifee <ArrowUpRight size={14} /></Link>
         </nav>
+        <span className="demo-badge landing-demo-badge">Demo mode</span>
       </div>
     </header>
     <main>
