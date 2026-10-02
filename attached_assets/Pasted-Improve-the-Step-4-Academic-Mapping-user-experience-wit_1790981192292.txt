@@ -1,0 +1,201 @@
+Improve the Step 4 Academic Mapping user experience without changing the existing mapping logic, evidence retrieval, AI reasoning, or result schema.
+
+The mapping itself is working correctly. This task is only to improve progress visibility and how results are displayed.
+
+--------------------------------------------------
+1. SHOW LIVE MAPPING PROGRESS
+--------------------------------------------------
+
+While academic mapping is running, show how many target requirements have completed.
+
+Example for a program with 4 requirements:
+
+Mapping academic requirements...
+
+2 of 4 requirements mapped
+Still in progress
+
+Display:
+- current completed count
+- total requirement count
+- existing progress/loading indicator
+
+Update the count immediately whenever one requirement finishes.
+
+Examples:
+
+0 of 4 requirements mapped
+1 of 4 requirements mapped
+2 of 4 requirements mapped
+3 of 4 requirements mapped
+4 of 4 requirements mapped
+
+When all requirements finish, change the loading state to:
+
+Academic mapping complete
+
+Do not use fake timed progress.
+
+The count must reflect actual completed mapping results.
+
+--------------------------------------------------
+2. PRESERVE PROGRESSIVE RESULTS
+--------------------------------------------------
+
+The application currently displays mapping results progressively as they complete.
+
+Preserve this behavior.
+
+Do NOT wait for all requirements to finish before showing results.
+
+As each requirement finishes:
+
+- update the completed count
+- immediately add that requirement's result to the results area
+- continue processing the remaining requirements
+
+Example:
+
+2 of 4 requirements mapped
+Still in progress
+
+[Completed result 1]
+[Completed result 2]
+
+Remaining requirements continue processing.
+
+--------------------------------------------------
+3. MAKE EACH REQUIREMENT AN EXPANDABLE CARD
+--------------------------------------------------
+
+Display each completed target requirement as an expandable/collapsible card or accordion.
+
+The collapsed header should immediately show:
+
+- requirement name
+- final status
+- confidence
+
+Example:
+
+Basic Linear Algebra                 COVERED     HIGH
+Probability / Statistics            PARTIALLY COVERED     MEDIUM
+Programming                         COVERED     HIGH
+Calculus                            INSUFFICIENT EVIDENCE     LOW
+
+The user should be able to click anywhere on the card header to expand it.
+
+--------------------------------------------------
+4. EXPANDED CARD CONTENT
+--------------------------------------------------
+
+When expanded, show:
+
+Relevant prior coursework
+
+Evidence found
+
+Reasoning
+
+Confidence explanation
+
+Official source links, if any were used
+
+Example:
+
+Basic Linear Algebra
+COVERED · HIGH CONFIDENCE
+
+Relevant prior coursework
+MH1811 — Mathematics 2
+
+Evidence
+- Matrices
+- Vector spaces
+- Eigenvalues
+- Linear systems
+
+Reasoning
+The official course information provides strong evidence that the student's prior coursework covers the core concepts expected for basic linear algebra.
+
+Source
+Nanyang Technological University
+[Official course source]
+
+--------------------------------------------------
+5. DEFAULT EXPANSION BEHAVIOR
+--------------------------------------------------
+
+As results arrive progressively:
+
+- automatically expand the newest completed result
+- previously completed results may collapse when the next one arrives
+
+After all mapping is complete:
+
+- leave the first result expanded
+- keep the remaining results collapsed by default
+
+The user can freely open and close any card.
+
+Avoid having all cards expanded at once because this makes long reports difficult to scan.
+
+--------------------------------------------------
+6. STATUS VISIBILITY
+--------------------------------------------------
+
+Keep the existing four mapping statuses:
+
+COVERED
+PARTIALLY_COVERED
+INSUFFICIENT_EVIDENCE
+POTENTIAL_GAP
+
+Use restrained visual badges consistent with the existing Verifee design.
+
+Do not change the wording or meaning of these statuses.
+
+--------------------------------------------------
+7. COMPLETION SUMMARY
+--------------------------------------------------
+
+Once all requirements have finished mapping, retain the existing summary counts near the top.
+
+Example:
+
+4 requirements analyzed
+
+2 Covered
+1 Partially Covered
+1 Insufficient Evidence
+0 Potential Gaps
+
+The expandable cards should appear underneath this summary.
+
+--------------------------------------------------
+8. PRESERVE EVERYTHING ELSE
+--------------------------------------------------
+
+Do not change:
+
+- PDF extraction
+- extracted academic JSON
+- Georgia Tech requirement JSON
+- course shortlisting
+- university course research
+- mapping reasoning
+- evidence retrieval
+- confidence calculations
+- source URLs
+- stepper navigation
+- current session state
+
+This is a Step 4 presentation/progress improvement only.
+
+Test with a target program containing multiple requirements and confirm:
+
+1. the progress count reflects actual completed requirements;
+2. results appear progressively;
+3. each result is expandable/collapsible;
+4. evidence and reasoning remain accessible;
+5. all existing mapping data is preserved.
