@@ -1,0 +1,498 @@
+Now implement the remaining academic-mapping flow using the academic JSON already extracted from the uploaded PDF.
+
+Do not change the existing PDF extraction logic or schema.
+
+The current architecture is:
+
+Step 1: Upload Credential
+→ Step 2: Verify & Review extracted academic JSON
+→ Step 3: Select Target from Georgia Tech program JSON
+→ Step 4: Academic Mapping
+
+This task should add state persistence, improve the Step 2 course display, and implement the real Step 4 mapping logic.
+
+--------------------------------------------------
+1. PRESERVE ANALYSIS STATE ACROSS THE STEPPER
+--------------------------------------------------
+
+Once a credential has been uploaded and successfully extracted, preserve the extracted academic JSON while the user moves between:
+
+Step 2
+Step 3
+Step 4
+
+Going backward or forward in the stepper must NOT:
+- rerun PDF extraction
+- replace the extracted record with demo data
+- clear the selected target
+- lose the uploaded credential state
+
+The current analysis should remain active until the user explicitly:
+
+- clicks Cancel / Start Over
+- uploads a different credential
+- starts a new analysis
+
+If the user explicitly starts over, then clear:
+- uploaded file state
+- extracted academic JSON
+- selected target program
+- mapping results
+- retrieved course evidence
+
+Do not persist the uploaded PDF permanently.
+
+--------------------------------------------------
+2. STEP 2 COURSE LIST — SHOW 10 AT A TIME
+--------------------------------------------------
+
+The extracted course list can be long.
+
+On Step 2:
+
+- initially display the first 10 extracted courses
+- if more than 10 exist, show a button:
+
+  Load 10 more
+
+- each click should display the next 10 courses
+- continue until all extracted courses are visible
+- when all are visible, hide the Load 10 more button
+
+Also show:
+
+15 courses extracted
+
+or the appropriate total count.
+
+Do not truncate or delete courses from the underlying academic JSON.
+
+This is only a display/pagination change.
+
+Keep the extracted record read-only.
+
+--------------------------------------------------
+3. STEP 3 — TARGET SELECTION
+--------------------------------------------------
+
+Continue using the existing Georgia Tech target-program JSON.
+
+The user selects one target program, such as:
+
+- MS Analytics
+- MS Computer Science
+- MS Industrial Engineering
+
+Preserve that selection when moving backward and forward through the stepper.
+
+Do not allow the AI to invent Georgia Tech requirements.
+
+The stored JSON remains the authoritative target definition.
+
+--------------------------------------------------
+4. STEP 4 — MAPPING PIPELINE
+--------------------------------------------------
+
+Step 4 should use:
+
+A. the student's extracted academic JSON
++
+B. the selected Georgia Tech program requirements
+
+The mapping must happen in stages.
+
+Do NOT simply send the entire transcript to the model and ask whether the applicant matches the program.
+
+--------------------------------------------------
+STAGE A — SHORTLIST RELEVANT COURSES
+--------------------------------------------------
+
+For EACH Georgia Tech requirement:
+
+Review the extracted student courses and classify them internally as:
+
+LIKELY_RELEVANT
+POSSIBLY_RELEVANT
+NOT_RELEVANT
+
+Examples:
+
+Target:
+Basic Linear Algebra
+
+Transcript:
+MH1810 Mathematics 1
+MH1811 Mathematics 2
+PH1011 Physics
+AB1201 Financial Management
+
+Possible shortlist:
+
+MH1810 Mathematics 1 → POSSIBLY_RELEVANT
+MH1811 Mathematics 2 → LIKELY_RELEVANT
+PH1011 Physics → NOT_RELEVANT
+AB1201 Financial Management → NOT_RELEVANT
+
+Only LIKELY_RELEVANT and POSSIBLY_RELEVANT courses continue to deeper investigation.
+
+Do not perform deeper research on NOT_RELEVANT courses.
+
+This shortlist should use:
+- course code
+- course title
+- any description already present in the extracted record
+- the target requirement concepts stored in the GT JSON
+
+--------------------------------------------------
+STAGE B — RESEARCH SHORTLISTED COURSES
+--------------------------------------------------
+
+For a REAL university:
+
+When additional evidence is needed, search for the specific shortlisted course at the specific issuing university.
+
+Search using:
+
+institution name
++
+course code
++
+course title
+
+For example:
+
+Nanyang Technological University
+MH1811
+Mathematics 2
+
+The goal is to determine what that specific course actually teaches.
+
+Use ONLY authoritative university-controlled sources, in this priority order:
+
+1. official university course catalog
+2. official university school/department page
+3. official course syllabus
+4. official archived university catalog
+
+Do NOT use:
+
+- Reddit
+- Quizlet
+- CourseHero
+- Studocu
+- Wikipedia as course evidence
+- third-party course aggregators
+- generic AI-generated summaries
+
+Prefer the issuing university's own domain.
+
+Store the official source URL used as evidence.
+
+If authoritative information cannot be found, do not invent course content.
+
+--------------------------------------------------
+DEMO UNIVERSITY EXCEPTION
+--------------------------------------------------
+
+If the institution is:
+
+Verifee Demo University
+
+do NOT search the web.
+
+Use the course descriptions embedded in the synthetic demo credential/data and reason from those directly.
+
+--------------------------------------------------
+STAGE C — FINAL ACADEMIC REASONING
+--------------------------------------------------
+
+After obtaining evidence for the shortlisted courses, compare that evidence against the Georgia Tech requirement.
+
+Return exactly ONE of these statuses for each target requirement:
+
+COVERED
+
+Meaning:
+Strong evidence indicates that prior coursework addresses the important concepts of the target requirement.
+
+PARTIALLY_COVERED
+
+Meaning:
+Relevant preparation exists, but only part of the target requirement is clearly demonstrated.
+
+INSUFFICIENT_EVIDENCE
+
+Meaning:
+A potentially relevant course exists, but available authoritative information is not detailed enough to determine whether it satisfies the requirement.
+
+POTENTIAL_GAP
+
+Meaning:
+No meaningful evidence was identified in the student's academic record for the requirement.
+
+Do NOT use:
+- Validated
+- Approved
+- Accepted
+- Equivalent
+
+because Verifee is not making an official admissions or transfer-credit determination.
+
+--------------------------------------------------
+5. CONFIDENCE
+--------------------------------------------------
+
+For each result return:
+
+HIGH
+MEDIUM
+LOW
+
+Confidence should reflect the quality of the supporting academic evidence.
+
+Examples:
+
+HIGH:
+official course description directly lists the relevant concepts
+
+MEDIUM:
+course is clearly relevant but only some content is documented
+
+LOW:
+course may be relevant but available evidence is limited
+
+Confidence must not merely represent how confident the AI feels.
+
+--------------------------------------------------
+6. STEP 4 OUTPUT
+--------------------------------------------------
+
+For every Georgia Tech requirement, display a clear result card.
+
+Example:
+
+Basic Linear Algebra
+
+Status:
+COVERED
+
+Confidence:
+HIGH
+
+Relevant prior coursework:
+MH1811 — Mathematics 2
+
+Evidence:
+- matrices
+- vector spaces
+- eigenvalues
+- linear systems
+
+Reasoning:
+The official course information indicates that Mathematics 2 covers the principal concepts expected for basic linear algebra preparation.
+
+Source:
+Nanyang Technological University
+[official source link]
+
+--------------------------------------------------
+7. OUTPUT STRUCTURE
+--------------------------------------------------
+
+Use structured output similar to:
+
+{
+  "targetProgram": "MS Analytics",
+  "mappings": [
+    {
+      "requirementId": "msa-linear-algebra",
+      "requirementName": "Basic Linear Algebra",
+      "status": "COVERED",
+      "confidence": "HIGH",
+      "candidateCourses": [
+        {
+          "code": "MH1811",
+          "title": "Mathematics 2",
+          "relevance": "LIKELY_RELEVANT"
+        }
+      ],
+      "evidence": [
+        "Matrices",
+        "Vector spaces",
+        "Eigenvalues"
+      ],
+      "rationale": "The official course description provides strong evidence of basic linear algebra preparation.",
+      "sources": [
+        {
+          "institution": "Nanyang Technological University",
+          "url": "OFFICIAL_SOURCE_URL"
+        }
+      ]
+    }
+  ]
+}
+
+Validate this structured output before rendering Step 4.
+
+--------------------------------------------------
+8. IMPORTANT REASONING RULES
+--------------------------------------------------
+
+Do not assume course equivalence from course titles alone when the title is ambiguous.
+
+Example:
+
+"Mathematics 2"
+
+must not automatically become:
+
+"Linear Algebra covered"
+
+without deeper evidence.
+
+However, a highly explicit course title such as:
+
+"Probability and Statistics"
+
+may itself provide useful evidence, while official course information can still be used when deeper interpretation is needed.
+
+Never invent:
+- syllabi
+- course topics
+- learning outcomes
+- university requirements
+- credits
+- grades
+
+If evidence is inadequate, use:
+
+INSUFFICIENT_EVIDENCE
+
+--------------------------------------------------
+9. EFFICIENCY
+--------------------------------------------------
+
+Do not research every transcript course.
+
+The required sequence is:
+
+Extracted transcript JSON
+→ shortlist likely/possible courses
+→ research only shortlisted courses
+→ compare evidence against target
+→ produce final mapping
+
+Reuse retrieved course evidence when the same student course is relevant to multiple requirements.
+
+Do not repeat the same web search unnecessarily.
+
+Do not resend the original PDF to the AI during Step 4.
+
+Step 4 should operate from the already extracted academic JSON.
+
+--------------------------------------------------
+10. STEP 4 UI
+--------------------------------------------------
+
+Use the existing Verifee visual style.
+
+At the top show:
+
+Preliminary Academic Mapping
+
+Target:
+[Selected Georgia Tech program]
+
+Then summarize:
+
+Covered: X
+Partially Covered: X
+Potential Gaps: X
+Insufficient Evidence: X
+
+Below, display one expandable result card per target requirement.
+
+Each card should show:
+
+- requirement
+- status
+- confidence
+- student courses considered
+- evidence
+- rationale
+- official source links where available
+
+Use visually distinct but restrained status badges.
+
+At the bottom preserve the disclaimer:
+
+"Verifee provides preliminary academic interpretation and mapping. It is not an official admissions decision, credential-equivalency determination, or transfer-credit decision."
+
+--------------------------------------------------
+11. FAILURE STATES
+--------------------------------------------------
+
+If course research cannot find an authoritative source:
+
+Do not fail the entire mapping.
+
+Return:
+
+INSUFFICIENT_EVIDENCE
+
+for that requirement where appropriate.
+
+If one requirement fails to analyze, other requirements should still complete.
+
+If the mapping service itself fails, show:
+
+"We couldn't complete the academic mapping. Your extracted credential has been preserved, so you can try again without re-uploading the document."
+
+--------------------------------------------------
+12. DO NOT IMPLEMENT YET
+--------------------------------------------------
+
+Do not add:
+
+- OpenCerts verification
+- EDC verification
+- transfer-credit equivalency
+- employer credential verification
+- additional universities
+- additional GT programs
+
+Those will come later.
+
+For this task, complete the PDF → GT preliminary academic-mapping path.
+
+--------------------------------------------------
+13. TEST
+--------------------------------------------------
+
+Test using the existing privately uploaded NTU Electrical & Electronic Engineering transcript.
+
+For MS Analytics, the shortlisting stage should reasonably consider courses such as:
+
+- IE1005 — From Computational Thinking to Programming
+- MH1810 — Mathematics 1
+- MH1811 — Mathematics 2
+- IE0005 — Introduction to Data Science & Artificial Intelligence
+
+Do NOT hard-code these mappings.
+
+They are only expected test candidates.
+
+The system itself must determine relevance from the extracted record and then seek authoritative NTU course information where needed.
+
+Confirm the complete flow works:
+
+upload PDF
+→ extracted record
+→ review
+→ select GT program
+→ shortlist courses
+→ retrieve evidence
+→ academic mapping
+→ Step 4 results
+
+without reprocessing or losing the uploaded credential when moving through the stepper.
