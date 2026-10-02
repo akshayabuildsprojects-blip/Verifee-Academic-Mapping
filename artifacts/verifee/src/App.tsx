@@ -549,9 +549,7 @@ function Report() {
   const [mappingError, setMappingError] = useState('');
   const [progressRequirements, setProgressRequirements] = useState<RequirementMapping[]>([]);
   const [progressCourseEvidence, setProgressCourseEvidence] = useState<CourseEvidence[]>([]);
-  const [expandedRequirementId, setExpandedRequirementId] = useState<string | null>(
-    () => readStoredMapping(program.id)?.requirements[0]?.requirementId ?? null,
-  );
+  const [expandedRequirementId, setExpandedRequirementId] = useState<string | null>(null);
   const currentMapping = mapping?.programId === program.id ? mapping : null;
 
   useEffect(() => {
@@ -572,11 +570,9 @@ function Report() {
       };
       const result = await runAcademicMappingWithProgress(request, (snapshot) => {
         if (cancelled()) return;
-        const newestRequirement = snapshot.requirements[snapshot.requirements.length - 1];
         flushSync(() => {
           setProgressRequirements(snapshot.requirements);
           setProgressCourseEvidence(snapshot.courseEvidence);
-          if (newestRequirement) setExpandedRequirementId(newestRequirement.requirementId);
         });
       });
       const parsed = RunAcademicMappingResponse.safeParse(result);
@@ -586,7 +582,6 @@ function Report() {
       if (cancelled()) return;
       sessionStorage.setItem('verifee-mapping-result', JSON.stringify(parsed.data));
       setMapping(parsed.data);
-      setExpandedRequirementId(parsed.data.requirements[0]?.requirementId ?? null);
     } catch {
       if (!cancelled()) {
         setMappingError('The preliminary mapping could not be completed. Your academic record is still saved in this browser session; retry without uploading the PDF again.');
@@ -605,7 +600,7 @@ function Report() {
       setMappingError('');
       setProgressRequirements([]);
       setProgressCourseEvidence([]);
-      setExpandedRequirementId(cached.requirements[0]?.requirementId ?? null);
+      setExpandedRequirementId(null);
       setLoading(false);
     } else {
       setMapping(null);
@@ -669,6 +664,9 @@ function Report() {
   ];
   const allRequirementsCompleted = program.requirements.length > 0 && requirements.length === program.requirements.length;
   const showMappingProgress = loading || Boolean(currentMapping) || Boolean(mappingError);
+  const progressPercent = program.requirements.length > 0
+    ? Math.min(100, Math.round((requirements.length / program.requirements.length) * 100))
+    : 0;
 
   return <div className="shell"><Header /><main className="page-wrap report-page">
     <Stepper current={4} />
@@ -730,6 +728,21 @@ function Report() {
                   <strong>{requirements.length} of {program.requirements.length} requirements mapped</strong>
                   <span>{mappingError ? 'Mapping stopped' : allRequirementsCompleted ? 'All requirements completed' : 'Still in progress'}</span>
                 </div>
+                <div className="mapping-progress-meter">
+                  <div
+                    className="mapping-progress-bar"
+                    role="progressbar"
+                    aria-label="Requirements mapped"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={progressPercent}
+                    aria-valuetext={`${requirements.length} of ${program.requirements.length} requirements mapped, ${progressPercent}%`}
+                    data-testid="mapping-progress-bar"
+                  >
+                    <span className="mapping-progress-fill" style={{ width: `${progressPercent}%` }} />
+                  </div>
+                  <span className="mapping-progress-percent">{progressPercent}%</span>
+                </div>
                 <p>{mappingError
                   ? 'Your academic record is saved. Retry without uploading the PDF again.'
                   : allRequirementsCompleted
@@ -766,9 +779,9 @@ function Report() {
           <div className="summary-caption">{showPartialMapping ? `of ${program.requirements.length} requirements mapped` : `Stored ${program.shortName} criteria reviewed`}</div>
           {currentMapping && !showPartialMapping && <div className="result-counts">
             <div><strong>{counts.covered}</strong><span>Covered</span></div>
-            <div><strong>{counts.partial}</strong><span>Partial</span></div>
-            <div><strong>{counts.potentialGap}</strong><span>Potential gaps</span></div>
-            <div><strong>{counts.insufficient}</strong><span>Insufficient evidence</span></div>
+             <div><strong>{counts.partial}</strong><span>Partially Covered</span></div>
+             <div><strong>{counts.potentialGap}</strong><span>Potential Gaps</span></div>
+             <div><strong>{counts.insufficient}</strong><span>Insufficient Evidence</span></div>
           </div>}
         </section>
         <section className="panel section-card"><p className="report-aside-title">Selected target program</p><p className="mapping-course">{program.name}</p><span className="data-label">{program.school}</span><p className="form-note"><strong>Requirement type:</strong> {formatRequirementType(program.requirementType)}</p><p className="form-note">{program.description}</p></section>

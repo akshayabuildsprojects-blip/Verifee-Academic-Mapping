@@ -1,0 +1,212 @@
+Improve the Step 4 Academic Mapping progress and result-card behavior.
+
+Do NOT change the existing mapping logic, AI reasoning, course research, evidence retrieval, or result schema.
+
+This task is only about progress feedback and result presentation.
+
+--------------------------------------------------
+1. ALL RESULT CARDS SHOULD START COLLAPSED
+--------------------------------------------------
+
+Currently the first completed requirement card is expanded while the remaining cards are collapsed.
+
+Change this behavior.
+
+When mapping results are displayed:
+
+- ALL requirement cards must be collapsed by default
+- do not automatically expand the first card
+- do not automatically expand the newest completed card
+- the user should manually click a requirement to expand it
+
+The collapsed header should continue to show:
+
+- requirement name
+- status
+- confidence
+
+Example:
+
+Basic Linear Algebra       COVERED              HIGH
+Probability / Statistics  PARTIALLY COVERED    MEDIUM
+Programming                COVERED              HIGH
+
+The user can click any card to view:
+- relevant coursework
+- evidence
+- reasoning
+- confidence explanation
+- source links
+
+--------------------------------------------------
+2. FIX / CLARIFY THE REQUIREMENTS-MAPPED COUNTER
+--------------------------------------------------
+
+The progress count should represent ACTUAL completed mapping results.
+
+Use a single source of truth:
+
+completed = completedMappings.length
+total = targetRequirements.length
+
+Display:
+
+`${completed} of ${total} requirements mapped`
+
+Do not use fake timers or artificial increments.
+
+IMPORTANT:
+
+If requirements are actually processed individually and returned progressively, the UI should update naturally:
+
+0/4
+→ 1/4
+→ 2/4
+→ 3/4
+→ 4/4
+
+However, if the backend currently completes or returns multiple requirements at the same time, it is acceptable for the counter to jump:
+
+0/4
+→ 4/4
+
+Do NOT artificially slow down or stagger completed results just to create visible increments.
+
+Inspect the current mapping implementation and determine whether:
+
+A. requirements genuinely complete one at a time; or
+B. the backend returns the mappings as one batch.
+
+If A:
+update completedMappings immediately as each requirement completes.
+
+If B:
+do not pretend that granular progress exists.
+
+--------------------------------------------------
+3. ADD A REAL PROGRESS BAR
+--------------------------------------------------
+
+Add a progress bar to the Step 4 loading state.
+
+The progress bar must reflect real application state.
+
+CASE A — GRANULAR RESULTS ARE AVAILABLE
+
+If individual requirement results complete progressively:
+
+progress percentage =
+completedMappings.length / targetRequirements.length * 100
+
+Example:
+
+2 of 4 requirements mapped
+
+[██████████----------] 50%
+
+The bar should advance whenever another mapping result actually completes.
+
+CASE B — RESULTS ARE RETURNED AS A BATCH
+
+If the backend does not expose per-requirement completion events:
+
+show an INDETERMINATE progress bar while mapping is running.
+
+Text:
+
+Mapping academic requirements...
+Still in progress
+
+Do NOT display fake percentages.
+
+When the batch finishes:
+
+4 of 4 requirements mapped
+Academic mapping complete
+
+and set the bar to 100%.
+
+--------------------------------------------------
+4. OPTIONAL REAL PIPELINE STATUS
+--------------------------------------------------
+
+If the application already has real distinct processing stages, show the current stage above the progress bar.
+
+Examples:
+
+Extracting academic evidence
+Researching shortlisted courses
+Comparing against target requirements
+Preparing results
+
+Only change these labels when the underlying process actually reaches that stage.
+
+Do not simulate stage progression using timers.
+
+--------------------------------------------------
+5. RESULT DISPLAY WHILE PROCESSING
+--------------------------------------------------
+
+Preserve progressive results if the backend genuinely returns them progressively.
+
+As each result completes:
+
+- update completedMappings
+- update the progress bar
+- add its collapsed requirement card to the results list
+
+Do not auto-expand it.
+
+If results are returned only after the full batch completes, show them all together once mapping finishes.
+
+--------------------------------------------------
+6. COMPLETION STATE
+--------------------------------------------------
+
+When mapping finishes, show:
+
+Academic mapping complete
+
+X of X requirements mapped
+
+Progress bar: 100%
+
+Then show the summary:
+
+Covered: X
+Partially Covered: X
+Potential Gaps: X
+Insufficient Evidence: X
+
+Underneath, show ALL requirement cards collapsed.
+
+--------------------------------------------------
+7. PRESERVE EVERYTHING ELSE
+--------------------------------------------------
+
+Do not change:
+
+- PDF extraction
+- credential state
+- target selection
+- Georgia Tech JSON
+- course shortlisting
+- official university research
+- AI mapping logic
+- evidence
+- reasoning
+- confidence
+- source links
+- current mapping statuses
+- stepper state
+
+Test with a program containing at least four requirements.
+
+Confirm:
+
+1. all result cards are collapsed by default;
+2. the progress count reflects actual completed results;
+3. no fake increments are generated;
+4. the progress bar is determinate only when real granular completion data exists;
+5. otherwise the progress bar is indeterminate until completion;
+6. mapping results and evidence remain unchanged.
