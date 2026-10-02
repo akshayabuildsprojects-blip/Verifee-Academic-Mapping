@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -571,10 +572,12 @@ function Report() {
       };
       const result = await runAcademicMappingWithProgress(request, (snapshot) => {
         if (cancelled()) return;
-        setProgressRequirements(snapshot.requirements);
-        setProgressCourseEvidence(snapshot.courseEvidence);
         const newestRequirement = snapshot.requirements[snapshot.requirements.length - 1];
-        if (newestRequirement) setExpandedRequirementId(newestRequirement.requirementId);
+        flushSync(() => {
+          setProgressRequirements(snapshot.requirements);
+          setProgressCourseEvidence(snapshot.courseEvidence);
+          if (newestRequirement) setExpandedRequirementId(newestRequirement.requirementId);
+        });
       });
       const parsed = RunAcademicMappingResponse.safeParse(result);
       if (!parsed.success || parsed.data.programId !== program.id) {
@@ -583,8 +586,6 @@ function Report() {
       if (cancelled()) return;
       sessionStorage.setItem('verifee-mapping-result', JSON.stringify(parsed.data));
       setMapping(parsed.data);
-      setProgressRequirements([]);
-      setProgressCourseEvidence([]);
       setExpandedRequirementId(parsed.data.requirements[0]?.requirementId ?? null);
     } catch {
       if (!cancelled()) {
@@ -666,7 +667,8 @@ function Report() {
     { value: 'POTENTIAL_GAP', label: 'Potential gap' },
     { value: 'INSUFFICIENT_EVIDENCE', label: 'Insufficient evidence' },
   ];
-  const allRequirementsCompleted = program.requirements.length > 0 && progressRequirements.length === program.requirements.length;
+  const allRequirementsCompleted = program.requirements.length > 0 && requirements.length === program.requirements.length;
+  const showMappingProgress = loading || Boolean(currentMapping) || Boolean(mappingError);
 
   return <div className="shell"><Header /><main className="page-wrap report-page">
     <Stepper current={4} />
@@ -712,15 +714,27 @@ function Report() {
           </div>
           {expanded && <>
             <details className="source-details"><summary>Stored program source</summary><p>{program.source.title}</p><span>Last checked: {program.source.lastChecked}</span></details>
-            {loading && <div className="mapping-loading" role="status" data-testid="status-mapping-loading">
-              {allRequirementsCompleted ? <Check size={18} /> : <LoaderCircle size={18} className="animate-spin" />}
+            {showMappingProgress && <div
+              className="mapping-loading"
+              role="status"
+              data-testid={loading ? 'status-mapping-loading' : allRequirementsCompleted && !mappingError ? 'status-mapping-complete' : 'status-mapping-progress'}
+            >
+              {mappingError
+                ? <AlertCircle size={18} />
+                : allRequirementsCompleted
+                  ? <Check size={18} />
+                  : <LoaderCircle size={18} className="animate-spin" />}
               <div>
-                <strong>{allRequirementsCompleted ? 'Academic mapping complete' : 'Mapping academic requirements…'}</strong>
-                <div className="mapping-progress-count">
-                  <strong>{progressRequirements.length} of {program.requirements.length} requirements mapped</strong>
-                  <span>{allRequirementsCompleted ? 'All requirements completed' : 'Still in progress'}</span>
+                <strong>{mappingError ? 'Mapping did not finish' : allRequirementsCompleted ? 'Academic mapping complete' : 'Mapping academic requirements…'}</strong>
+                <div className="mapping-progress-count" data-testid="mapping-progress-count">
+                  <strong>{requirements.length} of {program.requirements.length} requirements mapped</strong>
+                  <span>{mappingError ? 'Mapping stopped' : allRequirementsCompleted ? 'All requirements completed' : 'Still in progress'}</span>
                 </div>
-                <p>Shortlisting courses, checking official course sources where available, and comparing each stored requirement.</p>
+                <p>{mappingError
+                  ? 'Your academic record is saved. Retry without uploading the PDF again.'
+                  : allRequirementsCompleted
+                    ? 'All stored requirements have been compared. Review the result cards below.'
+                    : 'Shortlisting courses, checking official course sources where available, and comparing each stored requirement.'}</p>
               </div>
             </div>}
             {mappingError && <div className="mapping-error" role="alert" data-testid="status-mapping-error"><div><strong>Mapping did not finish</strong><p>{mappingError}</p></div><button className="secondary-btn" type="button" onClick={retryMapping} disabled={loading} data-testid="button-retry-mapping"><RotateCcw size={14} /> Retry mapping</button></div>}
@@ -732,7 +746,7 @@ function Report() {
               </div>}
             </>}
             {(requirements.length > 0 || (currentMapping && !loading && !showPartialMapping)) && <>
-              {showPartialMapping && requirements.length > 0 && <p className="mapping-progress-note">Completed requirement results are shown below while the remaining requirements continue processing.</p>}
+              {showPartialMapping && requirements.length > 0 && requirements.length < program.requirements.length && <p className="mapping-progress-note">Completed requirement results are shown below while the remaining requirements continue processing.</p>}
               <div className="mapping-filter" role="group" aria-label="Filter requirement results">{statusFilters.map((item) => <button key={item.value} type="button" onClick={() => setFilter(item.value)} className="secondary-btn" style={{ padding: '7px 10px', fontSize: 10, background: filter === item.value ? '#eaf1ed' : '#fff', borderColor: filter === item.value ? '#a9c1b6' : undefined }} data-testid={`filter-${item.label.toLowerCase().replaceAll(' ', '-')}`}>{item.label}</button>)}</div>
               <div className="mapping-card-list">{visibleRequirements.map((match) => <RequirementCard
                 key={match.requirementId}
