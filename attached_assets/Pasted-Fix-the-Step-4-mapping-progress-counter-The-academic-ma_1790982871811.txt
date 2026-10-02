@@ -1,0 +1,105 @@
+Fix the Step 4 mapping progress counter.
+
+The academic mapping itself is working correctly and the result cards appear progressively, but the text such as:
+
+"2 of 4 requirements mapped"
+
+is not incrementing reliably as each requirement completes.
+
+Do NOT change the mapping logic, evidence retrieval, or result schema.
+
+The progress counter must reflect the ACTUAL number of completed mapping requirements.
+
+REQUIRED BEHAVIOR
+
+For a program with 4 target requirements:
+
+Start:
+0 of 4 requirements mapped
+
+After requirement 1 returns successfully:
+1 of 4 requirements mapped
+
+After requirement 2 returns:
+2 of 4 requirements mapped
+
+After requirement 3 returns:
+3 of 4 requirements mapped
+
+After requirement 4 returns:
+4 of 4 requirements mapped
+
+Then show:
+Academic mapping complete
+
+IMPORTANT
+
+Do not simulate progress with timers.
+
+Do not calculate the progress count only after the complete mapping request finishes.
+
+The completed count must update at the same moment each completed requirement result is added to the UI.
+
+Please inspect how progressive results are currently being rendered.
+
+If the result cards are being revealed one-by-one from an already completed batch result, change this behavior so the progress indicator is explicitly synchronized with the number of results currently revealed/committed to completed state.
+
+If the backend actually processes requirements one at a time, update completedCount immediately after each successful requirement response.
+
+Use a single source of truth such as:
+
+completedMappings.length
+
+or an equivalent completed-results collection.
+
+Avoid maintaining a separate counter if that can become out of sync.
+
+The UI should derive:
+
+completed = completedMappings.length
+total = targetRequirements.length
+
+and render:
+
+`${completed} of ${total} requirements mapped`
+
+STATE UPDATE ISSUE
+
+Check for stale React state or batched state updates.
+
+When adding a completed mapping result, use a functional state update if needed, for example conceptually:
+
+setCompletedMappings(previous => [
+  ...previous,
+  newResult
+])
+
+The progress display should derive from the updated collection rather than an older closure value.
+
+PRESERVE
+
+- progressive result display
+- expandable requirement cards
+- automatic expansion of the newest result
+- all existing mapping results
+- status badges
+- confidence
+- evidence
+- sources
+- mapping logic
+
+TEST
+
+Run a mapping with at least 4 requirements.
+
+Confirm visually that the counter changes:
+
+0/4
+→ 1/4
+→ 2/4
+→ 3/4
+→ 4/4
+
+at the same time the corresponding result cards become available.
+
+Do not finish until the progress counter visibly increments during the mapping run without requiring a refresh.
