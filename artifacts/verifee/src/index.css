@@ -234,6 +234,10 @@ button { cursor:pointer; }
 .mapping-progress-count{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px}
 .mapping-progress-count strong{color:#34494b}
 .mapping-progress-count span{color:#6b7979}
+.mapping-progress-meter{display:flex;align-items:center;gap:9px;margin-top:10px}
+.mapping-progress-bar{flex:1;min-width:0;height:8px;overflow:hidden;border-radius:999px;background:#e5ebe7}
+.mapping-progress-fill{display:block;height:100%;border-radius:inherit;background:hsl(var(--primary))}
+.mapping-progress-percent{flex:none;min-width:32px;color:#526a62;font-size:11px;font-weight:600;text-align:right}
 .mapping-card-list{display:grid;gap:10px}
 .mapping-card{overflow:hidden;border:1px solid #e2e9e4;border-radius:9px;background:#fff}
 .mapping-card-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 15px;border:0;background:transparent;color:inherit;text-align:left}
