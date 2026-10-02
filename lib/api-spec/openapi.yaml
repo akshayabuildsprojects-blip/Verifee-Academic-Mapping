@@ -132,6 +132,50 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /academic-mappings/run/stream:
+    post:
+      operationId: streamAcademicMapping
+      tags: [academic-mapping]
+      summary: Stream completed academic mapping requirements
+      description: Uses the same mapper and input as runAcademicMapping. Each progress event contains an AcademicMappingResult snapshot with only completed requirements; the complete event contains the unchanged final AcademicMappingResult.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcademicMappingInput"
+      responses:
+        "200":
+          description: Server-sent events carrying the existing mapping result shape
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Each progress or complete event's data is an AcademicMappingResult; error event data uses ErrorResponse.
+        "400":
+          description: The mapping request is invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The academic mapping request is too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: The mapping request limit was reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: The mapping service is temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:

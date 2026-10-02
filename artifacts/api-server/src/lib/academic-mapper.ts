@@ -57,6 +57,9 @@ type RequirementTaskResult = {
   mapping: RequirementResult;
   retryable: boolean;
 };
+type MappingProgressOptions = {
+  onProgress?: (snapshot: MappingResult) => void;
+};
 
 const courseChunkSize = 40;
 const demoInstitutionName = "verifee demo university";
@@ -566,6 +569,7 @@ ${JSON.stringify(inputCandidates)}`,
 
 export async function mapAcademicRecord(
   input: MappingInput,
+  progress: MappingProgressOptions = {},
 ): Promise<MappingResult> {
   const program = georgiaTechDataset.programs.find(({ id }) => id === input.programId);
   if (!program) throw new Error("The requested Georgia Tech program is not stored.");
@@ -656,6 +660,12 @@ export async function mapAcademicRecord(
     evidenceByIndex.set(courseIndex, makeCourseEvidence(indexed, researchStatus, research));
   }
 
+  const courseEvidence = [...evidenceByIndex.values()];
+  const retryableBeforeRequirementAnalysis =
+    failedRequirements.size > 0 ||
+    domainResolution.failed ||
+    researched.some((item) => item.failed);
+  const completedRequirementOutcomes: RequirementTaskResult[] = [];
   const requirementOutcomes = await batchProcess(
     program.requirements,
     async (requirement): Promise<RequirementTaskResult> => {
@@ -720,6 +730,20 @@ export async function mapAcademicRecord(
         ),
         retryable: true,
       }),
+      onProgress: (_completed, _total, _requirement, outcome) => {
+        completedRequirementOutcomes.push(outcome);
+        progress.onProgress?.(RunAcademicMappingResponse.parse({
+          programId: input.programId,
+          programName: program.name,
+          institutionName,
+          officialUniversityDomain: officialDomain,
+          retryable:
+            retryableBeforeRequirementAnalysis ||
+            completedRequirementOutcomes.some((item) => item.retryable),
+          courseEvidence,
+          requirements: completedRequirementOutcomes.map((item) => item.mapping),
+        }));
+      },
     },
   );
 
@@ -729,11 +753,9 @@ export async function mapAcademicRecord(
     institutionName,
     officialUniversityDomain: officialDomain,
     retryable:
-      failedRequirements.size > 0 ||
-      domainResolution.failed ||
-      researched.some((item) => item.failed) ||
+      retryableBeforeRequirementAnalysis ||
       requirementOutcomes.some((item) => item.retryable),
-    courseEvidence: [...evidenceByIndex.values()],
+    courseEvidence,
     requirements: requirementOutcomes.map((item) => item.mapping),
   };
   return RunAcademicMappingResponse.parse(result);

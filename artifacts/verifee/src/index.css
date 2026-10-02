@@ -231,6 +231,30 @@ button { cursor:pointer; }
 .mapping-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
 .mapping-match-courses,.mapping-rationale{margin-top:9px}
 .mapping-evidence span{display:inline-block;margin-top:7px}
+.mapping-progress-count{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px}
+.mapping-progress-count strong{color:#34494b}
+.mapping-progress-count span{color:#6b7979}
+.mapping-card-list{display:grid;gap:10px}
+.mapping-card{overflow:hidden;border:1px solid #e2e9e4;border-radius:9px;background:#fff}
+.mapping-card-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 15px;border:0;background:transparent;color:inherit;text-align:left}
+.mapping-card-trigger:hover{background:#f8faf8}
+.mapping-card-trigger:focus-visible{outline:2px solid #729d91;outline-offset:-2px}
+.mapping-card-heading{display:grid;gap:4px;min-width:0}
+.mapping-card-heading .mapping-course{margin:0;font-size:13px}
+.mapping-card-badges{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:none}
+.confidence-pill{display:inline-flex;align-items:center;border-radius:99px;padding:5px 8px;font-size:9px;font-weight:700;letter-spacing:.035em;text-transform:uppercase;white-space:nowrap}
+.confidence-pill.high{background:#e7f1eb;color:#35654f}
+.confidence-pill.medium{background:#f4eee4;color:#816843}
+.confidence-pill.low{background:#edf0ef;color:#657270}
+.mapping-card-chevron{color:#788684;transition:transform .2s}
+.mapping-card-content{border-top:1px solid #e8ece9}
+.mapping-detail-section{padding:15px 16px;border-top:1px solid #edf0ed}
+.mapping-detail-section:first-child{border-top:0}
+.mapping-detail-title{margin:0 0 8px;color:#4b625c;font-size:11px;font-weight:700}
+.mapping-detail-copy{margin:0;color:#667678;font-size:11px;line-height:1.6}
+.mapping-detail-section .candidate-course-list{margin-top:0}
+.mapping-detail-section .candidate-course-list+*{margin-top:12px}
+.mapping-progress-note{margin:0 0 12px;color:#687879;font-size:11px;line-height:1.55}
 
 @media(max-width:760px){
   .wizard-wrap{padding-top:22px}
@@ -243,6 +267,8 @@ button { cursor:pointer; }
   .wizard-actions .secondary-btn,.wizard-next{width:100%;justify-content:center}
   .report-actions{margin-top:16px}
   .program-requirement-list{grid-template-columns:1fr}
+  .mapping-card-trigger{align-items:flex-start}
+  .mapping-card-badges{flex-wrap:wrap}
 }
 @media(max-width:460px){
   .wizard-title{font-size:34px}
@@ -252,6 +278,8 @@ button { cursor:pointer; }
   .course-preview-row>span:last-child{grid-column:2;text-align:left}
   .report-verification-top{align-items:flex-start;flex-direction:column}
   .report-actions .secondary-btn{margin-top:0}
+  .mapping-card-trigger{flex-direction:column}
+  .mapping-card-badges{width:100%;justify-content:flex-start}
 }
 
 /* Verifee landing page */

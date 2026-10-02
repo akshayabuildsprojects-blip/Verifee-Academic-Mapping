@@ -310,3 +310,92 @@ export const useRunAcademicMapping = <TError = ErrorType<ErrorResponse>,
       return useMutation(getRunAcademicMappingMutationOptions(options));
     }
 
+export const getStreamAcademicMappingUrl = () => {
+
+
+
+
+  return `/api/academic-mappings/run/stream`
+}
+
+/**
+ * Uses the same mapper and input as runAcademicMapping. Each progress event contains an AcademicMappingResult snapshot with only completed requirements; the complete event contains the unchanged final AcademicMappingResult.
+ * @summary Stream completed academic mapping requirements
+ */
+export const streamAcademicMapping = async (academicMappingInput: AcademicMappingInput, options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<string>(getStreamAcademicMappingUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(academicMappingInput)
+  }
+);}
+
+
+
+
+
+export const getStreamAcademicMappingMutationKey = () => ['streamAcademicMapping'] as const;
+
+export const getStreamAcademicMappingMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof streamAcademicMapping>>, TError,StreamAcademicMappingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof streamAcademicMapping>>, TError,StreamAcademicMappingMutationVariables, TContext> => {
+
+const mutationKey = getStreamAcademicMappingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof streamAcademicMapping>>, StreamAcademicMappingMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  streamAcademicMapping(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StreamAcademicMappingMutationResult = NonNullable<Awaited<ReturnType<typeof streamAcademicMapping>>>
+    export type StreamAcademicMappingMutationBody = BodyType<AcademicMappingInput>
+    export type StreamAcademicMappingMutationError = ErrorType<ErrorResponse>
+    export type StreamAcademicMappingMutationVariables = {data: BodyType<AcademicMappingInput>}
+
+    /**
+ * @summary Stream completed academic mapping requirements
+ */
+export const useStreamAcademicMapping = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof streamAcademicMapping>>, TError,StreamAcademicMappingMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof streamAcademicMapping>>,
+        TError,
+        StreamAcademicMappingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getStreamAcademicMappingMutationOptions(options));
+    }
+

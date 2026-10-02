@@ -3,7 +3,7 @@ export interface BatchOptions<T, R> {
   retries?: number;
   minTimeout?: number;
   maxTimeout?: number;
-  onProgress?: (completed: number, total: number, item: T) => void;
+  onProgress?: (completed: number, total: number, item: T, result: R) => void;
   onError?: (error: unknown, item: T, index: number) => R | Promise<R>;
 }
 
@@ -81,7 +81,7 @@ export async function batchProcess<T, R>(
       }
 
       completed += 1;
-      onProgress?.(completed, items.length, item);
+      onProgress?.(completed, items.length, item, results[index]);
     }
   };
 

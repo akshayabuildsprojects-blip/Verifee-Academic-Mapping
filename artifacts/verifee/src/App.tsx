@@ -6,10 +6,11 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter, Link } from 'wouter';
 import { AlertCircle, ArrowLeft, ArrowRight, ArrowDown, ArrowUpRight, BookOpen, Check, ChevronRight, ExternalLink, FileText, GraduationCap, Landmark, LoaderCircle, RotateCcw, ScanText, ShieldAlert, Upload, X } from 'lucide-react';
-import { extractAcademicTranscript, runAcademicMapping, type AcademicMappingInput, type AcademicMappingResult, type AcademicRecord } from '@workspace/api-client-react';
+import { extractAcademicTranscript, type AcademicMappingInput, type AcademicMappingResult, type AcademicRecord } from '@workspace/api-client-react';
 import { ExtractAcademicTranscriptResponse, RunAcademicMappingResponse } from '@workspace/api-zod';
 import { georgiaTechDataset } from '@workspace/georgia-tech-programs';
 import { checkVerification, extractMockRecord, sampleCourses, sampleCredential, uploadSchema, type CredentialVerification } from '@/lib/mock-analysis';
+import { runAcademicMappingWithProgress } from '@/lib/academic-mapping-stream';
 
 const queryClient = new QueryClient();
 const wizardSteps = ['Upload Credential', 'Verify & Review', 'Select Target', 'Academic Mapping'];
@@ -434,6 +435,99 @@ function SourceLinks({ sources }: { sources: AcademicMappingResult['courseEviden
   </li>)}</ul>;
 }
 
+type RequirementMapping = AcademicMappingResult['requirements'][number];
+type CourseEvidence = AcademicMappingResult['courseEvidence'][number];
+
+const confidenceExplanations: Record<RequirementMapping['confidence'], string> = {
+  HIGH: 'Based on detailed, directly relevant evidence.',
+  MEDIUM: 'The evidence is clear but incomplete.',
+  LOW: 'The available details are sparse or unavailable.',
+};
+
+function RequirementCard({
+  match,
+  courseEvidenceByIndex,
+  expanded,
+  onToggle,
+}: {
+  match: RequirementMapping;
+  courseEvidenceByIndex: ReadonlyMap<number, CourseEvidence>;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const triggerId = `mapping-trigger-${match.requirementId}`;
+  const contentId = `mapping-content-${match.requirementId}`;
+
+  return <article className="mapping-card" data-testid={`mapping-${match.requirementId}`}>
+    <button
+      className="mapping-card-trigger"
+      id={triggerId}
+      type="button"
+      aria-expanded={expanded}
+      aria-controls={contentId}
+      onClick={onToggle}
+      data-testid={`toggle-mapping-${match.requirementId}`}
+    >
+      <span className="mapping-card-heading">
+        <span className="mapping-course">{match.requirementName}</span>
+        <span className="mapping-desc">{match.category.replaceAll('_', ' ')} · {formatImportance(match.importance)}</span>
+      </span>
+      <span className="mapping-card-badges">
+        <Status status={match.status} />
+        <span className={`confidence-pill ${match.confidence.toLowerCase()}`}>{match.confidence} confidence</span>
+        <ChevronRight className="mapping-card-chevron" size={16} style={{ transform: expanded ? 'rotate(90deg)' : 'none' }} aria-hidden="true" />
+      </span>
+    </button>
+    <div
+      className="mapping-card-content"
+      id={contentId}
+      role="region"
+      aria-labelledby={triggerId}
+      hidden={!expanded}
+    >
+      <section className="mapping-detail-section">
+        <h3 className="mapping-detail-title">Relevant prior coursework</h3>
+        {match.candidateCourses.length > 0
+          ? <div className="candidate-course-list">{match.candidateCourses.map((candidate) => {
+            const evidence = courseEvidenceByIndex.get(candidate.courseIndex);
+            return <div className="candidate-course" key={`${match.requirementId}-${candidate.courseIndex}`}>
+              <div className="candidate-course-head">
+                <strong>{candidate.code || 'Course code not shown'}{candidate.title ? ` · ${candidate.title}` : ''}</strong>
+                <span className={`relevance-pill ${candidate.relevance === 'LIKELY_RELEVANT' ? 'likely' : 'possible'}`}>{candidate.relevance === 'LIKELY_RELEVANT' ? 'Likely relevant' : 'Possibly relevant'}</span>
+              </div>
+              {evidence?.transcriptDescription && <p><strong>Transcript description:</strong> {evidence.transcriptDescription}</p>}
+              {candidate.evidence.length > 0 && <ul>{candidate.evidence.map((item, index) => <li key={`${candidate.courseIndex}-fact-${index}`}>{item}</li>)}</ul>}
+              {!evidence?.transcriptDescription && candidate.evidence.length === 0 && <p>No detailed course description or official course findings were available.</p>}
+              {evidence && <span className="research-status">{evidence.researchStatus.replaceAll('_', ' ').toLowerCase()}</span>}
+            </div>;
+          })}</div>
+          : <p className="mapping-detail-copy">No course was shortlisted for this stored requirement.</p>}
+      </section>
+      <section className="mapping-detail-section">
+        <h3 className="mapping-detail-title">Evidence found</h3>
+        {match.evidence.length > 0
+          ? <ul className="mapping-detail-copy">{match.evidence.map((item, index) => <li key={`${match.requirementId}-evidence-${index}`}>{item}</li>)}</ul>
+          : <p className="mapping-detail-copy">No additional requirement-level evidence was recorded.</p>}
+        <p className="stored-concepts"><strong>Stored matching concepts:</strong> {match.matchingConcepts.join(', ')}</p>
+      </section>
+      <section className="mapping-detail-section">
+        <h3 className="mapping-detail-title">Reasoning</h3>
+        <p className="mapping-detail-copy">{match.rationale}</p>
+      </section>
+      <section className="mapping-detail-section">
+        <h3 className="mapping-detail-title">Confidence explanation</h3>
+        <p className="mapping-detail-copy">{confidenceExplanations[match.confidence]} This is a preliminary assessment.</p>
+      </section>
+      <section className="mapping-detail-section">
+        <h3 className="mapping-detail-title">Official source links</h3>
+        {match.sources.length > 0
+          ? <SourceLinks sources={match.sources} />
+          : <p className="mapping-detail-copy">No official course source links were used for this requirement.</p>}
+      </section>
+    </div>
+  </article>;
+}
+
 function Report() {
   const [, setLocation] = useLocation();
   const [filter, setFilter] = useState('ALL');
@@ -452,8 +546,12 @@ function Report() {
   const [mapping, setMapping] = useState<AcademicMappingResult | null>(() => readStoredMapping(program.id));
   const [loading, setLoading] = useState(() => !readStoredMapping(program.id));
   const [mappingError, setMappingError] = useState('');
+  const [progressRequirements, setProgressRequirements] = useState<RequirementMapping[]>([]);
+  const [progressCourseEvidence, setProgressCourseEvidence] = useState<CourseEvidence[]>([]);
+  const [expandedRequirementId, setExpandedRequirementId] = useState<string | null>(
+    () => readStoredMapping(program.id)?.requirements[0]?.requirementId ?? null,
+  );
   const currentMapping = mapping?.programId === program.id ? mapping : null;
-  const courseEvidenceByIndex = new Map((currentMapping?.courseEvidence ?? []).map((item) => [item.courseIndex, item]));
 
   useEffect(() => {
     if (!started || !sessionStorage.getItem('verifee-file-name') || !academicRecord) setLocation('/start');
@@ -463,12 +561,21 @@ function Report() {
     if (!academicRecord) return;
     setLoading(true);
     setMappingError('');
+    setProgressRequirements([]);
+    setProgressCourseEvidence([]);
+    setExpandedRequirementId(null);
     try {
       const request: AcademicMappingInput = {
         programId: program.id as AcademicMappingInput['programId'],
         record: academicRecord,
       };
-      const result = await runAcademicMapping(request);
+      const result = await runAcademicMappingWithProgress(request, (snapshot) => {
+        if (cancelled()) return;
+        setProgressRequirements(snapshot.requirements);
+        setProgressCourseEvidence(snapshot.courseEvidence);
+        const newestRequirement = snapshot.requirements[snapshot.requirements.length - 1];
+        if (newestRequirement) setExpandedRequirementId(newestRequirement.requirementId);
+      });
       const parsed = RunAcademicMappingResponse.safeParse(result);
       if (!parsed.success || parsed.data.programId !== program.id) {
         throw new Error('The mapping response did not match the selected program.');
@@ -476,6 +583,9 @@ function Report() {
       if (cancelled()) return;
       sessionStorage.setItem('verifee-mapping-result', JSON.stringify(parsed.data));
       setMapping(parsed.data);
+      setProgressRequirements([]);
+      setProgressCourseEvidence([]);
+      setExpandedRequirementId(parsed.data.requirements[0]?.requirementId ?? null);
     } catch {
       if (!cancelled()) {
         setMappingError('The preliminary mapping could not be completed. Your academic record is still saved in this browser session; retry without uploading the PDF again.');
@@ -492,6 +602,9 @@ function Report() {
     if (cached) {
       setMapping(cached);
       setMappingError('');
+      setProgressRequirements([]);
+      setProgressCourseEvidence([]);
+      setExpandedRequirementId(cached.requirements[0]?.requirementId ?? null);
       setLoading(false);
     } else {
       setMapping(null);
@@ -522,8 +635,15 @@ function Report() {
     setLocation('/start');
   };
 
-  const requirements = currentMapping?.requirements ?? [];
+  const showPartialMapping = loading || (Boolean(mappingError) && progressRequirements.length > 0);
+  const requirements = showPartialMapping
+    ? progressRequirements
+    : currentMapping?.requirements ?? [];
   const visibleRequirements = requirements.filter((item) => filter === 'ALL' || item.status === filter);
+  const courseEvidence = showPartialMapping
+    ? progressCourseEvidence
+    : currentMapping?.courseEvidence ?? [];
+  const courseEvidenceByIndex = new Map(courseEvidence.map((item) => [item.courseIndex, item]));
   const counts = {
     covered: requirements.filter((item) => item.status === 'COVERED').length,
     partial: requirements.filter((item) => item.status === 'PARTIALLY_COVERED').length,
@@ -546,6 +666,7 @@ function Report() {
     { value: 'POTENTIAL_GAP', label: 'Potential gap' },
     { value: 'INSUFFICIENT_EVIDENCE', label: 'Insufficient evidence' },
   ];
+  const allRequirementsCompleted = program.requirements.length > 0 && progressRequirements.length === program.requirements.length;
 
   return <div className="shell"><Header /><main className="page-wrap report-page">
     <Stepper current={4} />
@@ -591,35 +712,35 @@ function Report() {
           </div>
           {expanded && <>
             <details className="source-details"><summary>Stored program source</summary><p>{program.source.title}</p><span>Last checked: {program.source.lastChecked}</span></details>
-            {loading && <div className="mapping-loading" role="status" data-testid="status-mapping-loading"><LoaderCircle size={18} className="animate-spin" /><div><strong>Mapping academic evidence…</strong><p>Shortlisting courses, checking official course sources where available, and comparing each stored requirement.</p></div></div>}
+            {loading && <div className="mapping-loading" role="status" data-testid="status-mapping-loading">
+              {allRequirementsCompleted ? <Check size={18} /> : <LoaderCircle size={18} className="animate-spin" />}
+              <div>
+                <strong>{allRequirementsCompleted ? 'Academic mapping complete' : 'Mapping academic requirements…'}</strong>
+                <div className="mapping-progress-count">
+                  <strong>{progressRequirements.length} of {program.requirements.length} requirements mapped</strong>
+                  <span>{allRequirementsCompleted ? 'All requirements completed' : 'Still in progress'}</span>
+                </div>
+                <p>Shortlisting courses, checking official course sources where available, and comparing each stored requirement.</p>
+              </div>
+            </div>}
             {mappingError && <div className="mapping-error" role="alert" data-testid="status-mapping-error"><div><strong>Mapping did not finish</strong><p>{mappingError}</p></div><button className="secondary-btn" type="button" onClick={retryMapping} disabled={loading} data-testid="button-retry-mapping"><RotateCcw size={14} /> Retry mapping</button></div>}
-            {currentMapping && <>
+            {currentMapping && !showPartialMapping && <>
               <p className="source-claim">{sourceSummary}</p>
               {currentMapping.retryable && !mappingError && <div className="mapping-error mapping-partial-error" role="status" data-testid="status-partial-mapping">
                 <div><strong>Some mapping steps were incomplete</strong><p>Results for other requirements are still shown. Retry using the saved academic record; no re-upload is needed.</p></div>
                 <button className="secondary-btn" type="button" onClick={retryMapping} disabled={loading} data-testid="button-retry-partial-mapping"><RotateCcw size={14} /> Retry mapping</button>
               </div>}
+            </>}
+            {(requirements.length > 0 || (currentMapping && !loading && !showPartialMapping)) && <>
+              {showPartialMapping && requirements.length > 0 && <p className="mapping-progress-note">Completed requirement results are shown below while the remaining requirements continue processing.</p>}
               <div className="mapping-filter" role="group" aria-label="Filter requirement results">{statusFilters.map((item) => <button key={item.value} type="button" onClick={() => setFilter(item.value)} className="secondary-btn" style={{ padding: '7px 10px', fontSize: 10, background: filter === item.value ? '#eaf1ed' : '#fff', borderColor: filter === item.value ? '#a9c1b6' : undefined }} data-testid={`filter-${item.label.toLowerCase().replaceAll(' ', '-')}`}>{item.label}</button>)}</div>
-              <div className="mapping-list">{visibleRequirements.map((match) => <article className="mapping-row" key={match.requirementId} data-testid={`mapping-${match.requirementId}`}>
-                <div className="mapping-head"><div><p className="mapping-course">{match.requirementName}</p><p className="mapping-desc">{match.category.replaceAll('_', ' ')} · {formatImportance(match.importance)}</p></div><Status status={match.status} /></div>
-                <p className="mapping-desc mapping-rationale"><strong>Rationale:</strong> {match.rationale}</p>
-                {match.candidateCourses.length > 0
-                  ? <div className="candidate-course-list"><strong className="candidate-list-heading">Shortlisted student courses</strong>{match.candidateCourses.map((candidate) => {
-                    const evidence = courseEvidenceByIndex.get(candidate.courseIndex);
-                    return <div className="candidate-course" key={`${match.requirementId}-${candidate.courseIndex}`}>
-                      <div className="candidate-course-head"><strong>{candidate.code || 'Course code not shown'}{candidate.title ? ` · ${candidate.title}` : ''}</strong><span className={`relevance-pill ${candidate.relevance === 'LIKELY_RELEVANT' ? 'likely' : 'possible'}`}>{candidate.relevance === 'LIKELY_RELEVANT' ? 'Likely relevant' : 'Possibly relevant'}</span></div>
-                      {evidence?.transcriptDescription && <p><strong>Transcript description:</strong> {evidence.transcriptDescription}</p>}
-                      {candidate.evidence.length > 0 && <ul>{candidate.evidence.map((item, index) => <li key={`${candidate.courseIndex}-fact-${index}`}>{item}</li>)}</ul>}
-                      {!evidence?.transcriptDescription && candidate.evidence.length === 0 && <p>No detailed course description or official course findings were available.</p>}
-                      {evidence && <span className="research-status">{evidence.researchStatus.replaceAll('_', ' ').toLowerCase()}</span>}
-                      <SourceLinks sources={candidate.sources} />
-                    </div>;
-                  })}</div>
-                  : <p className="mapping-desc mapping-match-courses">No course was shortlisted for this stored requirement.</p>}
-                {match.evidence.length > 0 && <div className="mapping-evidence"><strong>Evidence &amp; limits</strong><ul>{match.evidence.map((item, index) => <li key={`${match.requirementId}-evidence-${index}`}>{item}</li>)}</ul></div>}
-                <div className="stored-concepts"><strong>Stored matching concepts:</strong> {match.matchingConcepts.join(', ')}</div>
-                <span className="confidence">Confidence: {match.confidence.toLowerCase()} · Preliminary only</span>
-              </article>)}{visibleRequirements.length === 0 && <p className="form-note">No requirements have this result.</p>}</div>
+              <div className="mapping-card-list">{visibleRequirements.map((match) => <RequirementCard
+                key={match.requirementId}
+                match={match}
+                courseEvidenceByIndex={courseEvidenceByIndex}
+                expanded={expandedRequirementId === match.requirementId}
+                onToggle={() => setExpandedRequirementId((current) => current === match.requirementId ? null : match.requirementId)}
+              />)}{visibleRequirements.length === 0 && <p className="form-note">No requirements have this result.</p>}</div>
             </>}
           </>}
         </section>
@@ -628,8 +749,8 @@ function Report() {
         <section className="panel section-card">
           <p className="report-aside-title">Mapping overview</p>
           <div className="summary-number">{requirements.length}</div>
-          <div className="summary-caption">Stored {program.shortName} criteria reviewed</div>
-          {currentMapping && <div className="result-counts">
+          <div className="summary-caption">{showPartialMapping ? `of ${program.requirements.length} requirements mapped` : `Stored ${program.shortName} criteria reviewed`}</div>
+          {currentMapping && !showPartialMapping && <div className="result-counts">
             <div><strong>{counts.covered}</strong><span>Covered</span></div>
             <div><strong>{counts.partial}</strong><span>Partial</span></div>
             <div><strong>{counts.potentialGap}</strong><span>Potential gaps</span></div>

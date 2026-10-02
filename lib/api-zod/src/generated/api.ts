@@ -130,3 +130,37 @@ export const RunAcademicMappingResponse = zod.object({
 })
 
 
+/**
+ * Uses the same mapper and input as runAcademicMapping. Each progress event contains an AcademicMappingResult snapshot with only completed requirements; the complete event contains the unchanged final AcademicMappingResult.
+ * @summary Stream completed academic mapping requirements
+ */
+export const StreamAcademicMappingBody = zod.object({
+  "programId": zod.enum(['ms-analytics', 'ms-computer-science', 'ms-industrial-engineering']),
+  "record": zod.object({
+  "institution": zod.object({
+  "name": zod.string().nullable(),
+  "country": zod.string().nullable()
+}),
+  "credential": zod.object({
+  "degree": zod.string().nullable(),
+  "program": zod.string().nullable(),
+  "fieldOfStudy": zod.string().nullable(),
+  "graduationDate": zod.string().nullable()
+}),
+  "academicRecord": zod.object({
+  "creditSystem": zod.string().nullable(),
+  "cumulativeGPA": zod.string().nullable(),
+  "courses": zod.array(zod.object({
+  "code": zod.string().nullable(),
+  "title": zod.string().nullable(),
+  "credits": zod.string().nullable(),
+  "grade": zod.string().nullable(),
+  "description": zod.string().nullable()
+}))
+})
+})
+})
+
+export const StreamAcademicMappingResponse = zod.unknown()
+
+
