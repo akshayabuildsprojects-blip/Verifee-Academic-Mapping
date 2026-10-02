@@ -10,7 +10,7 @@ export const uploadSchema = z.object({
 export type AcademicCourse = { code: string; title: string; grade: string; credits: number; unitsLabel: string; description?: string; learningOutcomes?: string[]; syllabusText?: string };
 export type Credential = { institution: string; country: string; qualification: string; major: string; graduationDate: string };
 export type CredentialVerification = {
-  status: 'Digitally verified' | 'Verification unavailable' | 'Verification failed' | 'External verification recommended';
+  status: 'Digitally verified' | 'Digital verification unavailable' | 'Verification unavailable' | 'Verification failed' | 'External verification recommended';
   explanation: string;
 };
 export type Requirement = { id: string; targetName: string; courseCode: string; description: string; prerequisiteConcepts: string[]; courseDescription: string };

@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: credential-extraction
+    description: Academic transcript PDF interpretation
 paths:
   /healthz:
     get:
@@ -24,6 +26,67 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /academic-transcripts/extract:
+    post:
+      operationId: extractAcademicTranscript
+      tags: [credential-extraction]
+      summary: Extract academic information from a transcript PDF
+      description: Reads a PDF for academic interpretation only; it does not verify authenticity.
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema:
+              $ref: "#/components/schemas/AcademicTranscriptPdf"
+      responses:
+        "200":
+          description: Structured academic record extracted from the PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcademicRecord"
+        "400":
+          description: The request did not contain a valid PDF
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "413":
+          description: The PDF exceeds the 20 MB upload limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "415":
+          description: Only PDF uploads are supported for extraction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: The PDF could not be interpreted as an academic transcript
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: The extraction request limit was reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: The extraction provider returned an unusable response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: The extraction provider is temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +96,94 @@ components:
           type: string
       required:
         - status
+    AcademicTranscriptPdf:
+      type: string
+      format: binary
+      description: PDF bytes; processed in memory and not persisted.
+    AcademicRecord:
+      type: object
+      additionalProperties: false
+      properties:
+        institution:
+          $ref: "#/components/schemas/AcademicInstitution"
+        credential:
+          $ref: "#/components/schemas/AcademicCredential"
+        academicRecord:
+          $ref: "#/components/schemas/AcademicRecordDetails"
+      required:
+        - institution
+        - credential
+        - academicRecord
+    AcademicInstitution:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: ["string", "null"]
+        country:
+          type: ["string", "null"]
+      required:
+        - name
+        - country
+    AcademicCredential:
+      type: object
+      additionalProperties: false
+      properties:
+        degree:
+          type: ["string", "null"]
+        program:
+          type: ["string", "null"]
+        fieldOfStudy:
+          type: ["string", "null"]
+        graduationDate:
+          type: ["string", "null"]
+      required:
+        - degree
+        - program
+        - fieldOfStudy
+        - graduationDate
+    AcademicRecordDetails:
+      type: object
+      additionalProperties: false
+      properties:
+        creditSystem:
+          type: ["string", "null"]
+        cumulativeGPA:
+          type: ["string", "null"]
+        courses:
+          type: array
+          items:
+            $ref: "#/components/schemas/AcademicCourse"
+      required:
+        - creditSystem
+        - cumulativeGPA
+        - courses
+    AcademicCourse:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          type: ["string", "null"]
+        title:
+          type: ["string", "null"]
+        credits:
+          type: ["string", "null"]
+        grade:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+      required:
+        - code
+        - title
+        - credits
+        - grade
+        - description
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+      required:
+        - error
 

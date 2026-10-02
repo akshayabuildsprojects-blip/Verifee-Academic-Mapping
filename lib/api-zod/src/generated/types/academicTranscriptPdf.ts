@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
-}
+/**
+ * PDF bytes; processed in memory and not persisted.
+ */
+export type AcademicTranscriptPdf = Blob;

@@ -1,0 +1,1 @@
+- [Transcript PDF fidelity](transcript-pdf-fidelity.md) — pair the PDF with embedded text when available to preserve fine characters such as A-.
