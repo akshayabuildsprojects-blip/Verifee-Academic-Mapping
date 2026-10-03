@@ -121,8 +121,21 @@ test("transcript extraction gates on English and requests English-only fields", 
     );
     assert.equal(transcriptModelRequests.length, 2);
     assert.match(getModelPrompt(transcriptModelRequests[0]), /writing systems/i);
-    assert.match(getModelPrompt(transcriptModelRequests[1]), /English-language words only/i);
-    assert.match(getModelPrompt(transcriptModelRequests[1]), /Grade: A-/);
+    const extractionPrompt = getModelPrompt(transcriptModelRequests[1]);
+    assert.match(extractionPrompt, /English-language words only/i);
+    assert.match(extractionPrompt, /Grade: A-/);
+    assert.match(
+      extractionPrompt,
+      /If its code, title, credits, grade, or description is absent or unreadable, use null for that field rather than guessing\./,
+    );
+    assert.match(
+      extractionPrompt,
+      /Only include a course description or learning outcome if it is printed in this PDF\./,
+    );
+    assert.match(
+      extractionPrompt,
+      /Copy it in full, including labels or prefixes; do not paraphrase, shorten, or create descriptions from course titles\./,
+    );
 
     const latinMixedPdf = makeSyntheticPdf([
       "Academic transcript",
