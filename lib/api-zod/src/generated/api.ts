@@ -21,7 +21,16 @@ export const HealthCheckResponse = zod.object({
  * Reads a PDF for academic interpretation only; it does not verify authenticity.
  * @summary Extract academic information from a transcript PDF
  */
+export const extractAcademicTranscriptResponseLanguageDetectionLanguagesItemLanguageMax = 80;
+
+export const extractAcademicTranscriptResponseLanguageDetectionLanguagesItemScriptMax = 80;
+
+export const extractAcademicTranscriptResponseLanguageDetectionLanguagesMax = 12;
+
+
+
 export const ExtractAcademicTranscriptResponse = zod.object({
+  "record": zod.object({
   "institution": zod.object({
   "name": zod.string().nullable(),
   "country": zod.string().nullable()
@@ -43,6 +52,15 @@ export const ExtractAcademicTranscriptResponse = zod.object({
   "description": zod.string().nullable()
 }))
 })
+}),
+  "languageDetection": zod.object({
+  "status": zod.enum(['ENGLISH_DETECTED', 'NO_ENGLISH', 'UNCERTAIN']),
+  "confidence": zod.enum(['high', 'medium', 'low']),
+  "languages": zod.array(zod.object({
+  "language": zod.string().max(extractAcademicTranscriptResponseLanguageDetectionLanguagesItemLanguageMax),
+  "script": zod.string().max(extractAcademicTranscriptResponseLanguageDetectionLanguagesItemScriptMax)
+})).max(extractAcademicTranscriptResponseLanguageDetectionLanguagesMax)
+}).describe('Language and script labels only; does not contain transcript text.')
 })
 
 

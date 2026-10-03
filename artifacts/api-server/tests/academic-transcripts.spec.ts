@@ -168,10 +168,24 @@ test("transcript extraction gates on English and requests English-only fields", 
     ]);
     const englishResponse = await submitPdf(baseUrl, englishPdf);
     assert.equal(englishResponse.status, 200);
-    const englishRecord = (await englishResponse.json()) as ReturnType<
-      typeof academicRecord
-    >;
-    assert.equal(englishRecord.academicRecord.courses[0]?.grade, "A-");
+    const englishResult = (await englishResponse.json()) as {
+      record: ReturnType<typeof academicRecord>;
+      languageDetection: {
+        status: string;
+        confidence: string;
+        languages: { language: string; script: string }[];
+      };
+    };
+    assert.equal(englishResult.record.academicRecord.courses[0]?.grade, "A-");
+    assert.deepEqual(englishResult.languageDetection, {
+      status: "ENGLISH_DETECTED",
+      confidence: "high",
+      languages: [{ language: "English", script: "Latin" }],
+    });
+    assert.doesNotMatch(
+      JSON.stringify(englishResult.languageDetection),
+      /Academic transcript|Northbridge University|Linear Algebra/,
+    );
     assert.equal(transcriptModelRequests.length, 2);
     assert.match(getModelPrompt(transcriptModelRequests[0]), /writing systems/i);
     assert.match(getModelPrompt(transcriptModelRequests[1]), /English-language words only/i);
@@ -199,13 +213,26 @@ test("transcript extraction gates on English and requests English-only fields", 
     ]);
     const latinMixedResponse = await submitPdf(baseUrl, latinMixedPdf);
     assert.equal(latinMixedResponse.status, 200);
-    const latinMixedRecord = (await latinMixedResponse.json()) as ReturnType<
-      typeof academicRecord
-    >;
+    const latinMixedResult = (await latinMixedResponse.json()) as {
+      record: ReturnType<typeof academicRecord>;
+      languageDetection: {
+        status: string;
+        confidence: string;
+        languages: { language: string; script: string }[];
+      };
+    };
     assert.doesNotMatch(
-      JSON.stringify(latinMixedRecord),
+      JSON.stringify(latinMixedResult.record),
       /Observaciones|Matemáticas|aprobó/,
     );
+    assert.deepEqual(latinMixedResult.languageDetection, {
+      status: "ENGLISH_DETECTED",
+      confidence: "high",
+      languages: [
+        { language: "English", script: "Latin" },
+        { language: "Spanish", script: "Latin" },
+      ],
+    });
     assert.match(getModelPrompt(transcriptModelRequests[0]), /Matemáticas/);
     assert.match(getModelPrompt(transcriptModelRequests[1]), /Latin letters/);
 
@@ -231,11 +258,20 @@ test("transcript extraction gates on English and requests English-only fields", 
     ]);
     const nonLatinMixedResponse = await submitPdf(baseUrl, nonLatinMixedPdf);
     assert.equal(nonLatinMixedResponse.status, 200);
-    const nonLatinRecord = (await nonLatinMixedResponse.json()) as ReturnType<
-      typeof academicRecord
-    >;
-    assert.doesNotMatch(JSON.stringify(nonLatinRecord), /课程名称|线性代数/);
-    assert.equal(nonLatinRecord.academicRecord.courses[0]?.grade, "A-");
+    const nonLatinResult = (await nonLatinMixedResponse.json()) as {
+      record: ReturnType<typeof academicRecord>;
+      languageDetection: {
+        status: string;
+        confidence: string;
+        languages: { language: string; script: string }[];
+      };
+    };
+    assert.doesNotMatch(JSON.stringify(nonLatinResult.record), /课程名称|线性代数/);
+    assert.equal(nonLatinResult.record.academicRecord.courses[0]?.grade, "A-");
+    assert.deepEqual(nonLatinResult.languageDetection.languages, [
+      { language: "English", script: "Latin" },
+      { language: "Chinese", script: "Han" },
+    ]);
     assert.match(getModelPrompt(transcriptModelRequests[1]), /non-English words/i);
 
     const unreadableFieldPdf = makeSyntheticPdf([
@@ -257,11 +293,11 @@ test("transcript extraction gates on English and requests English-only fields", 
     ]);
     const unreadableResponse = await submitPdf(baseUrl, unreadableFieldPdf);
     assert.equal(unreadableResponse.status, 200);
-    const unreadableRecord = (await unreadableResponse.json()) as ReturnType<
-      typeof academicRecord
-    >;
-    assert.equal(unreadableRecord.academicRecord.courses[0]?.title, null);
-    assert.equal(unreadableRecord.academicRecord.courses[0]?.description, null);
+    const unreadableResult = (await unreadableResponse.json()) as {
+      record: ReturnType<typeof academicRecord>;
+    };
+    assert.equal(unreadableResult.record.academicRecord.courses[0]?.title, null);
+    assert.equal(unreadableResult.record.academicRecord.courses[0]?.description, null);
 
     const spanishOnlyPdf = makeSyntheticPdf([
       "Certificado académico",
@@ -276,9 +312,19 @@ test("transcript extraction gates on English and requests English-only fields", 
     assert.equal(spanishOnlyResponse.status, 422);
     const spanishOnlyError = (await spanishOnlyResponse.json()) as {
       error: string;
+      languageDetection: {
+        status: string;
+        confidence: string;
+        languages: { language: string; script: string }[];
+      };
     };
     assert.match(spanishOnlyError.error, /No readable English text was found/);
     assert.match(spanishOnlyError.error, /extraction was not performed/);
+    assert.deepEqual(spanishOnlyError.languageDetection, {
+      status: "NO_ENGLISH",
+      confidence: "high",
+      languages: [{ language: "Spanish", script: "Latin" }],
+    });
     assert.equal(transcriptModelRequests.length, 1);
     assert.match(getModelPrompt(transcriptModelRequests[0]), /writing systems/i);
 
@@ -294,9 +340,19 @@ test("transcript extraction gates on English and requests English-only fields", 
     assert.equal(ambiguousResponse.status, 422);
     const ambiguousError = (await ambiguousResponse.json()) as {
       error: string;
+      languageDetection: {
+        status: string;
+        confidence: string;
+        languages: { language: string; script: string }[];
+      };
     };
     assert.match(ambiguousError.error, /could not confidently identify readable English/i);
     assert.match(ambiguousError.error, /Upload a clearer scan/);
+    assert.deepEqual(ambiguousError.languageDetection, {
+      status: "UNCERTAIN",
+      confidence: "low",
+      languages: [{ language: "Unknown", script: "Latin" }],
+    });
     assert.equal(transcriptModelRequests.length, 1);
   } finally {
     restoreTranscriptModelFetch();

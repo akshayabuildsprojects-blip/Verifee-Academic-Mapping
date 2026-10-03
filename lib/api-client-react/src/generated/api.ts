@@ -24,9 +24,10 @@ import type {
   AcademicContextInput,
   AcademicMappingInput,
   AcademicMappingResult,
-  AcademicRecord,
   ErrorResponse,
-  HealthStatus
+  HealthStatus,
+  TranscriptExtractionProblem,
+  TranscriptExtractionResult
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -146,7 +147,7 @@ export const getExtractAcademicTranscriptUrl = () => {
  * Reads a PDF for academic interpretation only; it does not verify authenticity.
  * @summary Extract academic information from a transcript PDF
  */
-export const extractAcademicTranscript = async (extractAcademicTranscriptBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<AcademicRecord> => {
+export const extractAcademicTranscript = async (extractAcademicTranscriptBody: Blob, options?: Parameters<typeof customFetch>[1]): Promise<TranscriptExtractionResult> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -162,7 +163,7 @@ export const extractAcademicTranscript = async (extractAcademicTranscriptBody: B
     }
     return headers;
   };
-return customFetch<AcademicRecord>(getExtractAcademicTranscriptUrl(),
+return customFetch<TranscriptExtractionResult>(getExtractAcademicTranscriptUrl(),
   {
     ...options,
     method: 'POST',
@@ -177,7 +178,7 @@ return customFetch<AcademicRecord>(getExtractAcademicTranscriptUrl(),
 
 export const getExtractAcademicTranscriptMutationKey = () => ['extractAcademicTranscript'] as const;
 
-export const getExtractAcademicTranscriptMutationOptions = <TError = ErrorType<ErrorResponse>,
+export const getExtractAcademicTranscriptMutationOptions = <TError = ErrorType<ErrorResponse | TranscriptExtractionProblem>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof extractAcademicTranscript>>, TError,ExtractAcademicTranscriptMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof extractAcademicTranscript>>, TError,ExtractAcademicTranscriptMutationVariables, TContext> => {
 
@@ -206,13 +207,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type ExtractAcademicTranscriptMutationResult = NonNullable<Awaited<ReturnType<typeof extractAcademicTranscript>>>
     export type ExtractAcademicTranscriptMutationBody = BodyType<Blob>
-    export type ExtractAcademicTranscriptMutationError = ErrorType<ErrorResponse>
+    export type ExtractAcademicTranscriptMutationError = ErrorType<ErrorResponse | TranscriptExtractionProblem>
     export type ExtractAcademicTranscriptMutationVariables = {data: BodyType<Blob>}
 
     /**
  * @summary Extract academic information from a transcript PDF
  */
-export const useExtractAcademicTranscript = <TError = ErrorType<ErrorResponse>,
+export const useExtractAcademicTranscript = <TError = ErrorType<ErrorResponse | TranscriptExtractionProblem>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof extractAcademicTranscript>>, TError,ExtractAcademicTranscriptMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof extractAcademicTranscript>>,

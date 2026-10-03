@@ -1,5 +1,8 @@
 import express, { Router, type IRouter, type RequestHandler } from "express";
-import { ExtractAcademicTranscriptResponse } from "@workspace/api-zod";
+import {
+  ExtractAcademicTranscriptResponse,
+  type TranscriptExtractionProblem,
+} from "@workspace/api-zod";
 import {
   extractAcademicTranscript,
   TranscriptExtractionError,
@@ -58,24 +61,37 @@ router.post(
     }
 
     try {
-      const record = await extractAcademicTranscript(req.body);
-      res.json(ExtractAcademicTranscriptResponse.parse(record));
+      const extraction = await extractAcademicTranscript(req.body);
+      res.json(ExtractAcademicTranscriptResponse.parse(extraction));
     } catch (error) {
       if (error instanceof TranscriptExtractionError) {
-        if (error.code === "uncertain-language") {
-          res.status(422).json({
-            error: "We could not confidently identify readable English, so academic extraction was not performed. Upload a clearer scan or a transcript with readable English text.",
-          });
-          return;
-        }
-        if (error.code === "no-english") {
-          res.status(422).json({
-            error: "No readable English text was found, so academic extraction was not performed. Upload a transcript with clear English text.",
-          });
-          return;
-        }
-        if (error.code === "not-a-transcript") {
-          res.status(422).json({ error: "We could not identify readable academic transcript details in this PDF." });
+        if (
+          error.code === "uncertain-language" ||
+          error.code === "no-english" ||
+          error.code === "not-a-transcript"
+        ) {
+          if (!error.languageDetection) {
+            req.log.error(
+              { code: error.code },
+              "Transcript extraction result was missing its language summary.",
+            );
+            res.status(502).json({
+              error: "We could not safely validate the extracted transcript details.",
+            });
+            return;
+          }
+
+          const errorMessage =
+            error.code === "uncertain-language"
+              ? "We could not confidently identify readable English, so academic extraction was not performed. Upload a clearer scan or a transcript with readable English text."
+              : error.code === "no-english"
+                ? "No readable English text was found, so academic extraction was not performed. Upload a transcript with clear English text."
+                : "We could not identify readable academic transcript details in this PDF.";
+          const problem: TranscriptExtractionProblem = {
+            error: errorMessage,
+            languageDetection: error.languageDetection,
+          };
+          res.status(422).json(problem);
           return;
         }
         req.log.warn("Transcript extraction returned an invalid structured response.");

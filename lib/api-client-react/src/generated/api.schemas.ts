@@ -14,6 +14,41 @@ export interface HealthStatus {
  */
 export type AcademicTranscriptPdf = Blob;
 
+export interface TranscriptDetectedLanguage {
+  /** @maxLength 80 */
+  language: string;
+  /** @maxLength 80 */
+  script: string;
+}
+
+export type TranscriptLanguageDetectionStatus = typeof TranscriptLanguageDetectionStatus[keyof typeof TranscriptLanguageDetectionStatus];
+
+
+export const TranscriptLanguageDetectionStatus = {
+  ENGLISH_DETECTED: 'ENGLISH_DETECTED',
+  NO_ENGLISH: 'NO_ENGLISH',
+  UNCERTAIN: 'UNCERTAIN',
+} as const;
+
+export type TranscriptLanguageDetectionConfidence = typeof TranscriptLanguageDetectionConfidence[keyof typeof TranscriptLanguageDetectionConfidence];
+
+
+export const TranscriptLanguageDetectionConfidence = {
+  high: 'high',
+  medium: 'medium',
+  low: 'low',
+} as const;
+
+/**
+ * Language and script labels only; does not contain transcript text.
+ */
+export interface TranscriptLanguageDetection {
+  status: TranscriptLanguageDetectionStatus;
+  confidence: TranscriptLanguageDetectionConfidence;
+  /** @maxItems 12 */
+  languages: TranscriptDetectedLanguage[];
+}
+
 export interface AcademicInstitution {
   /** @nullable */
   name: string | null;
@@ -57,6 +92,16 @@ export interface AcademicRecord {
   institution: AcademicInstitution;
   credential: AcademicCredential;
   academicRecord: AcademicRecordDetails;
+}
+
+export interface TranscriptExtractionResult {
+  record: AcademicRecord;
+  languageDetection: TranscriptLanguageDetection;
+}
+
+export interface TranscriptExtractionProblem {
+  error: string;
+  languageDetection: TranscriptLanguageDetection;
 }
 
 export interface AcademicContextInput {

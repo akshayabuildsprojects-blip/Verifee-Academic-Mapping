@@ -1,5 +1,8 @@
 import { spawn } from "node:child_process";
-import { ExtractAcademicTranscriptResponse } from "@workspace/api-zod";
+import {
+  ExtractAcademicTranscriptResponse,
+  type TranscriptLanguageDetection,
+} from "@workspace/api-zod";
 import { openai } from "@workspace/integrations-openai-ai-server";
 
 const academicRecordJsonSchema = {
@@ -68,10 +71,11 @@ const transcriptLanguageJsonSchema = {
         additionalProperties: false,
         required: ["language", "script"],
         properties: {
-          language: { type: "string" },
-          script: { type: "string" },
+          language: { type: "string", maxLength: 80 },
+          script: { type: "string", maxLength: 80 },
         },
       },
+      maxItems: 12,
     },
   },
 } as const;
@@ -152,13 +156,19 @@ function parseTranscriptLanguagePreflight(
     if (
       typeof language !== "string" ||
       language.trim().length === 0 ||
+      language.trim().length > 80 ||
       typeof script !== "string" ||
-      script.trim().length === 0
+      script.trim().length === 0 ||
+      script.trim().length > 80
     ) {
       throw new TranscriptExtractionError("invalid-output");
     }
 
     languages.push({ language: language.trim(), script: script.trim() });
+  }
+
+  if (languages.length > 12) {
+    throw new TranscriptExtractionError("invalid-output");
   }
 
   return {
@@ -242,6 +252,7 @@ export class TranscriptExtractionError extends Error {
       | "not-a-transcript"
       | "no-english"
       | "uncertain-language",
+    readonly languageDetection?: TranscriptLanguageDetection,
   ) {
     super(code);
     this.name = "TranscriptExtractionError";
@@ -288,14 +299,27 @@ export async function extractAcademicTranscript(pdf: Buffer) {
   const preflight = parseTranscriptLanguagePreflight(
     languageResponse.output_text?.trim(),
   );
+  const languageDetection = (
+    status: TranscriptLanguageDetection["status"],
+  ): TranscriptLanguageDetection => ({
+    status,
+    confidence: preflight.confidence,
+    languages: preflight.languages,
+  });
   if (preflight.confidence === "low") {
-    throw new TranscriptExtractionError("uncertain-language");
+    throw new TranscriptExtractionError(
+      "uncertain-language",
+      languageDetection("UNCERTAIN"),
+    );
   }
   const englishWasDetected =
     preflight.hasReadableEnglish &&
     preflight.languages.some(isEnglishLanguage);
   if (!englishWasDetected) {
-    throw new TranscriptExtractionError("no-english");
+    throw new TranscriptExtractionError(
+      "no-english",
+      languageDetection("NO_ENGLISH"),
+    );
   }
 
   const hasOtherLanguage = preflight.languages.some(
@@ -354,15 +378,23 @@ export async function extractAcademicTranscript(pdf: Buffer) {
     throw new TranscriptExtractionError("invalid-output");
   }
 
-  const parsed = ExtractAcademicTranscriptResponse.safeParse(candidate);
+  const parsed = ExtractAcademicTranscriptResponse.shape.record.safeParse(
+    candidate,
+  );
   if (!parsed.success) {
     throw new TranscriptExtractionError("invalid-output");
   }
 
   const record = parsed.data;
   if (!record.institution.name && record.academicRecord.courses.length === 0) {
-    throw new TranscriptExtractionError("not-a-transcript");
+    throw new TranscriptExtractionError(
+      "not-a-transcript",
+      languageDetection("ENGLISH_DETECTED"),
+    );
   }
 
-  return record;
+  return ExtractAcademicTranscriptResponse.parse({
+    record,
+    languageDetection: languageDetection("ENGLISH_DETECTED"),
+  });
 }

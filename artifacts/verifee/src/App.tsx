@@ -8,7 +8,7 @@ import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter, Link } from 'wouter';
 import { AlertCircle, ArrowLeft, ArrowRight, ArrowDown, ArrowUpRight, BookOpen, Check, ChevronRight, ExternalLink, FileText, GraduationCap, Landmark, LoaderCircle, RotateCcw, ScanText, ShieldAlert, Upload, X } from 'lucide-react';
 import { extractAcademicTranscript, runAcademicContext, type AcademicContext, type AcademicContextInput, type AcademicMappingInput, type AcademicMappingResult, type AcademicRecord } from '@workspace/api-client-react';
-import { ExtractAcademicTranscriptResponse, RunAcademicContextResponse, RunAcademicMappingResponse } from '@workspace/api-zod';
+import { ExtractAcademicTranscriptResponse, RunAcademicContextResponse, RunAcademicMappingBody, RunAcademicMappingResponse, type TranscriptLanguageDetection } from '@workspace/api-zod';
 import { georgiaTechDataset } from '@workspace/georgia-tech-programs';
 import { checkVerification, extractMockRecord, sampleCourses, sampleCredential, uploadSchema, type CredentialVerification } from '@/lib/mock-analysis';
 import { runAcademicMappingWithProgress } from '@/lib/academic-mapping-stream';
@@ -54,11 +54,32 @@ function readAcademicRecord(): AcademicRecord | null {
   if (!serialized) return null;
   try {
     const candidate: unknown = JSON.parse(serialized);
-    const parsed = ExtractAcademicTranscriptResponse.safeParse(candidate);
+    const parsed = RunAcademicMappingBody.shape.record.safeParse(candidate);
     return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
+}
+
+function readStoredLanguageDetection(): TranscriptLanguageDetection | null {
+  const serialized = sessionStorage.getItem('verifee-language-detection');
+  if (!serialized) return null;
+  try {
+    const candidate: unknown = JSON.parse(serialized);
+    const parsed = ExtractAcademicTranscriptResponse.shape.languageDetection.safeParse(candidate);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function readLanguageDetectionFromError(cause: unknown): TranscriptLanguageDetection | null {
+  if (!cause || typeof cause !== 'object' || !('data' in cause)) return null;
+  const data = (cause as { data?: unknown }).data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const candidate = (data as Record<string, unknown>).languageDetection;
+  const parsed = ExtractAcademicTranscriptResponse.shape.languageDetection.safeParse(candidate);
+  return parsed.success ? parsed.data : null;
 }
 
 function readStoredMapping(programId: string): AcademicMappingResult | null {
@@ -163,9 +184,56 @@ function Stepper({ current }: { current: number }) {
     </div>)}
   </nav>;
 }
+
+function LanguageDetectionCard({
+  detection,
+  compact = false,
+}: {
+  detection: TranscriptLanguageDetection;
+  compact?: boolean;
+}) {
+  const statusLabel = detection.status === 'ENGLISH_DETECTED'
+    ? 'English detected'
+    : detection.status === 'NO_ENGLISH'
+      ? 'No readable English detected'
+      : 'Language detection uncertain';
+  const statusTone = detection.status === 'ENGLISH_DETECTED'
+    ? 'good'
+    : detection.status === 'UNCERTAIN'
+      ? 'review'
+      : 'gap';
+  const confidenceLabel = `${detection.confidence[0]?.toUpperCase()}${detection.confidence.slice(1)} confidence`;
+  const explanation = detection.status === 'ENGLISH_DETECTED'
+    ? 'Readable English was found. Non-English words may have been omitted from the extracted record.'
+    : detection.status === 'NO_ENGLISH'
+      ? 'Academic extraction was not performed because readable English was not found.'
+      : 'Academic extraction was not performed because the language check could not confidently identify readable English.';
+
+  return <div
+    className={`language-detection-card ${compact ? 'compact' : ''} ${detection.status.toLowerCase().replaceAll('_', '-')}`}
+    data-testid={compact ? 'language-detection-upload' : 'language-detection-review'}
+    role={compact ? 'status' : undefined}
+    aria-live={compact ? 'polite' : undefined}
+  >
+    <div className="language-detection-heading">
+      <strong>{statusLabel}</strong>
+      <span className={`status-pill ${statusTone}`}>{confidenceLabel}</span>
+    </div>
+    <p>{explanation}</p>
+    {detection.languages.length > 0
+      ? <ul className="language-detection-list" aria-label="Detected languages and writing systems">
+          {detection.languages.map(({ language, script }, index) => <li key={`${language}-${script}-${index}`}>
+            <strong>{language}</strong><span>Script: {script}</span>
+          </li>)}
+        </ul>
+      : <p className="language-detection-empty">No language labels could be identified.</p>}
+  </div>;
+}
+
 function UploadStep() {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState('');
+  const [languageDetection, setLanguageDetection] = useState<TranscriptLanguageDetection | null>(null);
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -174,12 +242,18 @@ function UploadStep() {
   const hasSavedAnalysis = sessionStorage.getItem('verifee-started') === 'yes' && Boolean(savedFileName);
   const chooseFile = (candidate?: File) => {
     setError('');
+    setLanguageDetection(null);
     if (!candidate) return;
     const validation = uploadSchema.safeParse({ file: candidate });
     if (!validation.success) { setFile(null); setError(validation.error.issues[0]?.message || 'Choose a supported credential file.'); return; }
     setFile(candidate);
   };
-  const saveReviewState = (mode: 'extracted' | 'demo', verification: CredentialVerification, record?: AcademicRecord) => {
+  const saveReviewState = (
+    mode: 'extracted' | 'demo',
+    verification: CredentialVerification,
+    record?: AcademicRecord,
+    detectedLanguages?: TranscriptLanguageDetection,
+  ) => {
     if (!file) return;
     sessionStorage.setItem('verifee-file-name', file.name);
     sessionStorage.setItem('verifee-file-format', formatForFileName(file.name));
@@ -188,6 +262,11 @@ function UploadStep() {
     sessionStorage.setItem('verifee-verification-explanation', verification.explanation);
     if (record) sessionStorage.setItem('verifee-extracted-record', JSON.stringify(record));
     else sessionStorage.removeItem('verifee-extracted-record');
+    if (detectedLanguages) {
+      sessionStorage.setItem('verifee-language-detection', JSON.stringify(detectedLanguages));
+    } else {
+      sessionStorage.removeItem('verifee-language-detection');
+    }
     sessionStorage.removeItem('verifee-mapping-result');
     sessionStorage.removeItem('verifee-academic-context');
     sessionStorage.removeItem('verifee-visible-course-count');
@@ -200,6 +279,7 @@ function UploadStep() {
     if (!file) return;
     setBusy(true);
     setError('');
+    setLanguageDetection(null);
     try {
       await extractMockRecord();
       const verification = await checkVerification();
@@ -214,13 +294,14 @@ function UploadStep() {
     if (!file) { setError('Choose a credential file to continue.'); return; }
     setBusy(true);
     setError('');
+    setLanguageDetection(null);
     try {
       if (isPdfFile(file)) {
-        const record = await extractAcademicTranscript(file);
+        const extraction = await extractAcademicTranscript(file);
         saveReviewState('extracted', {
           status: 'Verification unavailable',
           explanation: 'This PDF was read for academic interpretation only. No digital authenticity check was performed.',
-        }, record);
+        }, extraction.record, extraction.languageDetection);
       } else {
         await extractMockRecord();
         const verification = await checkVerification();
@@ -228,6 +309,7 @@ function UploadStep() {
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'We could not extract this transcript. Try again or use the demo sample.');
+      setLanguageDetection(readLanguageDetectionFromError(cause));
     } finally {
       setBusy(false);
     }
@@ -247,10 +329,11 @@ function UploadStep() {
         <div><span className="upload-icon"><Upload size={19} /></span><p className="drop-title">{file ? 'Credential selected' : 'Drop your credential here or'} {!file && <button className="browse" type="button" onClick={(event) => { event.stopPropagation(); inputRef.current?.click(); }}>browse files</button>}</p><p className="drop-hint">{file ? `${formatForFileName(file.name)} · ${(file.size / (1024 * 1024)).toFixed(2)} MB` : 'PDF, .opencert, or .jsonld · 20 MB maximum'}</p></div>
       </div>
       <input ref={inputRef} className="file-control" type="file" accept=".pdf,.opencert,.jsonld,application/pdf,application/ld+json" aria-label="Choose a credential file" data-testid="input-credential" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} />
-      {file && <div className="file-chip" data-testid="text-selected-file"><div className="chip-file"><FileText size={17} color="#55766c" /><div><strong>{file.name}</strong><div className="file-meta">{(file.size / (1024 * 1024)).toFixed(2)} MB · {formatForFileName(file.name)}</div></div></div><button className="remove-file" aria-label="Remove selected file" data-testid="button-remove-file" onClick={() => { setFile(null); setError(''); if (inputRef.current) inputRef.current.value = ''; }}><X size={16} /></button></div>}
+      {file && <div className="file-chip" data-testid="text-selected-file"><div className="chip-file"><FileText size={17} color="#55766c" /><div><strong>{file.name}</strong><div className="file-meta">{(file.size / (1024 * 1024)).toFixed(2)} MB · {formatForFileName(file.name)}</div></div></div><button className="remove-file" aria-label="Remove selected file" data-testid="button-remove-file" onClick={() => { setFile(null); setError(''); setLanguageDetection(null); if (inputRef.current) inputRef.current.value = ''; }}><X size={16} /></button></div>}
       <p className="upload-note">PDF contents are sent to the configured AI service for academic extraction. The extracted record is kept in this browser session; mapping sends only that academic JSON, not the PDF. Reading a PDF does not verify that it is authentic. OpenCerts and JSON-LD are not verified in this version.</p>
       <div className="demo-disclosure"><strong>Current scope:</strong> PDF extraction and preliminary mapping use the academic details extracted from your transcript. If extraction fails, you can explicitly continue with the synthetic demo sample instead.</div>
-      {error && <div className="error-message" role="alert" data-testid="status-upload-error">{error}</div>}
+       {error && <div className="error-message" role="alert" data-testid="status-upload-error">{error}</div>}
+       {languageDetection && <LanguageDetectionCard detection={languageDetection} compact />}
       <button className="cta" type="button" onClick={() => void submit()} disabled={!file || busy} data-testid="button-continue-upload"><span>{busy ? file && isPdfFile(file) ? 'Reading transcript…' : 'Preparing sample record…' : 'Continue to verify & review'}</span>{busy ? <LoaderCircle size={16} className="animate-spin" /> : <ArrowRight size={16} />}</button>
       {file && isPdfFile(file) && error && <button className="secondary-btn" type="button" onClick={() => void continueWithDemo()} disabled={busy} data-testid="button-use-demo-fallback">Continue with demo sample instead</button>}
       {hasSavedAnalysis && !file && <button className="secondary-btn resume-analysis" type="button" onClick={() => setLocation('/analysis')} data-testid="button-resume-analysis"><ArrowRight size={14} /> Continue saved analysis · {savedFileName}</button>}
@@ -337,6 +420,7 @@ function Review() {
   const fileName = sessionStorage.getItem('verifee-file-name');
   const isExtracted = sessionStorage.getItem('verifee-analysis-mode') === 'extracted';
   const academicRecord = useMemo(() => readAcademicRecord(), []);
+  const languageDetection = useMemo(() => readStoredLanguageDetection(), []);
   const extractedRecord = isExtracted ? academicRecord : null;
   const reviewRecord = academicRecord || createSampleAcademicRecord();
   const [visibleCourseCount, setVisibleCourseCount] = useState(() => {
@@ -387,6 +471,10 @@ function Review() {
         <div className="section-title"><h2 id="interpretation-status-heading">Academic interpretation</h2></div>
         <div className="verification-review"><Check size={18} /><div><span className="status-pill" data-testid="status-academic-interpretation">{isExtracted ? 'Available' : 'Sample only'}</span><p>{isExtracted ? 'The values below were extracted from the PDF. Missing or unreadable details are shown as not present in the transcript.' : 'The values below are sample data and were not extracted from the selected file.'}</p></div></div>
       </section>
+      {isExtracted && languageDetection && <section className="review-section" aria-labelledby="language-detection-heading">
+        <div className="section-title"><h2 id="language-detection-heading">Language detection</h2></div>
+        <LanguageDetectionCard detection={languageDetection} />
+      </section>}
       <section className="review-section" aria-labelledby="credential-heading">
         <div className="section-title"><h2 id="credential-heading">Credential details</h2><span className="small-label">{isExtracted ? 'Extracted from PDF' : 'Sample record'}</span></div>
         <div className="credential-grid">{credentialFields.map(([label, value]) => <div key={label}><span className="data-label">{label}</span><span className="data-value">{value}</span></div>)}</div>

@@ -44,11 +44,11 @@ paths:
               $ref: "#/components/schemas/AcademicTranscriptPdf"
       responses:
         "200":
-          description: Structured academic record extracted from the PDF
+          description: Academic record and a concise language-detection summary
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AcademicRecord"
+                $ref: "#/components/schemas/TranscriptExtractionResult"
         "400":
           description: The request did not contain a valid PDF
           content:
@@ -68,11 +68,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "422":
-          description: The PDF could not be interpreted as an academic transcript
+          description: The PDF contained no readable English, detection was uncertain, or no academic transcript details were found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: "#/components/schemas/TranscriptExtractionProblem"
         "429":
           description: The extraction request limit was reached
           content:
@@ -228,6 +228,67 @@ components:
       type: string
       format: binary
       description: PDF bytes; processed in memory and not persisted.
+    TranscriptDetectedLanguage:
+      type: object
+      additionalProperties: false
+      properties:
+        language:
+          type: string
+          maxLength: 80
+        script:
+          type: string
+          maxLength: 80
+      required:
+        - language
+        - script
+    TranscriptLanguageDetection:
+      type: object
+      description: Language and script labels only; does not contain transcript text.
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum:
+            - ENGLISH_DETECTED
+            - NO_ENGLISH
+            - UNCERTAIN
+        confidence:
+          type: string
+          enum:
+            - high
+            - medium
+            - low
+        languages:
+          type: array
+          maxItems: 12
+          items:
+            $ref: "#/components/schemas/TranscriptDetectedLanguage"
+      required:
+        - status
+        - confidence
+        - languages
+    TranscriptExtractionResult:
+      type: object
+      additionalProperties: false
+      properties:
+        record:
+          $ref: "#/components/schemas/AcademicRecord"
+        languageDetection:
+          $ref: "#/components/schemas/TranscriptLanguageDetection"
+      required:
+        - record
+        - languageDetection
+    TranscriptExtractionProblem:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+        languageDetection:
+          $ref: "#/components/schemas/TranscriptLanguageDetection"
+      required:
+        - error
+        - languageDetection
     AcademicRecord:
       type: object
       additionalProperties: false

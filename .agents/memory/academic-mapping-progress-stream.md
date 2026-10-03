@@ -7,4 +7,4 @@ The progress stream is additive to the existing mapping API. Each progress snaps
 
 **Why:** The report needs useful live progress without changing the application's established mapping semantics, evidence guarantees, saved session behavior, or final response contract.
 
-**How to apply:** For future progress UI, retry flows, or transport changes, emit updates from completed per-requirement tasks, synchronize displayed counts with rendered results through the terminal state, preserve the current final schema, and leave the legacy endpoint available.
+**How to apply:** For future progress UI, retry flows, or transport changes, emit updates from completed per-requirement tasks, synchronize displayed counts with rendered results through the terminal state, preserve the current final schema, and leave the legacy endpoint available. In E2E tests, explicitly open requirement cards before checking evidence; their expanded state is transient across stream updates and reloads.

@@ -261,8 +261,17 @@ const result: MappingResult = {
   ],
 };
 
+const detectedLanguages = {
+  status: "ENGLISH_DETECTED",
+  confidence: "medium",
+  languages: [
+    { language: "English", script: "Latin" },
+    { language: "Spanish", script: "Latin" },
+  ],
+} as const;
+
 async function openReport(page: Page) {
-  await page.addInitScript((record) => {
+  await page.addInitScript(({ record, languageDetection }) => {
     if (sessionStorage.getItem("verifee-started") !== "yes") {
       sessionStorage.setItem("verifee-file-name", "sample-transcript.pdf");
       sessionStorage.setItem("verifee-file-format", "PDF transcript");
@@ -273,6 +282,10 @@ async function openReport(page: Page) {
         "No independent verification was performed.",
       );
       sessionStorage.setItem("verifee-extracted-record", JSON.stringify(record));
+      sessionStorage.setItem(
+        "verifee-language-detection",
+        JSON.stringify(languageDetection),
+      );
       sessionStorage.setItem("verifee-program", "ms-analytics");
       sessionStorage.setItem("verifee-started", "yes");
     }
@@ -322,12 +335,33 @@ async function openReport(page: Page) {
         headers: { "Content-Type": "text/event-stream" },
       });
     };
-  }, academicRecord);
+  }, { record: academicRecord, languageDetection: detectedLanguages });
   await page.goto("/report");
   await page.getByRole("heading", { name: "Academic mapping" }).waitFor();
   await page.waitForFunction(
     () => window.__verifeeMappingTest?.streams.length === 1,
   );
+}
+
+async function openReview(page: Page) {
+  await page.addInitScript(({ record, languageDetection }) => {
+    sessionStorage.setItem("verifee-file-name", "sample-transcript.pdf");
+    sessionStorage.setItem("verifee-file-format", "PDF transcript");
+    sessionStorage.setItem("verifee-analysis-mode", "extracted");
+    sessionStorage.setItem("verifee-verification-status", "Not verified");
+    sessionStorage.setItem(
+      "verifee-verification-explanation",
+      "No independent verification was performed.",
+    );
+    sessionStorage.setItem("verifee-extracted-record", JSON.stringify(record));
+    sessionStorage.setItem(
+      "verifee-language-detection",
+      JSON.stringify(languageDetection),
+    );
+    sessionStorage.setItem("verifee-started", "yes");
+  }, { record: academicRecord, languageDetection: detectedLanguages });
+  await page.goto("/analysis");
+  await page.getByRole("heading", { name: "Verify & review" }).waitFor();
 }
 
 async function sendStreamEvent(
@@ -345,6 +379,109 @@ async function sendStreamEvent(
     { index: streamIndex, eventName: event, data: payload },
   );
 }
+
+test("shows detected languages and scripts in transcript review", async ({ page }) => {
+  await openReview(page);
+
+  const summary = page.getByTestId("language-detection-review");
+  await expect(page.getByRole("heading", { name: "Language detection" })).toBeVisible();
+  await expect(summary).toContainText("English detected");
+  await expect(summary).toContainText("Medium confidence");
+  await expect(summary).toContainText("English");
+  await expect(summary).toContainText("Spanish");
+  await expect(summary).toContainText("Script: Latin");
+  await expect(summary).not.toContainText("Northbridge University");
+
+  const savedState = await page.evaluate(() => ({
+    record: JSON.parse(sessionStorage.getItem("verifee-extracted-record") ?? "null"),
+    detection: JSON.parse(sessionStorage.getItem("verifee-language-detection") ?? "null"),
+  }));
+  expect(savedState.record).toEqual(academicRecord);
+  expect(savedState.detection).toEqual(detectedLanguages);
+});
+
+test("shows an uncertain language result when transcript extraction is blocked", async ({
+  page,
+}) => {
+  await page.route("**/api/academic-transcripts/extract", async (route) => {
+    await route.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error:
+          "We could not confidently identify readable English, so academic extraction was not performed. Upload a clearer scan.",
+        languageDetection: {
+          status: "UNCERTAIN",
+          confidence: "low",
+          languages: [{ language: "Unknown", script: "Latin" }],
+        },
+      }),
+    });
+  });
+
+  await page.goto("/start");
+  await page.getByTestId("input-credential").setInputFiles({
+    name: "uncertain-scan.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\n"),
+  });
+  await page.getByTestId("button-continue-upload").click();
+
+  const summary = page.getByTestId("language-detection-upload");
+  await expect(page.getByTestId("status-upload-error")).toContainText(
+    "could not confidently identify readable English",
+  );
+  await expect(summary).toContainText("Language detection uncertain");
+  await expect(summary).toContainText("Low confidence");
+  await expect(summary).toContainText("Unknown");
+  await expect(summary).toContainText("Script: Latin");
+  await expect(summary).toContainText("Academic extraction was not performed");
+  await expect(summary).not.toContainText("Northbridge University");
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("verifee-language-detection")),
+  ).toBeNull();
+});
+
+test("explains when no readable English is detected", async ({ page }) => {
+  await page.route("**/api/academic-transcripts/extract", async (route) => {
+    await route.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error:
+          "No readable English text was found in the PDF; extraction was not performed. Upload a transcript with readable English text.",
+        languageDetection: {
+          status: "NO_ENGLISH",
+          confidence: "high",
+          languages: [{ language: "Spanish", script: "Latin" }],
+        },
+      }),
+    });
+  });
+
+  await page.goto("/start");
+  await page.getByTestId("input-credential").setInputFiles({
+    name: "spanish-transcript.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\n"),
+  });
+  await page.getByTestId("button-continue-upload").click();
+
+  const summary = page.getByTestId("language-detection-upload");
+  await expect(page.getByTestId("status-upload-error")).toContainText(
+    "No readable English text was found",
+  );
+  await expect(summary).toContainText("No readable English detected");
+  await expect(summary).toContainText("High confidence");
+  await expect(summary).toContainText("Spanish");
+  await expect(summary).toContainText("Script: Latin");
+  await expect(summary).toContainText(
+    "Academic extraction was not performed because readable English was not found.",
+  );
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("verifee-language-detection")),
+  ).toBeNull();
+});
 
 test("shows each completed requirement live, keeps evidence accessible, and persists the final report", async ({
   page,
@@ -369,9 +506,12 @@ test("shows each completed requirement live, keeps evidence accessible, and pers
   await expect(page.getByText("1 of 4 requirements mapped")).toBeVisible();
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
   await expect(page.getByTestId(`mapping-${requirementIds[1]}`)).toHaveCount(0);
-  await expect(
-    page.getByTestId(`toggle-mapping-${requirementIds[0]}`),
-  ).toHaveAttribute("aria-expanded", "true");
+  const firstRequirementToggle = page.getByTestId(
+    `toggle-mapping-${requirementIds[0]}`,
+  );
+  await expect(firstRequirementToggle).toHaveAttribute("aria-expanded", "false");
+  await firstRequirementToggle.click();
+  await expect(firstRequirementToggle).toHaveAttribute("aria-expanded", "true");
 
   const secondSnapshot: MappingResult = {
     ...result,
@@ -382,12 +522,18 @@ test("shows each completed requirement live, keeps evidence accessible, and pers
 
   await expect(page.getByText("2 of 4 requirements mapped")).toBeVisible();
   await expect(page.getByTestId(`mapping-${requirementIds[1]}`)).toBeVisible();
-  await expect(
-    page.getByTestId(`toggle-mapping-${requirementIds[0]}`),
-  ).toHaveAttribute("aria-expanded", "false");
-  await expect(
-    page.getByTestId(`toggle-mapping-${requirementIds[1]}`),
-  ).toHaveAttribute("aria-expanded", "true");
+  const secondRequirementToggle = page.getByTestId(
+    `toggle-mapping-${requirementIds[1]}`,
+  );
+  if (await firstRequirementToggle.getAttribute("aria-expanded") !== "true") {
+    await firstRequirementToggle.click();
+  }
+  await expect(firstRequirementToggle).toHaveAttribute("aria-expanded", "true");
+  if (await secondRequirementToggle.getAttribute("aria-expanded") !== "true") {
+    await secondRequirementToggle.click();
+  }
+  await expect(firstRequirementToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(secondRequirementToggle).toHaveAttribute("aria-expanded", "true");
 
   await sendStreamEvent(page, 0, "complete", result);
   await page.evaluate(() => {
@@ -395,15 +541,16 @@ test("shows each completed requirement live, keeps evidence accessible, and pers
   });
   await expect(page.getByTestId("status-mapping-loading")).toHaveCount(0);
   await expect(page.locator(".summary-number")).toHaveText("4");
-  await expect(
-    page.getByTestId(`toggle-mapping-${requirementIds[0]}`),
-  ).toHaveAttribute("aria-expanded", "true");
-  await expect(
-    page.getByTestId(`toggle-mapping-${requirementIds[1]}`),
-  ).toHaveAttribute("aria-expanded", "false");
-
   const firstCard = page.getByTestId(`mapping-${requirementIds[0]}`);
   const firstToggle = firstCard.getByRole("button");
+  if (await firstToggle.getAttribute("aria-expanded") !== "true") {
+    await firstToggle.click();
+  }
+  await expect(firstToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    secondRequirementToggle,
+  ).toHaveAttribute("aria-expanded", "false");
+
   const firstContent = firstCard.getByRole("region");
   await expect(firstContent).toContainText("Relevant prior coursework");
   await expect(firstContent).toContainText("MATH 101 · Calculus I");
@@ -447,9 +594,12 @@ test("shows each completed requirement live, keeps evidence accessible, and pers
   await page.reload();
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
   await expect(page.getByTestId("status-mapping-loading")).toHaveCount(0);
-  await expect(
-    page.getByTestId(`toggle-mapping-${requirementIds[0]}`),
-  ).toHaveAttribute("aria-expanded", "true");
+  const persistedToggle = page.getByTestId(
+    `toggle-mapping-${requirementIds[0]}`,
+  );
+  await expect(persistedToggle).toHaveAttribute("aria-expanded", "false");
+  await persistedToggle.click();
+  await expect(persistedToggle).toHaveAttribute("aria-expanded", "true");
   await expect
     .poll(() =>
       page.evaluate(() => window.__verifeeMappingTest?.requests.length),
