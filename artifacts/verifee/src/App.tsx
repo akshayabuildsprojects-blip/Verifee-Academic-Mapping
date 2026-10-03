@@ -12,9 +12,33 @@ import { ExtractAcademicTranscriptResponse, RunAcademicContextResponse, RunAcade
 import { georgiaTechDataset } from '@workspace/georgia-tech-programs';
 import { checkVerification, extractMockRecord, sampleCourses, sampleCredential, uploadSchema, type CredentialVerification } from '@/lib/mock-analysis';
 import { runAcademicMappingWithProgress } from '@/lib/academic-mapping-stream';
+import VerifeeReportView from '@/components/verifee-report-view';
+import { buildVerifeeReportData, type GeneratedReportMetadata } from '@/lib/verifee-report';
+import { downloadVerifeeReportPdf } from '@/lib/verifee-report-pdf';
 
 const queryClient = new QueryClient();
-const wizardSteps = ['Upload Credential', 'Verify & Review', 'Select Target', 'Academic Mapping'];
+const wizardSteps = ['Upload Credential', 'Verify & Review', 'Select Target', 'Academic Mapping', 'Verifee Report'];
+const verifeeSessionKeys = [
+  'verifee-file-name',
+  'verifee-file-format',
+  'verifee-target',
+  'verifee-program',
+  'verifee-started',
+  'verifee-verification-status',
+  'verifee-verification-explanation',
+  'verifee-verification-method',
+  'verifee-analysis-mode',
+  'verifee-extracted-record',
+  'verifee-language-detection',
+  'verifee-mapping-result',
+  'verifee-academic-context',
+  'verifee-visible-course-count',
+  'verifee-generated-report',
+];
+
+function clearVerifeeSession() {
+  verifeeSessionKeys.forEach((key) => sessionStorage.removeItem(key));
+}
 const programTypeLabels: Record<string, string> = {
   published_prerequisite_background: 'Published prerequisite / background expectations',
   recommended_expected_background: 'Recommended / expected preparation · holistic admissions',
@@ -104,6 +128,35 @@ function readStoredAcademicContext(): AcademicContext | null {
   } catch {
     return null;
   }
+}
+
+function readStoredGeneratedReport(): GeneratedReportMetadata | null {
+  const serialized = sessionStorage.getItem('verifee-generated-report');
+  if (!serialized) return null;
+  try {
+    const candidate: unknown = JSON.parse(serialized);
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      return null;
+    }
+    const value = candidate as Record<string, unknown>;
+    if (
+      typeof value.reportId !== 'string' ||
+      !/^VF-[A-Z0-9-]{4,16}$/i.test(value.reportId) ||
+      typeof value.generatedAt !== 'string' ||
+      Number.isNaN(Date.parse(value.generatedAt))
+    ) {
+      return null;
+    }
+    return { reportId: value.reportId, generatedAt: value.generatedAt };
+  } catch {
+    return null;
+  }
+}
+
+function createReportId() {
+  const token = globalThis.crypto?.randomUUID?.()
+    ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`;
+  return `VF-${token.replaceAll('-', '').slice(0, 8).toUpperCase()}`;
 }
 
 function createFallbackAcademicContext(record: AcademicRecord): AcademicContext {
@@ -260,6 +313,8 @@ function UploadStep() {
     sessionStorage.setItem('verifee-analysis-mode', mode);
     sessionStorage.setItem('verifee-verification-status', verification.status);
     sessionStorage.setItem('verifee-verification-explanation', verification.explanation);
+    sessionStorage.removeItem('verifee-verification-method');
+    sessionStorage.removeItem('verifee-generated-report');
     if (record) sessionStorage.setItem('verifee-extracted-record', JSON.stringify(record));
     else sessionStorage.removeItem('verifee-extracted-record');
     if (detectedLanguages) {
@@ -317,7 +372,7 @@ function UploadStep() {
   return <div className="shell"><Header /><main className="page-wrap wizard-wrap">
     <Stepper current={1} />
     <section className="wizard-card">
-      <div className="eyebrow">Step 1 of 4</div>
+      <div className="eyebrow">Step 1 of 5</div>
       <h1 className="wizard-title">Upload an academic credential</h1>
       <p className="wizard-intro">Upload a transcript PDF. Verifee checks its languages first, then extracts readable English text only; non-English words are omitted, including those written in Latin letters. If no readable English is found, extraction will not run. Detection can be uncertain for short words, names, and low-quality scans. Other accepted formats continue through the sample-data demo path.</p>
       <div className="format-grid" aria-label="Accepted credential formats">
@@ -453,7 +508,7 @@ function Review() {
   return <div className="shell"><Header /><main className="page-wrap wizard-wrap">
     <Stepper current={2} />
     <section className="wizard-card">
-      <div className="eyebrow">Step 2 of 4</div>
+      <div className="eyebrow">Step 2 of 5</div>
       <h1 className="wizard-title">Verify &amp; review</h1>
       <p className="wizard-intro">Review the academic details before choosing a target. Reading a transcript does not establish that it is authentic.</p>
       <div className="review-disclosure"><AlertCircle size={17} /><span>{isExtracted
@@ -502,6 +557,7 @@ function TargetSelection() {
   const changeProgram = (value: string) => {
     setProgramId(value);
     sessionStorage.setItem('verifee-program', value);
+    if (value !== programId) sessionStorage.removeItem('verifee-generated-report');
     if (sessionStorage.getItem('verifee-mapping-result')) {
       const saved = readStoredMapping(value);
       if (!saved) sessionStorage.removeItem('verifee-mapping-result');
@@ -514,7 +570,7 @@ function TargetSelection() {
   return <div className="shell"><Header /><main className="page-wrap wizard-wrap">
     <Stepper current={3} />
     <section className="wizard-card target-card">
-      <div className="eyebrow">Step 3 of 4</div>
+      <div className="eyebrow">Step 3 of 5</div>
       <h1 className="wizard-title">Choose what you want to compare against</h1>
         <p className="wizard-intro">{isExtracted ? 'Choose the Georgia Tech program to compare with the complete extracted academic record. The mapping request uses the extracted JSON, not the PDF file.' : 'Choose the Georgia Tech program to compare with the synthetic sample academic record.'}</p>
       <div className="target-form">
@@ -813,24 +869,12 @@ function Report() {
 
   const retryMapping = () => {
     sessionStorage.removeItem('verifee-mapping-result');
+    sessionStorage.removeItem('verifee-generated-report');
     void requestMapping();
   };
 
   const reset = () => {
-    [
-      'verifee-file-name',
-      'verifee-file-format',
-      'verifee-target',
-      'verifee-program',
-      'verifee-started',
-      'verifee-verification-status',
-      'verifee-verification-explanation',
-      'verifee-analysis-mode',
-      'verifee-extracted-record',
-      'verifee-mapping-result',
-      'verifee-academic-context',
-      'verifee-visible-course-count',
-    ].forEach((key) => sessionStorage.removeItem(key));
+    clearVerifeeSession();
     setLocation('/start');
   };
 
@@ -875,7 +919,7 @@ function Report() {
     <Stepper current={4} />
     <div className="report-top">
       <div>
-        <div className="eyebrow">Step 4 of 4 · Preliminary report</div>
+        <div className="eyebrow">Step 4 of 5 · Academic mapping</div>
         <h1 className="report-title">Academic mapping</h1>
         <p className="report-lede">Course-by-course evidence compared with the stored {program.shortName} background requirements.</p>
       </div>
@@ -1022,15 +1066,102 @@ function Report() {
         <section className="panel section-card"><p className="report-aside-title">Items requiring review</p><ul className="review-list"><li><span className="review-dot" />Confirm detailed course coverage with official catalog pages, syllabi, or learning outcomes.</li><li><span className="review-dot" />Confirm grading scale, credit units, and instructional hours with the issuing institution.</li><li><span className="review-dot" />Verify the credential independently; no verification was performed here.</li><li><span className="review-dot" />These preliminary mappings are not admissions, approval, equivalency, or transfer-credit decisions.</li></ul></section>
       </aside>
     </div>
+    {currentMapping && !loading && !mappingError && allRequirementsCompleted && !currentMapping.retryable && !contextLoading && <div className="report-finalize-cta" data-testid="card-generate-verifee-report">
+      <div>
+        <span className="small-label">Analysis complete</span>
+        <p>Continue to a downloadable report built from these completed results.</p>
+      </div>
+      <button className="cta" type="button" onClick={() => setLocation('/final-report')} data-testid="button-open-verifee-report">
+        <span>Generate Verifee Report</span><ArrowRight size={16} />
+      </button>
+    </div>}
     <div className="report-disclaimer">Verifee provides preliminary academic interpretation and mapping. It is not an official admissions decision, credential equivalency, or transfer-credit determination.</div>
   </main></div>;
+}
+
+function FinalReport() {
+  const [, setLocation] = useLocation();
+  const started = sessionStorage.getItem('verifee-started') === 'yes';
+  const reportData = useMemo(() => {
+    const fileName = sessionStorage.getItem('verifee-file-name');
+    const record = readAcademicRecord();
+    const programId = sessionStorage.getItem('verifee-program');
+    const program = georgiaTechDataset.programs.find((item) => item.id === programId);
+    if (!started || !fileName || !record || !program) return null;
+
+    const mapping = readStoredMapping(program.id);
+    if (
+      !mapping ||
+      mapping.retryable ||
+      mapping.requirements.length !== program.requirements.length
+    ) {
+      return null;
+    }
+
+    const context = readStoredAcademicContext() ?? createFallbackAcademicContext(record);
+    return buildVerifeeReportData({
+      record,
+      context,
+      mapping,
+      program,
+      targetInstitution: georgiaTechDataset.institution.name,
+      verificationStatus:
+        sessionStorage.getItem('verifee-verification-status') || 'Verification unavailable',
+      verificationExplanation:
+        sessionStorage.getItem('verifee-verification-explanation') ||
+        'No independent credential verification was performed.',
+      verificationMethod: sessionStorage.getItem('verifee-verification-method'),
+      fileFormat: sessionStorage.getItem('verifee-file-format') || 'PDF transcript',
+    });
+  }, [started]);
+  const [generatedReport, setGeneratedReport] = useState(readStoredGeneratedReport);
+
+  useEffect(() => {
+    if (!reportData) setLocation(started ? '/report' : '/start');
+  }, [reportData, setLocation, started]);
+
+  if (!reportData) return null;
+
+  const generateReport = () => {
+    const metadata = readStoredGeneratedReport() ?? {
+      reportId: createReportId(),
+      generatedAt: new Date().toISOString(),
+    };
+    sessionStorage.setItem('verifee-generated-report', JSON.stringify(metadata));
+    setGeneratedReport(metadata);
+  };
+
+  const startNewAnalysis = () => {
+    clearVerifeeSession();
+    setLocation('/start');
+  };
+
+  const downloadReport = () => {
+    if (!generatedReport) return;
+    downloadVerifeeReportPdf(reportData, generatedReport);
+  };
+
+  return <div className="shell">
+    <Header />
+    <div className="page-wrap wizard-wrap final-report-stepper">
+      <Stepper current={5} />
+    </div>
+    <VerifeeReportView
+      data={reportData}
+      generatedReport={generatedReport}
+      onGenerate={generateReport}
+      onDownload={downloadReport}
+      onBackToMapping={() => setLocation('/report')}
+      onStartNewAnalysis={startNewAnalysis}
+    />
+  </div>;
 }
 function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 function Router() {
-  return <RoutedErrorBoundary><Switch><Route path="/" component={Landing} /><Route path="/start" component={UploadStep} /><Route path="/analysis" component={Review} /><Route path="/target" component={TargetSelection} /><Route path="/report" component={Report} /><Route component={NotFound} /></Switch></RoutedErrorBoundary>;
+  return <RoutedErrorBoundary><Switch><Route path="/" component={Landing} /><Route path="/start" component={UploadStep} /><Route path="/analysis" component={Review} /><Route path="/target" component={TargetSelection} /><Route path="/report" component={Report} /><Route path="/final-report" component={FinalReport} /><Route component={NotFound} /></Switch></RoutedErrorBoundary>;
 }
 function App() {
   return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>;

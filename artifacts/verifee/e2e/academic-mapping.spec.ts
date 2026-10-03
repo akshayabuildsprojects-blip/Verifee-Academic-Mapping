@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 const programId = "ms-analytics";
 const requirementIds = [
@@ -706,4 +707,93 @@ test("keeps completed requirement results visible after a stream failure and ret
   });
   await expect(page.getByTestId("status-mapping-loading")).toHaveCount(0);
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
+});
+
+test("generates a PDF from the completed mapping without rerunning analysis", async ({
+  page,
+}) => {
+  await openReport(page);
+  await sendStreamEvent(page, 0, "complete", result);
+  await page.evaluate(() => {
+    window.__verifeeMappingTest?.streams[0]?.close();
+  });
+
+  await expect(page.getByTestId("button-open-verifee-report")).toBeVisible();
+  const storedMappingBefore = await page.evaluate(() =>
+    JSON.parse(sessionStorage.getItem("verifee-mapping-result") ?? "null"),
+  );
+  await page.getByTestId("button-open-verifee-report").click();
+  await expect(page).toHaveURL(/\/final-report$/);
+  await expect(page.getByText("$0.00")).toBeVisible();
+  await expect(page.getByText("Free in Demo Mode")).toBeVisible();
+  await expect(page.getByText("Report pricing is disabled during the Verifee demo. No payment information is required.")).toBeVisible();
+  await page.getByTestId("button-generate-report").click();
+
+  await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
+  await expect(page.getByText("Preliminary Academic Mapping Report").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Example University", exact: true })).toBeVisible();
+  await expect(page.getByText("Academic Interpretation · Completed")).toBeVisible();
+  await expect(page.getByTestId(`report-requirement-${requirementIds[0]}`)).toContainText("Calculus");
+  await expect(page.getByTestId(`report-requirement-${requirementIds[0]}`)).toContainText("Covered");
+  await expect(
+    page.getByRole("link", { name: "Example University course catalog: Calculus I" }).first(),
+  ).toHaveAttribute("href", "https://catalog.example.edu/courses/math-101");
+  await expect(page.getByRole("heading", { name: "Items requiring review" })).toBeVisible();
+  await expect(page.getByText(/Confirm the transcript grading scale/)).toBeVisible();
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByTestId("button-download-report").click(),
+  ]);
+  expect(download.suggestedFilename()).toMatch(/\.pdf$/);
+  const downloadPath = await download.path();
+  expect(downloadPath).not.toBeNull();
+  const pdf = await readFile(downloadPath!);
+  expect(pdf.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+  const pdfContents = pdf.toString("latin1");
+  expect(pdfContents).toContain("Preliminary Academic");
+  expect(pdfContents).toContain("Final academic and admissions decisions");
+  expect(pdfContents).toContain("https://catalog.example.edu/courses/math-101");
+  expect(pdfContents).toContain("/Annots");
+
+  expect(
+    await page.evaluate(() => window.__verifeeMappingTest?.requests.length),
+  ).toBe(1);
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(sessionStorage.getItem("verifee-mapping-result") ?? "null"),
+    ),
+  ).toEqual(storedMappingBefore);
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(sessionStorage.getItem("verifee-generated-report") ?? "null"),
+    ),
+  ).toMatchObject({ reportId: expect.stringMatching(/^VF-/), generatedAt: expect.any(String) });
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__verifeeMappingTest?.requests.length),
+  ).toBe(0);
+
+  await page.getByTestId("button-back-to-mapping").click();
+  await expect(page).toHaveURL(/\/report$/);
+  await expect(page.getByTestId("button-open-verifee-report")).toBeVisible();
+  expect(
+    await page.evaluate(() => window.__verifeeMappingTest?.requests.length),
+  ).toBe(0);
+
+  await page.getByTestId("button-open-verifee-report").click();
+  await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
+  await page.getByTestId("button-start-new-analysis").click();
+  await expect(page).toHaveURL(/\/start$/);
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("verifee-generated-report")),
+  ).toBeNull();
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("verifee-mapping-result")),
+  ).toBeNull();
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("verifee-extracted-record")),
+  ).toBeNull();
 });
