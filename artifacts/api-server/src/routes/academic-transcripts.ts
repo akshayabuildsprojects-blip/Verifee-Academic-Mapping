@@ -62,6 +62,18 @@ router.post(
       res.json(ExtractAcademicTranscriptResponse.parse(record));
     } catch (error) {
       if (error instanceof TranscriptExtractionError) {
+        if (error.code === "uncertain-language") {
+          res.status(422).json({
+            error: "We could not confidently identify readable English, so academic extraction was not performed. Upload a clearer scan or a transcript with readable English text.",
+          });
+          return;
+        }
+        if (error.code === "no-english") {
+          res.status(422).json({
+            error: "No readable English text was found, so academic extraction was not performed. Upload a transcript with clear English text.",
+          });
+          return;
+        }
         if (error.code === "not-a-transcript") {
           res.status(422).json({ error: "We could not identify readable academic transcript details in this PDF." });
           return;

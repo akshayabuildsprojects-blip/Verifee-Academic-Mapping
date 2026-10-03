@@ -237,7 +237,7 @@ function UploadStep() {
     <section className="wizard-card">
       <div className="eyebrow">Step 1 of 4</div>
       <h1 className="wizard-title">Upload an academic credential</h1>
-      <p className="wizard-intro">Upload an English-language transcript PDF to extract its academic details for review and preliminary mapping. Other accepted formats continue through the sample-data demo path.</p>
+      <p className="wizard-intro">Upload a transcript PDF. Verifee checks its languages first, then extracts readable English text only; non-English words are omitted, including those written in Latin letters. If no readable English is found, extraction will not run. Detection can be uncertain for short words, names, and low-quality scans. Other accepted formats continue through the sample-data demo path.</p>
       <div className="format-grid" aria-label="Accepted credential formats">
         <div className="format-option"><span className="format-name">PDF</span><span>AI academic extraction for Step 2</span></div>
         <div className="format-option"><span className="format-name">OpenCerts <span className="format-ext">.opencert</span></span><span>Sample-data demo only; not verified</span></div>
