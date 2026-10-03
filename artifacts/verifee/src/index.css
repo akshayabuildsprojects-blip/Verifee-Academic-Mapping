@@ -285,11 +285,20 @@ button { cursor:pointer; }
 .academic-context-note{margin:12px 0 0;color:#806447;font-size:11px;line-height:1.5}
 .academic-context-disclaimer{margin:10px 0 0;color:#788583;font-size:10px;line-height:1.45}
 .academic-context-loading{display:flex;align-items:center;gap:9px;margin-top:14px;color:#536a62;font-size:12px}
+.institution-status-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:13px 18px;margin:14px 0 0}
+.institution-status-details>div{display:grid;align-content:start;gap:5px;min-width:0}
+.institution-status-details dt{color:#778481;font-size:10px;font-weight:600}
+.institution-status-details dd{margin:0;color:#314649;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.institution-status-details a{display:inline-flex;align-items:center;gap:4px;color:#3f6f60;text-decoration:underline;text-underline-offset:2px}
+.institution-status-coverage{margin:12px 0 0;color:#687678;font-size:10px;line-height:1.55}
+.institution-status-retry{margin-top:9px;padding:0;border:0;background:transparent;color:#3f6f60;font-size:11px;font-weight:700;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.institution-status-retry:disabled{opacity:.55;cursor:wait}
 .mapping-context-stage{margin-top:9px}
 .mapping-context-stage strong{display:block;color:#34494b;font-size:11px}
 .mapping-context-stage p{margin:5px 0 0;color:#6b7979;font-size:11px;line-height:1.5}
 @media(max-width:760px){.academic-context-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 18px}}
-@media(max-width:460px){.academic-context-grid{grid-template-columns:1fr;gap:14px}}
+@media(max-width:760px){.institution-status-details{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 15px}}
+@media(max-width:460px){.academic-context-grid,.institution-status-details{grid-template-columns:1fr;gap:14px}}
 
 @media(max-width:760px){
   .wizard-wrap{padding-top:22px}

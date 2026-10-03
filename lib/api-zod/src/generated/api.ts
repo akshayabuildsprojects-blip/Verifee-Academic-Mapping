@@ -196,6 +196,40 @@ export const RunAcademicContextResponse = zod.object({
 
 
 /**
+ * Checks only the explicitly supplied jurisdiction in a supported registry. A missing match means only that no exact name was found in the checked source; it is not a judgment about legitimacy, credential authenticity, academic mapping, or admissions.
+ * @summary Check an institution against an implemented official registry
+ */
+export const runInstitutionStatusCheckBodyInstitutionNameMax = 200;
+
+export const runInstitutionStatusCheckBodyJurisdictionMax = 120;
+
+
+
+export const RunInstitutionStatusCheckBody = zod.object({
+  "institutionName": zod.string().max(runInstitutionStatusCheckBodyInstitutionNameMax).nullable(),
+  "jurisdiction": zod.string().max(runInstitutionStatusCheckBodyJurisdictionMax).nullable()
+})
+
+export const runInstitutionStatusCheckResponseSummaryMax = 500;
+
+export const runInstitutionStatusCheckResponseCoverageLimitsMax = 1000;
+
+
+
+export const RunInstitutionStatusCheckResponse = zod.object({
+  "status": zod.enum(['LISTED', 'NOT_LISTED', 'UNABLE_TO_CHECK']),
+  "jurisdiction": zod.string().nullable(),
+  "sourceName": zod.string().nullable(),
+  "sourceUrl": zod.string().url().nullable(),
+  "checkedAt": zod.coerce.date(),
+  "matchedName": zod.string().nullable(),
+  "registryStatus": zod.string().nullable(),
+  "summary": zod.string().max(runInstitutionStatusCheckResponseSummaryMax),
+  "coverageLimits": zod.string().max(runInstitutionStatusCheckResponseCoverageLimitsMax)
+})
+
+
+/**
  * Uses the same mapper and input as runAcademicMapping. Each progress event contains an AcademicMappingResult snapshot with only completed requirements; the complete event contains the unchanged final AcademicMappingResult.
  * @summary Stream completed academic mapping requirements
  */

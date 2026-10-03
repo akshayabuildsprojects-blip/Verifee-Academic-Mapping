@@ -26,6 +26,8 @@ import type {
   AcademicMappingResult,
   ErrorResponse,
   HealthStatus,
+  InstitutionStatusInput,
+  InstitutionStatusResult,
   TranscriptExtractionProblem,
   TranscriptExtractionResult
 } from './api.schemas';
@@ -400,6 +402,95 @@ export const useRunAcademicContext = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getRunAcademicContextMutationOptions(options));
+    }
+
+export const getRunInstitutionStatusCheckUrl = () => {
+
+
+
+
+  return `/api/institution-status/check`
+}
+
+/**
+ * Checks only the explicitly supplied jurisdiction in a supported registry. A missing match means only that no exact name was found in the checked source; it is not a judgment about legitimacy, credential authenticity, academic mapping, or admissions.
+ * @summary Check an institution against an implemented official registry
+ */
+export const runInstitutionStatusCheck = async (institutionStatusInput: InstitutionStatusInput, options?: Parameters<typeof customFetch>[1]): Promise<InstitutionStatusResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<InstitutionStatusResult>(getRunInstitutionStatusCheckUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(institutionStatusInput)
+  }
+);}
+
+
+
+
+
+export const getRunInstitutionStatusCheckMutationKey = () => ['runInstitutionStatusCheck'] as const;
+
+export const getRunInstitutionStatusCheckMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runInstitutionStatusCheck>>, TError,RunInstitutionStatusCheckMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runInstitutionStatusCheck>>, TError,RunInstitutionStatusCheckMutationVariables, TContext> => {
+
+const mutationKey = getRunInstitutionStatusCheckMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runInstitutionStatusCheck>>, RunInstitutionStatusCheckMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  runInstitutionStatusCheck(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunInstitutionStatusCheckMutationResult = NonNullable<Awaited<ReturnType<typeof runInstitutionStatusCheck>>>
+    export type RunInstitutionStatusCheckMutationBody = BodyType<InstitutionStatusInput>
+    export type RunInstitutionStatusCheckMutationError = ErrorType<ErrorResponse>
+    export type RunInstitutionStatusCheckMutationVariables = {data: BodyType<InstitutionStatusInput>}
+
+    /**
+ * @summary Check an institution against an implemented official registry
+ */
+export const useRunInstitutionStatusCheck = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runInstitutionStatusCheck>>, TError,RunInstitutionStatusCheckMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runInstitutionStatusCheck>>,
+        TError,
+        RunInstitutionStatusCheckMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRunInstitutionStatusCheckMutationOptions(options));
     }
 
 export const getStreamAcademicMappingUrl = () => {

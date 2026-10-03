@@ -7,14 +7,16 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter, Link } from 'wouter';
 import { AlertCircle, ArrowLeft, ArrowRight, ArrowDown, ArrowUpRight, BookOpen, Check, ChevronRight, ExternalLink, FileText, GraduationCap, Landmark, LoaderCircle, RotateCcw, ScanText, ShieldAlert, Upload, X } from 'lucide-react';
-import { extractAcademicTranscript, runAcademicContext, type AcademicContext, type AcademicContextInput, type AcademicMappingInput, type AcademicMappingResult, type AcademicRecord } from '@workspace/api-client-react';
-import { ExtractAcademicTranscriptResponse, RunAcademicContextResponse, RunAcademicMappingBody, RunAcademicMappingResponse, type TranscriptLanguageDetection } from '@workspace/api-zod';
+import { extractAcademicTranscript, runAcademicContext, runInstitutionStatusCheck, type AcademicContext, type AcademicContextInput, type AcademicMappingInput, type AcademicMappingResult, type AcademicRecord, type InstitutionStatusInput } from '@workspace/api-client-react';
+import { ExtractAcademicTranscriptResponse, RunAcademicContextResponse, RunInstitutionStatusCheckResponse, RunAcademicMappingBody, RunAcademicMappingResponse, type TranscriptLanguageDetection } from '@workspace/api-zod';
 import { georgiaTechDataset } from '@workspace/georgia-tech-programs';
 import { checkVerification, extractMockRecord, sampleCourses, sampleCredential, uploadSchema, type CredentialVerification } from '@/lib/mock-analysis';
 import { runAcademicMappingWithProgress } from '@/lib/academic-mapping-stream';
 import VerifeeReportView from '@/components/verifee-report-view';
 import { buildVerifeeReportData, type GeneratedReportMetadata } from '@/lib/verifee-report';
 import { downloadVerifeeReportPdf } from '@/lib/verifee-report-pdf';
+
+type InstitutionStatusView = (typeof RunInstitutionStatusCheckResponse)['_output'];
 
 const queryClient = new QueryClient();
 const wizardSteps = ['Upload Credential', 'Verify & Review', 'Select Target', 'Academic Mapping', 'Verifee Report'];
@@ -32,6 +34,7 @@ const verifeeSessionKeys = [
   'verifee-language-detection',
   'verifee-mapping-result',
   'verifee-academic-context',
+  'verifee-institution-status',
   'verifee-visible-course-count',
   'verifee-generated-report',
 ];
@@ -128,6 +131,47 @@ function readStoredAcademicContext(): AcademicContext | null {
   } catch {
     return null;
   }
+}
+
+function readStoredInstitutionStatus(): InstitutionStatusView | null {
+  const serialized = sessionStorage.getItem('verifee-institution-status');
+  if (!serialized) return null;
+  try {
+    const candidate: unknown = JSON.parse(serialized);
+    const parsed = RunInstitutionStatusCheckResponse.safeParse(candidate);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function createUnavailableInstitutionStatus(
+  record: AcademicRecord,
+  summary = 'The institution status service did not return a result. No institution status was inferred.',
+): InstitutionStatusView {
+  return {
+    status: 'UNABLE_TO_CHECK',
+    jurisdiction: record.institution.country?.trim() || null,
+    sourceName: null,
+    sourceUrl: null,
+    checkedAt: new Date(),
+    matchedName: null,
+    registryStatus: null,
+    summary,
+    coverageLimits: 'This implementation checks Ghana through the GTEC public institution directory only. Other jurisdictions are not checked, and no comprehensive worldwide coverage is claimed.',
+  };
+}
+
+function institutionStatusLabel(status: InstitutionStatusView['status']) {
+  if (status === 'LISTED') return 'Listed in source';
+  if (status === 'NOT_LISTED') return 'No exact match found';
+  return 'Unable to check';
+}
+
+function formatInstitutionStatusTime(value: Date | string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Time unavailable';
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
 function readStoredGeneratedReport(): GeneratedReportMetadata | null {
@@ -324,6 +368,7 @@ function UploadStep() {
     }
     sessionStorage.removeItem('verifee-mapping-result');
     sessionStorage.removeItem('verifee-academic-context');
+    sessionStorage.removeItem('verifee-institution-status');
     sessionStorage.removeItem('verifee-visible-course-count');
     sessionStorage.removeItem('verifee-target');
     sessionStorage.removeItem('verifee-program');
@@ -740,6 +785,8 @@ function Report() {
   const [academicContext, setAcademicContext] = useState<AcademicContext | null>(() => readStoredAcademicContext());
   const [contextLoading, setContextLoading] = useState(() => !readStoredAcademicContext());
   const [contextFailure, setContextFailure] = useState(false);
+  const [institutionStatus, setInstitutionStatus] = useState<InstitutionStatusView | null>(() => readStoredInstitutionStatus());
+  const [institutionStatusLoading, setInstitutionStatusLoading] = useState(() => !readStoredInstitutionStatus());
   const [mappingStage, setMappingStage] = useState<'context' | 'requirements' | 'complete'>(() => readStoredAcademicContext() ? 'requirements' : 'context');
   const [loading, setLoading] = useState(() => !readStoredMapping(program.id));
   const [mappingError, setMappingError] = useState('');
@@ -748,9 +795,46 @@ function Report() {
   const [expandedRequirementId, setExpandedRequirementId] = useState<string | null>(null);
   const currentMapping = mapping?.programId === program.id ? mapping : null;
 
+  const requestInstitutionStatus = async (cancelled: () => boolean = () => false) => {
+    if (!academicRecord) return;
+    setInstitutionStatusLoading(true);
+    let resolvedStatus: InstitutionStatusView;
+    try {
+      const input: InstitutionStatusInput = {
+        institutionName: academicRecord.institution.name,
+        jurisdiction: academicRecord.institution.country,
+      };
+      const candidate = await runInstitutionStatusCheck(input);
+      const parsed = RunInstitutionStatusCheckResponse.safeParse(candidate);
+      if (!parsed.success) throw new Error('The institution status response was invalid.');
+      resolvedStatus = parsed.data;
+    } catch {
+      resolvedStatus = createUnavailableInstitutionStatus(academicRecord);
+    }
+
+    if (cancelled()) return;
+    sessionStorage.setItem('verifee-institution-status', JSON.stringify(resolvedStatus));
+    setInstitutionStatus(resolvedStatus);
+    setInstitutionStatusLoading(false);
+  };
+
   useEffect(() => {
     if (!started || !sessionStorage.getItem('verifee-file-name') || !academicRecord) setLocation('/start');
   }, [academicRecord, started, setLocation]);
+
+  useEffect(() => {
+    if (!started || !academicRecord) return;
+    let cancelled = false;
+    const cachedStatus = readStoredInstitutionStatus();
+    if (cachedStatus) {
+      setInstitutionStatus(cachedStatus);
+      setInstitutionStatusLoading(false);
+    } else {
+      setInstitutionStatus(null);
+      void requestInstitutionStatus(() => cancelled);
+    }
+    return () => { cancelled = true; };
+  }, [academicRecord, started]);
 
   const ensureAcademicContext = async (cancelled: () => boolean = () => false): Promise<AcademicContext> => {
     const cachedContext = readStoredAcademicContext();
@@ -931,6 +1015,61 @@ function Report() {
     <section className="report-verification" data-testid="card-verification">
       <div className="report-verification-top"><p className="verify-heading"><ShieldAlert size={16} color="#8a764d" /> Overall credential verification</p><span className="status-pill" data-testid="status-verification">{verificationStatus}</span></div>
       <p className="verify-copy">{verificationExplanation} Verification is separate from academic interpretation and course mapping.</p>
+    </section>
+    <section
+      className="report-verification institution-status-card"
+      aria-live="polite"
+      aria-busy={institutionStatusLoading}
+      data-testid="card-institution-status"
+    >
+      <div className="report-verification-top">
+        <p className="verify-heading"><Landmark size={16} color="#55766c" /> Institution status check</p>
+        <span className="status-pill review" data-testid="status-institution-registry">
+          {institutionStatusLoading ? 'Checking registry…' : institutionStatus ? institutionStatusLabel(institutionStatus.status) : 'Unable to check'}
+        </span>
+      </div>
+      {institutionStatus ? <>
+        <p className="verify-copy">{institutionStatus.summary}</p>
+        <dl className="institution-status-details">
+          <div>
+            <dt>Jurisdiction</dt>
+            <dd>{institutionStatus.jurisdiction || 'Not stated in the transcript'}</dd>
+          </div>
+          <div>
+            <dt>Source</dt>
+            <dd>
+              {institutionStatus.sourceName
+                ? institutionStatus.sourceUrl
+                  ? <a href={institutionStatus.sourceUrl} target="_blank" rel="noreferrer noopener" data-testid="institution-status-source-link">{institutionStatus.sourceName} <ExternalLink size={12} /></a>
+                  : institutionStatus.sourceName
+                : 'No supported registry source was checked for this jurisdiction.'}
+            </dd>
+          </div>
+          {institutionStatus.matchedName && <div>
+            <dt>Registry entry</dt>
+            <dd>{institutionStatus.matchedName}</dd>
+          </div>}
+          {institutionStatus.registryStatus && <div>
+            <dt>Registry status</dt>
+            <dd>{institutionStatus.registryStatus}</dd>
+          </div>}
+          <div>
+            <dt>Checked</dt>
+            <dd>{formatInstitutionStatusTime(institutionStatus.checkedAt)}</dd>
+          </div>
+        </dl>
+        <p className="institution-status-coverage"><strong>Coverage limits:</strong> {institutionStatus.coverageLimits}</p>
+        <p className="academic-context-disclaimer">This source-scoped listing check is separate from credential authenticity, academic mapping, and admissions decisions.</p>
+        {institutionStatus.status === 'UNABLE_TO_CHECK' && <button
+          className="institution-status-retry"
+          type="button"
+          onClick={() => void requestInstitutionStatus()}
+          disabled={institutionStatusLoading}
+          data-testid="button-retry-institution-status"
+        >Retry status check</button>}
+      </> : <div className="academic-context-loading" role="status" data-testid="status-institution-check-loading">
+        <LoaderCircle size={15} className="animate-spin" /> Checking the supported institution registry…
+      </div>}
     </section>
     <div className="preliminary" data-testid="notice-preliminary"><AlertCircle size={16} /><span>
       <strong>{isExtracted ? 'Preliminary mapping of extracted academic details.' : 'Preliminary mapping of the synthetic demo record.'}</strong>{' '}

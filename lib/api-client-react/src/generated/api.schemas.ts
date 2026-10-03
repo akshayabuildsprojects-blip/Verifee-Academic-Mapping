@@ -143,6 +143,47 @@ export interface AcademicContext {
   program: AcademicContextField;
 }
 
+export interface InstitutionStatusInput {
+  /**
+     * @maxLength 200
+     * @nullable
+     */
+  institutionName: string | null;
+  /**
+     * @maxLength 120
+     * @nullable
+     */
+  jurisdiction: string | null;
+}
+
+export type InstitutionStatusResultStatus = typeof InstitutionStatusResultStatus[keyof typeof InstitutionStatusResultStatus];
+
+
+export const InstitutionStatusResultStatus = {
+  LISTED: 'LISTED',
+  NOT_LISTED: 'NOT_LISTED',
+  UNABLE_TO_CHECK: 'UNABLE_TO_CHECK',
+} as const;
+
+export interface InstitutionStatusResult {
+  status: InstitutionStatusResultStatus;
+  /** @nullable */
+  jurisdiction: string | null;
+  /** @nullable */
+  sourceName: string | null;
+  /** @nullable */
+  sourceUrl: string | null;
+  checkedAt: string;
+  /** @nullable */
+  matchedName: string | null;
+  /** @nullable */
+  registryStatus: string | null;
+  /** @maxLength 500 */
+  summary: string;
+  /** @maxLength 1000 */
+  coverageLimits: string;
+}
+
 export type AcademicMappingInputProgramId = typeof AcademicMappingInputProgramId[keyof typeof AcademicMappingInputProgramId];
 
 

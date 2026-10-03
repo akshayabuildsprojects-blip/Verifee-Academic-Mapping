@@ -14,6 +14,8 @@ tags:
     description: Academic transcript PDF interpretation
   - name: academic-context
     description: Contextualized interpretation of extracted institution and program information
+  - name: institution-status
+    description: Source-scoped checks in supported official institution directories
   - name: academic-mapping
     description: Preliminary course-to-requirement mapping
 paths:
@@ -167,6 +169,37 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "503":
           description: The academic context service is temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /institution-status/check:
+    post:
+      operationId: runInstitutionStatusCheck
+      tags: [institution-status]
+      summary: Check an institution against an implemented official registry
+      description: Checks only the explicitly supplied jurisdiction in a supported registry. A missing match means only that no exact name was found in the checked source; it is not a judgment about legitimacy, credential authenticity, academic mapping, or admissions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InstitutionStatusInput"
+      responses:
+        "200":
+          description: Source-scoped institution status or a clear unable-to-check result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstitutionStatusResult"
+        "400":
+          description: The institution status request is invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: The institution status request limit was reached
           content:
             application/json:
               schema:
@@ -388,6 +421,59 @@ components:
         - broadField
         - specificDiscipline
         - program
+    InstitutionStatusInput:
+      type: object
+      additionalProperties: false
+      properties:
+        institutionName:
+          type: ["string", "null"]
+          maxLength: 200
+        jurisdiction:
+          type: ["string", "null"]
+          maxLength: 120
+      required:
+        - institutionName
+        - jurisdiction
+    InstitutionStatusResult:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum:
+            - LISTED
+            - NOT_LISTED
+            - UNABLE_TO_CHECK
+        jurisdiction:
+          type: ["string", "null"]
+        sourceName:
+          type: ["string", "null"]
+        sourceUrl:
+          type: ["string", "null"]
+          format: uri
+        checkedAt:
+          type: string
+          format: date-time
+        matchedName:
+          type: ["string", "null"]
+        registryStatus:
+          type: ["string", "null"]
+        summary:
+          type: string
+          maxLength: 500
+        coverageLimits:
+          type: string
+          maxLength: 1000
+      required:
+        - status
+        - jurisdiction
+        - sourceName
+        - sourceUrl
+        - checkedAt
+        - matchedName
+        - registryStatus
+        - summary
+        - coverageLimits
     AcademicRecordDetails:
       type: object
       additionalProperties: false
