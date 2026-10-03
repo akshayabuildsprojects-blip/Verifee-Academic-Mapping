@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
+  Check,
   ExternalLink,
   FileText,
   Landmark,
@@ -26,6 +27,8 @@ export interface VerifeeReportViewProps {
   onDownloadReceipt(): void;
   onBackToMapping(): void;
   onStartNewAnalysis(): void;
+  onSaveToMyReports?(): void;
+  isSavedToMyReports?: boolean;
 }
 
 const statusLabels: Record<string, string> = {
@@ -201,6 +204,8 @@ export function VerifeeReportView({
   onDownloadReceipt,
   onBackToMapping,
   onStartNewAnalysis,
+  onSaveToMyReports,
+  isSavedToMyReports,
 }: VerifeeReportViewProps) {
   const counts = [
     { label: 'Covered', count: data.counts.covered, tone: 'covered' },
@@ -294,6 +299,18 @@ export function VerifeeReportView({
                   <h2 id="v-report-preview-title">Report preview</h2>
                 </div>
                 <div className="v-report-download-actions">
+                  {onSaveToMyReports && (
+                    <button
+                      className="v-report-button v-report-button-secondary"
+                      type="button"
+                      onClick={onSaveToMyReports}
+                      disabled={isSavedToMyReports}
+                      data-testid="button-save-to-my-reports"
+                    >
+                      {isSavedToMyReports ? <Check size={15} aria-hidden="true" /> : <FileText size={15} aria-hidden="true" />}
+                      {isSavedToMyReports ? 'Saved to My Reports' : 'Save to My Reports'}
+                    </button>
+                  )}
                   <button className="v-report-button v-report-button-secondary" type="button" onClick={onDownloadReceipt} data-testid="button-download-submission-receipt">
                     <FileText size={15} aria-hidden="true" /> Download Submission Receipt
                   </button>

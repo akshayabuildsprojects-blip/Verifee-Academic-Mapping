@@ -287,6 +287,7 @@ async function openReport(page: Page) {
   await page.addInitScript(({ record, languageDetection, institutionStatus }) => {
     if (sessionStorage.getItem("verifee-started") !== "yes") {
       sessionStorage.setItem("verifee-file-name", "sample-transcript.pdf");
+      sessionStorage.setItem("verifee-file-size", "7");
       sessionStorage.setItem("verifee-file-format", "PDF transcript");
       sessionStorage.setItem("verifee-analysis-mode", "extracted");
       sessionStorage.setItem("verifee-verification-status", "Not verified");
@@ -400,6 +401,15 @@ async function sendStreamEvent(
     { index: streamIndex, eventName: event, data: payload },
   );
 }
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      "verifee-demo-session",
+      JSON.stringify({ mode: "DEMO", displayName: "Verifee Demo" }),
+    );
+  });
+});
 
 test("shows detected languages and scripts in transcript review", async ({ page }) => {
   await openReview(page);
@@ -807,9 +817,39 @@ test("generates a PDF from the completed mapping without rerunning analysis", as
   );
   expect(receiptContents).toContain("(institution.) Tj");
 
+  await page.getByTestId("button-save-to-my-reports").click();
+  await expect(page.getByTestId("status-save-to-reports")).toContainText(
+    "Report saved to My Reports",
+  );
+  const firstSavedReportId = await page.evaluate(() => {
+    const reports = JSON.parse(
+      sessionStorage.getItem("verifee-demo-saved-reports") ?? "[]",
+    ) as { metadata: { reportId: string } }[];
+    return reports[0]?.metadata.reportId ?? "";
+  });
+  expect(firstSavedReportId).toMatch(/^VF-/);
+  expect(
+    await page.evaluate(() => {
+      const reports = JSON.parse(
+        sessionStorage.getItem("verifee-demo-saved-reports") ?? "[]",
+      ) as { metadata: { paymentStatus: string; deliveryStatus: string } }[];
+      return reports[0]?.metadata;
+    }),
+  ).toMatchObject({ paymentStatus: "DEMO_FREE", deliveryStatus: "NOT_SENT" });
+
+  await page.evaluate(() => sessionStorage.removeItem("verifee-generated-report"));
+  await page.reload();
+  await page.getByTestId("button-generate-report").click();
+  await page.getByTestId("button-save-to-my-reports").click();
+  await expect(page.getByTestId("button-view-existing-report")).toBeVisible();
+  await page.getByTestId("button-save-duplicate-anyway").click();
+  await expect(page.getByTestId("status-save-to-reports")).toContainText(
+    "Report saved to My Reports",
+  );
+
   expect(
     await page.evaluate(() => window.__verifeeMappingTest?.requests.length),
-  ).toBe(1);
+  ).toBe(0);
   expect(
     await page.evaluate(() =>
       JSON.parse(sessionStorage.getItem("verifee-mapping-result") ?? "null"),
@@ -872,4 +912,16 @@ test("generates a PDF from the completed mapping without rerunning analysis", as
   expect(
     await page.evaluate(() => sessionStorage.getItem("verifee-extracted-record")),
   ).toBeNull();
+
+  await page.getByTestId("input-credential").setInputFiles({
+    name: "sample-transcript.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.alloc(7),
+  });
+  await expect(page.getByTestId("status-duplicate-upload")).toContainText(
+    "This file was used for a report saved in this demo session",
+  );
+  await page.getByTestId("button-view-duplicate-report").click();
+  await expect(page).toHaveURL(new RegExp(`/saved-report/${firstSavedReportId}$`));
+  await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
 });

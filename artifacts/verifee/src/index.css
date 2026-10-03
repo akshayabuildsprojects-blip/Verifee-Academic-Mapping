@@ -473,3 +473,31 @@ button { cursor:pointer; }
 @media(prefers-reduced-motion:reduce){
   .landing-shell *, .landing-shell *::before, .landing-shell *::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
 }
+
+.app-demo-navigation{display:flex;align-items:center;justify-content:flex-end;gap:clamp(8px,1.7vw,21px);font-size:11px}
+.app-demo-navigation a,.app-demo-navigation button{padding:7px 0;border:0;background:transparent;color:#48665d;text-decoration:none;font:inherit;font-weight:600;white-space:nowrap}
+.app-demo-navigation a:hover,.app-demo-navigation button:hover{color:#244f47}
+.app-demo-navigation .demo-badge{white-space:nowrap}
+.demo-save-feedback{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;margin-bottom:20px;padding:15px 17px;border:1px solid #d9e5dc;border-radius:8px;background:#f5f9f4;color:#3f5e52;font-size:12px;line-height:1.5}
+.demo-save-feedback[role=alert]{border-color:#e7ddc7;background:#fbf8f0;color:#665b43}
+.demo-save-feedback p{margin:3px 0 0;color:#6d7a71}
+.demo-save-feedback-actions{display:flex;flex-wrap:wrap;gap:8px}
+.demo-duplicate-upload{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:14px;padding:13px 15px;border:1px solid #e7ddc7;border-radius:8px;background:#fbf8f0;color:#665b43;font-size:11px;line-height:1.5}
+.demo-duplicate-upload p{margin:3px 0 0;color:#766f5f}
+.demo-duplicate-actions{display:flex;flex-wrap:wrap;gap:8px}
+.demo-duplicate-actions .secondary-btn{font-size:10px}
+.demo-duplicate-actions .secondary-btn:disabled{opacity:.55;cursor:default}
+.saved-report-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:20px}
+@media(max-width:760px){
+  .app-demo-navigation{gap:8px;font-size:9px}
+  .app-demo-navigation .demo-badge{margin-left:0;padding:4px 6px;font-size:8px}
+  .app-demo-navigation button:last-child{display:none}
+  .demo-save-feedback,.demo-duplicate-upload{align-items:flex-start;flex-direction:column}
+  .demo-save-feedback-actions,.demo-duplicate-actions{width:100%}
+  .demo-save-feedback-actions .secondary-btn,.demo-duplicate-actions .secondary-btn{flex:1;justify-content:center;white-space:normal}
+}
+@media(max-width:460px){
+  .app-demo-navigation{gap:7px;font-size:8px}
+  .app-demo-navigation .demo-badge{padding:4px;font-size:7px}
+  .app-demo-navigation a,.app-demo-navigation button{font-size:8px}
+}

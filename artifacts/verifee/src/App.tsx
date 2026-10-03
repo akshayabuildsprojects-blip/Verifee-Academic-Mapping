@@ -5,7 +5,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
-import { Route, Switch, useLocation, Router as WouterRouter, Link } from 'wouter';
+import { Route, Switch, useLocation, useRoute, Router as WouterRouter, Link } from 'wouter';
 import { AlertCircle, ArrowLeft, ArrowRight, ArrowDown, ArrowUpRight, BookOpen, Check, ChevronRight, ExternalLink, FileText, GraduationCap, Landmark, LoaderCircle, RotateCcw, ScanText, ShieldAlert, Upload, X } from 'lucide-react';
 import { extractAcademicTranscript, runAcademicContext, runInstitutionStatusCheck, type AcademicContext, type AcademicContextInput, type AcademicMappingInput, type AcademicMappingResult, type AcademicRecord, type InstitutionStatusInput } from '@workspace/api-client-react';
 import { ExtractAcademicTranscriptResponse, RunAcademicContextResponse, RunInstitutionStatusCheckResponse, RunAcademicMappingBody, RunAcademicMappingResponse, type TranscriptLanguageDetection } from '@workspace/api-zod';
@@ -20,6 +20,22 @@ import {
   type GeneratedReportMetadata,
 } from '@/lib/verifee-report';
 import { downloadVerifeeReportPdf, downloadVerifeeSubmissionReceiptPdf } from '@/lib/verifee-report-pdf';
+import {
+  DemoDashboardPage,
+  DemoLoginPage,
+  DemoReportsPage,
+  type DemoSavedReportSummary,
+} from '@/components/demo-account-pages';
+import {
+  createSeededDemoReport,
+  DEMO_REPORTS_KEY,
+  DEMO_SESSION_KEY,
+  isSameUpload,
+  parseDemoSavedReports,
+  sameReportScope,
+  type DemoSavedReport,
+  type DemoUploadFingerprint,
+} from '@/lib/demo-reports';
 
 type InstitutionStatusView = (typeof RunInstitutionStatusCheckResponse)['_output'];
 
@@ -27,6 +43,7 @@ const queryClient = new QueryClient();
 const wizardSteps = ['Upload Credential', 'Verify & Review', 'Select Target', 'Academic Mapping', 'Verifee Report'];
 const verifeeSessionKeys = [
   'verifee-file-name',
+  'verifee-file-size',
   'verifee-file-format',
   'verifee-target',
   'verifee-program',
@@ -46,6 +63,54 @@ const verifeeSessionKeys = [
 
 function clearVerifeeSession() {
   verifeeSessionKeys.forEach((key) => sessionStorage.removeItem(key));
+}
+
+type DemoSession = { mode: 'DEMO'; displayName: string };
+
+function readDemoSession(): DemoSession | null {
+  try {
+    const candidate: unknown = JSON.parse(sessionStorage.getItem(DEMO_SESSION_KEY) || 'null');
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return null;
+    const value = candidate as Record<string, unknown>;
+    return value.mode === 'DEMO' && typeof value.displayName === 'string'
+      ? { mode: 'DEMO', displayName: value.displayName }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function readDemoSavedReports(): DemoSavedReport[] {
+  return parseDemoSavedReports(sessionStorage.getItem(DEMO_REPORTS_KEY)) ?? [];
+}
+
+function beginDemoSession() {
+  sessionStorage.setItem(DEMO_SESSION_KEY, JSON.stringify({
+    mode: 'DEMO',
+    displayName: 'Verifee Demo',
+  } satisfies DemoSession));
+  if (parseDemoSavedReports(sessionStorage.getItem(DEMO_REPORTS_KEY)) === null) {
+    sessionStorage.setItem(DEMO_REPORTS_KEY, JSON.stringify([createSeededDemoReport()]));
+  }
+}
+
+function endDemoSession() {
+  clearVerifeeSession();
+  sessionStorage.removeItem(DEMO_SESSION_KEY);
+  sessionStorage.removeItem(DEMO_REPORTS_KEY);
+}
+
+function toDemoSavedReportSummary(report: DemoSavedReport): DemoSavedReportSummary {
+  return {
+    reportId: report.metadata.reportId,
+    createdAt: report.metadata.createdAt,
+    sourceInstitution: report.metadata.sourceInstitution,
+    targetInstitution: report.metadata.targetInstitution,
+    targetProgram: report.metadata.targetProgram,
+    verificationStatus: report.metadata.verificationStatus,
+    reportStatus: report.reportStatus,
+    mappingSummary: report.metadata.mappingSummary,
+  };
 }
 const programTypeLabels: Record<string, string> = {
   published_prerequisite_background: 'Published prerequisite / background expectations',
@@ -276,9 +341,16 @@ function displayTranscriptValue(value: string | null | undefined) {
 }
 
 function Header() {
+  const [, setLocation] = useLocation();
+  const demoSession = readDemoSession();
   return <header className="masthead">
-    <Link href="/" className="brand" data-testid="link-brand"><span className="brand-mark"><BookOpen size={16} strokeWidth={2.1} /></span><span>verifee</span></Link>
-    <div className="mast-meta"><span className="mast-dot" /> Preliminary academic interpretation <span className="demo-badge">Mapping demo</span></div>
+    <Link href={demoSession ? '/dashboard' : '/'} className="brand" data-testid="link-brand"><span className="brand-mark"><BookOpen size={16} strokeWidth={2.1} /></span><span>verifee</span></Link>
+    {demoSession ? <nav className="app-demo-navigation" aria-label="Demo navigation">
+      <button type="button" onClick={() => { clearVerifeeSession(); setLocation('/start'); }} data-testid="button-navigation-new-mapping">New Mapping</button>
+      <Link href="/my-reports" data-testid="link-navigation-my-reports">My Reports</Link>
+      <span className="demo-badge">Demo Mode</span>
+      <button type="button" onClick={() => { endDemoSession(); setLocation('/'); }} data-testid="button-navigation-log-out">Exit demo</button>
+    </nav> : <div className="mast-meta"><span className="mast-dot" /> Preliminary academic interpretation <span className="demo-badge">Mapping demo</span></div>}
   </header>;
 }
 function Disclaimer() {
@@ -340,6 +412,8 @@ function LanguageDetectionCard({
 function UploadStep() {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState('');
+  const [duplicateReportId, setDuplicateReportId] = useState<string | null>(null);
+  const [continueWithDuplicate, setContinueWithDuplicate] = useState(false);
   const [languageDetection, setLanguageDetection] = useState<TranscriptLanguageDetection | null>(null);
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -350,10 +424,22 @@ function UploadStep() {
   const chooseFile = (candidate?: File) => {
     setError('');
     setLanguageDetection(null);
-    if (!candidate) return;
+    setDuplicateReportId(null);
+    setContinueWithDuplicate(false);
+    if (!candidate) {
+      setFile(null);
+      return;
+    }
     const validation = uploadSchema.safeParse({ file: candidate });
     if (!validation.success) { setFile(null); setError(validation.error.issues[0]?.message || 'Choose a supported credential file.'); return; }
     setFile(candidate);
+    const duplicate = readDemoSavedReports().find((report) =>
+      report.uploadFingerprint && isSameUpload(report.uploadFingerprint, {
+        fileName: candidate.name,
+        fileSize: candidate.size,
+      }),
+    );
+    setDuplicateReportId(duplicate?.metadata.reportId ?? null);
   };
   const saveReviewState = (
     mode: 'extracted' | 'demo',
@@ -363,6 +449,7 @@ function UploadStep() {
   ) => {
     if (!file) return;
     sessionStorage.setItem('verifee-file-name', file.name);
+    sessionStorage.setItem('verifee-file-size', String(file.size));
     sessionStorage.setItem('verifee-file-format', formatForFileName(file.name));
     sessionStorage.setItem('verifee-analysis-mode', mode);
     sessionStorage.setItem('verifee-verification-status', verification.status);
@@ -387,6 +474,7 @@ function UploadStep() {
   };
   const continueWithDemo = async () => {
     if (!file) return;
+    if (duplicateReportId && !continueWithDuplicate) return;
     setBusy(true);
     setError('');
     setLanguageDetection(null);
@@ -402,6 +490,7 @@ function UploadStep() {
   };
   const submit = async () => {
     if (!file) { setError('Choose a credential file to continue.'); return; }
+    if (duplicateReportId && !continueWithDuplicate) return;
     setBusy(true);
     setError('');
     setLanguageDetection(null);
@@ -439,12 +528,13 @@ function UploadStep() {
         <div><span className="upload-icon"><Upload size={19} /></span><p className="drop-title">{file ? 'Credential selected' : 'Drop your credential here or'} {!file && <button className="browse" type="button" onClick={(event) => { event.stopPropagation(); inputRef.current?.click(); }}>browse files</button>}</p><p className="drop-hint">{file ? `${formatForFileName(file.name)} · ${(file.size / (1024 * 1024)).toFixed(2)} MB` : 'PDF, .opencert, or .jsonld · 20 MB maximum'}</p></div>
       </div>
       <input ref={inputRef} className="file-control" type="file" accept=".pdf,.opencert,.jsonld,application/pdf,application/ld+json" aria-label="Choose a credential file" data-testid="input-credential" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} />
-      {file && <div className="file-chip" data-testid="text-selected-file"><div className="chip-file"><FileText size={17} color="#55766c" /><div><strong>{file.name}</strong><div className="file-meta">{(file.size / (1024 * 1024)).toFixed(2)} MB · {formatForFileName(file.name)}</div></div></div><button className="remove-file" aria-label="Remove selected file" data-testid="button-remove-file" onClick={() => { setFile(null); setError(''); setLanguageDetection(null); if (inputRef.current) inputRef.current.value = ''; }}><X size={16} /></button></div>}
+       {file && <div className="file-chip" data-testid="text-selected-file"><div className="chip-file"><FileText size={17} color="#55766c" /><div><strong>{file.name}</strong><div className="file-meta">{(file.size / (1024 * 1024)).toFixed(2)} MB · {formatForFileName(file.name)}</div></div></div><button className="remove-file" aria-label="Remove selected file" data-testid="button-remove-file" onClick={() => { setFile(null); setError(''); setLanguageDetection(null); setDuplicateReportId(null); setContinueWithDuplicate(false); if (inputRef.current) inputRef.current.value = ''; }}><X size={16} /></button></div>}
+       {duplicateReportId && <div className="demo-duplicate-upload" role="alert" data-testid="status-duplicate-upload"><div><strong>This file was used for a report saved in this demo session.</strong><p>Open that report, or continue with this file to create a new mapping.</p></div><div className="demo-duplicate-actions"><button className="secondary-btn" type="button" onClick={() => setLocation(`/saved-report/${encodeURIComponent(duplicateReportId)}`)} data-testid="button-view-duplicate-report">View Existing Report</button><button className="secondary-btn" type="button" onClick={() => setContinueWithDuplicate(true)} disabled={continueWithDuplicate} data-testid="button-continue-duplicate-upload">{continueWithDuplicate ? 'Continuing anyway' : 'Continue Anyway'}</button></div></div>}
       <p className="upload-note">PDF contents are sent to the configured AI service for academic extraction. The extracted record is kept in this browser session; mapping sends only that academic JSON, not the PDF. Reading a PDF does not verify that it is authentic. OpenCerts and JSON-LD are not verified in this version.</p>
       <div className="demo-disclosure"><strong>Current scope:</strong> PDF extraction and preliminary mapping use the academic details extracted from your transcript. If extraction fails, you can explicitly continue with the synthetic demo sample instead.</div>
        {error && <div className="error-message" role="alert" data-testid="status-upload-error">{error}</div>}
        {languageDetection && <LanguageDetectionCard detection={languageDetection} compact />}
-      <button className="cta" type="button" onClick={() => void submit()} disabled={!file || busy} data-testid="button-continue-upload"><span>{busy ? file && isPdfFile(file) ? 'Reading transcript…' : 'Preparing sample record…' : 'Continue to verify & review'}</span>{busy ? <LoaderCircle size={16} className="animate-spin" /> : <ArrowRight size={16} />}</button>
+       <button className="cta" type="button" onClick={() => void submit()} disabled={!file || busy || Boolean(duplicateReportId && !continueWithDuplicate)} data-testid="button-continue-upload"><span>{busy ? file && isPdfFile(file) ? 'Reading transcript…' : 'Preparing sample record…' : 'Continue to verify & review'}</span>{busy ? <LoaderCircle size={16} className="animate-spin" /> : <ArrowRight size={16} />}</button>
       {file && isPdfFile(file) && error && <button className="secondary-btn" type="button" onClick={() => void continueWithDemo()} disabled={busy} data-testid="button-use-demo-fallback">Continue with demo sample instead</button>}
       {hasSavedAnalysis && !file && <button className="secondary-btn resume-analysis" type="button" onClick={() => setLocation('/analysis')} data-testid="button-resume-analysis"><ArrowRight size={14} /> Continue saved analysis · {savedFileName}</button>}
     </section>
@@ -458,7 +548,7 @@ function Landing() {
         <Link href="/" className="brand" data-testid="link-brand-home"><span className="brand-mark"><BookOpen size={16} strokeWidth={2.1} /></span><span>verifee</span></Link>
         <nav className="landing-nav" aria-label="Main navigation">
           <a href="#how-it-works" data-testid="link-how-it-works">How it works</a>
-          <Link href="/start" className="nav-cta" data-testid="link-try-verifee-nav">Try Verifee <ArrowUpRight size={14} /></Link>
+          <Link href="/login" className="nav-cta" data-testid="link-try-verifee-nav">Try Verifee <ArrowUpRight size={14} /></Link>
         </nav>
         <span className="demo-badge landing-demo-badge">Demo mode</span>
       </div>
@@ -471,7 +561,7 @@ function Landing() {
             <h1>Understand academic credentials <em>across borders.</em></h1>
             <p className="landing-lede">Verifee interprets international academic records, verifies supported digital credential formats where possible, and maps prior coursework against target university requirements.</p>
             <div className="hero-actions">
-              <Link href="/start" className="landing-primary" data-testid="link-try-verifee-hero">Try Verifee <ArrowRight size={16} /></Link>
+              <Link href="/login" className="landing-primary" data-testid="link-try-verifee-hero">Try Verifee <ArrowRight size={16} /></Link>
               <a href="#how-it-works" className="landing-text-link" data-testid="link-see-how-it-works">See how it works <ArrowDown size={14} /></a>
             </div>
             <div className="hero-assurance"><span className="assurance-mark"><Check size={13} /></span> A clearer first look before formal review</div>
@@ -519,7 +609,7 @@ function Landing() {
       </section>
       <section className="landing-bottom-cta">
         <div><div className="landing-eyebrow"><span className="eyebrow-rule" /> Begin with a credential</div><h2>Make the next review<br /><em>more informed.</em></h2></div>
-        <div className="bottom-cta-action"><p>Start with an academic record and a program in mind.</p><Link href="/start" className="landing-primary" data-testid="link-try-verifee-bottom">Try Verifee <ArrowRight size={16} /></Link></div>
+        <div className="bottom-cta-action"><p>Start with an academic record and a program in mind.</p><Link href="/login" className="landing-primary" data-testid="link-try-verifee-bottom">Try Verifee <ArrowRight size={16} /></Link></div>
       </section>
     </main>
     <footer className="landing-footer"><Link href="/" className="brand"><span className="brand-mark"><BookOpen size={15} /></span><span>verifee</span></Link><span>Preliminary academic interpretation, with care.</span><a href="#top" onClick={(event) => { event.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Back to top <ArrowUpRight size={13} /></a></footer>
@@ -1278,6 +1368,9 @@ function FinalReport() {
       ? createGeneratedReportMetadata(reportData, identity)
       : null;
   });
+  const [savedReports, setSavedReports] = useState<DemoSavedReport[]>(readDemoSavedReports);
+  const [saveConflict, setSaveConflict] = useState<DemoSavedReport | null>(null);
+  const [saveNotice, setSaveNotice] = useState('');
 
   useEffect(() => {
     if (!reportData) setLocation(started ? '/report' : '/start');
@@ -1314,11 +1407,63 @@ function FinalReport() {
     downloadVerifeeSubmissionReceiptPdf(generatedReport);
   };
 
+  const saveToMyReports = (continueAnyway = false) => {
+    if (!reportData || !generatedReport) return;
+    const alreadySaved = savedReports.some(
+      (item) => item.metadata.reportId === generatedReport.reportId,
+    );
+    if (alreadySaved) {
+      setSaveNotice('This report is already saved in My Reports for this browser session.');
+      setSaveConflict(null);
+      return;
+    }
+
+    const duplicate = savedReports.find((item) => sameReportScope(item.data, reportData));
+    if (duplicate && !continueAnyway) {
+      setSaveConflict(duplicate);
+      setSaveNotice('');
+      return;
+    }
+
+    const fileName = sessionStorage.getItem('verifee-file-name');
+    const fileSize = Number(sessionStorage.getItem('verifee-file-size'));
+    const uploadFingerprint: DemoUploadFingerprint | undefined =
+      fileName && Number.isFinite(fileSize) && fileSize >= 0
+        ? { fileName, fileSize }
+        : undefined;
+    const savedReport: DemoSavedReport = {
+      metadata: generatedReport,
+      data: reportData,
+      reportStatus: 'Ready',
+      ...(uploadFingerprint ? { uploadFingerprint } : {}),
+    };
+    const nextReports = [...savedReports, savedReport];
+    sessionStorage.setItem(DEMO_REPORTS_KEY, JSON.stringify(nextReports));
+    setSavedReports(nextReports);
+    setSaveConflict(null);
+    setSaveNotice('Report saved to My Reports in this browser session.');
+  };
+
   return <div className="shell">
     <Header />
     <div className="page-wrap wizard-wrap final-report-stepper">
       <Stepper current={5} />
     </div>
+    {(saveConflict || saveNotice) && <section className="demo-save-feedback page-wrap" aria-live="polite" data-testid="status-save-to-reports">
+      {saveConflict ? <>
+        <div role="alert">
+          <strong>A report already exists for this academic program and target.</strong>
+          <p>Open the saved report, or continue anyway to save another copy.</p>
+        </div>
+        <div className="demo-save-feedback-actions">
+          <button className="secondary-btn" type="button" onClick={() => setLocation(`/saved-report/${saveConflict.metadata.reportId}`)} data-testid="button-view-existing-report">View Existing Report</button>
+          <button className="secondary-btn" type="button" onClick={() => saveToMyReports(true)} data-testid="button-save-duplicate-anyway">Continue Anyway</button>
+        </div>
+      </> : <>
+        <p>{saveNotice}</p>
+        <button className="secondary-btn" type="button" onClick={() => setLocation('/my-reports')} data-testid="button-go-to-my-reports">View My Reports</button>
+      </>}
+    </section>}
     <VerifeeReportView
       data={reportData}
       generatedReport={generatedReport}
@@ -1327,15 +1472,144 @@ function FinalReport() {
       onDownloadReceipt={downloadSubmissionReceipt}
       onBackToMapping={() => setLocation('/report')}
       onStartNewAnalysis={startNewAnalysis}
+      onSaveToMyReports={() => saveToMyReports()}
+      isSavedToMyReports={Boolean(generatedReport && savedReports.some(
+        (item) => item.metadata.reportId === generatedReport.reportId,
+      ))}
     />
   </div>;
 }
+
+function RequireDemoSession({ children }: { children: ReactNode }) {
+  const [, setLocation] = useLocation();
+  const active = Boolean(readDemoSession());
+  useEffect(() => {
+    if (!active) setLocation('/login');
+  }, [active, setLocation]);
+  return active ? <>{children}</> : null;
+}
+
+function DemoLoginRoute() {
+  const [, setLocation] = useLocation();
+  const active = Boolean(readDemoSession());
+  useEffect(() => {
+    if (active) setLocation('/dashboard');
+  }, [active, setLocation]);
+  return active ? null : <DemoLoginPage onEnterDemo={() => {
+    beginDemoSession();
+    setLocation('/dashboard');
+  }} />;
+}
+
+function DemoDashboardRoute() {
+  const [, setLocation] = useLocation();
+  const session = readDemoSession();
+  const reports = readDemoSavedReports();
+  const startNewMapping = () => {
+    clearVerifeeSession();
+    setLocation('/start');
+  };
+  return <RequireDemoSession>
+    <DemoDashboardPage
+      displayName={session?.displayName || 'Verifee Demo'}
+      reportCount={reports.length}
+      onNewMapping={startNewMapping}
+      onMyReports={() => setLocation('/my-reports')}
+      onLogOut={() => { endDemoSession(); setLocation('/'); }}
+    />
+  </RequireDemoSession>;
+}
+
+function DemoReportsRoute() {
+  const [, setLocation] = useLocation();
+  const session = readDemoSession();
+  const reports = readDemoSavedReports().map(toDemoSavedReportSummary);
+  const startNewMapping = () => {
+    clearVerifeeSession();
+    setLocation('/start');
+  };
+  return <RequireDemoSession>
+    <DemoReportsPage
+      displayName={session?.displayName || 'Verifee Demo'}
+      reports={reports}
+      onNewMapping={startNewMapping}
+      onDashboard={() => setLocation('/dashboard')}
+      onOpenReport={(reportId) => setLocation(`/saved-report/${reportId}`)}
+      onLogOut={() => { endDemoSession(); setLocation('/'); }}
+    />
+  </RequireDemoSession>;
+}
+
+function ProtectedUploadStep() {
+  return <RequireDemoSession><UploadStep /></RequireDemoSession>;
+}
+
+function ProtectedReview() {
+  return <RequireDemoSession><Review /></RequireDemoSession>;
+}
+
+function ProtectedTargetSelection() {
+  return <RequireDemoSession><TargetSelection /></RequireDemoSession>;
+}
+
+function ProtectedReport() {
+  return <RequireDemoSession><Report /></RequireDemoSession>;
+}
+
+function ProtectedFinalReport() {
+  return <RequireDemoSession><FinalReport /></RequireDemoSession>;
+}
+
+function SavedReportRoute() {
+  const [, params] = useRoute<{ reportId: string }>('/saved-report/:reportId');
+  const [, setLocation] = useLocation();
+  const report = readDemoSavedReports().find((item) => item.metadata.reportId === params?.reportId);
+
+  useEffect(() => {
+    if (!report) setLocation('/my-reports');
+  }, [report, setLocation]);
+
+  if (!report) return <RequireDemoSession>{null}</RequireDemoSession>;
+  return <RequireDemoSession>
+    <div className="shell">
+      <Header />
+      <div className="page-wrap saved-report-toolbar">
+        <button className="secondary-btn" type="button" onClick={() => setLocation('/my-reports')} data-testid="button-back-to-my-reports">
+          <ArrowLeft size={14} /> Back to My Reports
+        </button>
+        <span className="demo-badge">Ready · {report.metadata.reportId}</span>
+      </div>
+      <VerifeeReportView
+        data={report.data}
+        generatedReport={report.metadata}
+        onGenerate={() => undefined}
+        onDownload={() => downloadVerifeeReportPdf(report.data, report.metadata)}
+        onDownloadReceipt={() => downloadVerifeeSubmissionReceiptPdf(report.metadata)}
+        onBackToMapping={() => setLocation('/my-reports')}
+        onStartNewAnalysis={() => { clearVerifeeSession(); setLocation('/start'); }}
+      />
+    </div>
+  </RequireDemoSession>;
+}
+
 function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 function Router() {
-  return <RoutedErrorBoundary><Switch><Route path="/" component={Landing} /><Route path="/start" component={UploadStep} /><Route path="/analysis" component={Review} /><Route path="/target" component={TargetSelection} /><Route path="/report" component={Report} /><Route path="/final-report" component={FinalReport} /><Route component={NotFound} /></Switch></RoutedErrorBoundary>;
+  return <RoutedErrorBoundary><Switch>
+    <Route path="/" component={Landing} />
+    <Route path="/login" component={DemoLoginRoute} />
+    <Route path="/dashboard" component={DemoDashboardRoute} />
+    <Route path="/my-reports" component={DemoReportsRoute} />
+    <Route path="/saved-report/:reportId" component={SavedReportRoute} />
+    <Route path="/start" component={ProtectedUploadStep} />
+    <Route path="/analysis" component={ProtectedReview} />
+    <Route path="/target" component={ProtectedTargetSelection} />
+    <Route path="/report" component={ProtectedReport} />
+    <Route path="/final-report" component={ProtectedFinalReport} />
+    <Route component={NotFound} />
+  </Switch></RoutedErrorBoundary>;
 }
 function App() {
   return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>;
