@@ -10,6 +10,7 @@ const testBundleDir = path.join(artifactDir, ".test-dist");
 const testFiles = [
   "tests/academic-mappings.spec.ts",
   "tests/academic-transcripts.spec.ts",
+  "tests/academic-transcript-model-evaluation.spec.ts",
 ];
 
 await rm(testBundleDir, { recursive: true, force: true });

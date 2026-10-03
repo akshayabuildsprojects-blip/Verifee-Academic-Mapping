@@ -1,0 +1,112 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { makeSyntheticPdf } from "./synthetic-transcript-pdf";
+
+const modelEvaluationEnabled = process.env.RUN_TRANSCRIPT_MODEL_EVAL === "1";
+
+test(
+  "configured model keeps English transcript text and omits other languages",
+  {
+    skip: modelEvaluationEnabled
+      ? false
+      : "Set RUN_TRANSCRIPT_MODEL_EVAL=1 to run the live synthetic-PDF evaluation.",
+  },
+  async () => {
+    const originalFetch = globalThis.fetch;
+    let preflightRequests = 0;
+    let extractionRequests = 0;
+    globalThis.fetch = (async (input, init) => {
+      if (typeof init?.body === "string") {
+        const request = JSON.parse(init.body) as {
+          text?: { format?: { name?: string } };
+        };
+        if (request.text?.format?.name === "transcript_language_preflight") {
+          preflightRequests += 1;
+        } else if (request.text?.format?.name === "academic_record") {
+          extractionRequests += 1;
+        }
+      }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+
+    try {
+      const { extractAcademicTranscript, TranscriptExtractionError } =
+        await import("../src/lib/academic-transcript-extractor");
+      const mixedLanguagePdf = makeSyntheticPdf([
+        "Academic transcript",
+        "Institution: Verifee Demo University",
+        "Degree: Bachelor of Science",
+        "Program: Applied Mathematics",
+        "GPA: 3.8",
+        "Course code: MATH 240",
+        "Course title: Applied Matemáticas Methods",
+        "Credits: 3.5",
+        "Grade: A-",
+        "Description: Study of matrices. Observaciones: cálculo avanzado.",
+        "Course code: CS 101",
+        "Course title: Linear Algebra 线性代数",
+        "Credits: 4",
+        "Grade: B+",
+        "Description: Study of vectors. 课程说明：高级计算.",
+      ]);
+
+      const extracted = await extractAcademicTranscript(mixedLanguagePdf);
+      assert.equal(preflightRequests, 1);
+      assert.equal(extractionRequests, 1);
+      assert.equal(extracted.languageDetection.status, "ENGLISH_DETECTED");
+
+      const record = extracted.record;
+      assert.equal(record.institution.name, "Verifee Demo University");
+      assert.equal(record.credential.degree, "Bachelor of Science");
+      assert.equal(record.academicRecord.cumulativeGPA, "3.8");
+      assert.deepEqual(
+        record.academicRecord.courses.map((course) => ({
+          code: course.code,
+          title: course.title,
+          credits: course.credits,
+          grade: course.grade,
+          description: course.description,
+        })),
+        [
+          {
+            code: "MATH 240",
+            title: "Applied Methods",
+            credits: "3.5",
+            grade: "A-",
+            description: "Study of matrices.",
+          },
+          {
+            code: "CS 101",
+            title: "Linear Algebra",
+            credits: "4",
+            grade: "B+",
+            description: "Study of vectors.",
+          },
+        ],
+      );
+      assert.doesNotMatch(
+        JSON.stringify(record),
+        /Matemáticas|Observaciones|cálculo|线性代数|课程说明|高级计算/,
+      );
+
+      preflightRequests = 0;
+      extractionRequests = 0;
+      const noEnglishPdf = makeSyntheticPdf([
+        "Certificado académico",
+        "Nombre del curso: Matemáticas avanzadas",
+        "Créditos: 3",
+        "Calificación: A-",
+      ]);
+      await assert.rejects(
+        extractAcademicTranscript(noEnglishPdf),
+        (error: unknown) =>
+          error instanceof TranscriptExtractionError &&
+          error.code === "no-english",
+      );
+      assert.equal(preflightRequests, 1);
+      assert.equal(extractionRequests, 0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  },
+);
