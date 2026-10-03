@@ -655,3 +655,55 @@ test("keeps the saved academic record available for retry after a stream failure
     ),
   ).toEqual(academicRecord);
 });
+
+test("keeps completed requirement results visible after a stream failure and retries from the saved record", async ({
+  page,
+}) => {
+  await openReport(page);
+
+  const firstSnapshot: MappingResult = {
+    ...result,
+    requirements: result.requirements.slice(0, 1),
+    courseEvidence: result.courseEvidence.slice(0, 1),
+  };
+  await sendStreamEvent(page, 0, "progress", firstSnapshot);
+
+  await expect(page.getByText("1 of 4 requirements mapped")).toBeVisible();
+  await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
+
+  await sendStreamEvent(page, 0, "error", {
+    error: "The mapping service is temporarily unavailable.",
+  });
+  await page.evaluate(() => {
+    window.__verifeeMappingTest?.streams[0]?.close();
+  });
+
+  await expect(page.getByTestId("status-mapping-error")).toBeVisible();
+  await expect(page.getByTestId("button-retry-mapping")).toBeEnabled();
+  await expect(page.getByText("1 of 4 requirements mapped")).toBeVisible();
+  await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
+  await expect(page.getByTestId(`mapping-${requirementIds[1]}`)).toHaveCount(0);
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(sessionStorage.getItem("verifee-extracted-record") ?? "null"),
+    ),
+  ).toEqual(academicRecord);
+
+  await page.getByTestId("button-retry-mapping").click();
+  await page.waitForFunction(
+    () => window.__verifeeMappingTest?.streams.length === 2,
+  );
+  await expect(page.getByTestId("status-mapping-error")).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.__verifeeMappingTest?.requests[1]?.body),
+    )
+    .toEqual({ programId, record: academicRecord });
+
+  await sendStreamEvent(page, 1, "complete", result);
+  await page.evaluate(() => {
+    window.__verifeeMappingTest?.streams[1]?.close();
+  });
+  await expect(page.getByTestId("status-mapping-loading")).toHaveCount(0);
+  await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
+});
