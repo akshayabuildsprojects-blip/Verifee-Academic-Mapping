@@ -5,6 +5,8 @@ import { test } from "node:test";
 import { RunAcademicMappingResponse } from "@workspace/api-zod";
 import {
   originalFetch,
+  mappingModelRequestCount,
+  resetMappingModelRequestCount,
   resetStageCCompletionOrder,
   restoreFetch,
   stageCCompletionOrder,
@@ -71,6 +73,74 @@ function listen(server: Server): Promise<string> {
     });
   });
 }
+
+test("invalid mapping requests return JSON 400 responses without starting mapping", async () => {
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => {
+    req.log = { warn: () => undefined } as typeof req.log;
+    next();
+  });
+  app.use("/api", academicMappingsRouter);
+  const server = createServer(app);
+  const baseUrl = await listen(server);
+  const invalidRequests = [
+    {
+      name: "invalid program ID",
+      body: { ...mappingRequest, programId: "not-a-program" },
+    },
+    {
+      name: "incomplete academic record",
+      body: {
+        ...mappingRequest,
+        record: {
+          ...mappingRequest.record,
+          academicRecord: { creditSystem: "Semester credits" },
+        },
+      },
+    },
+  ];
+
+  resetMappingModelRequestCount();
+
+  try {
+    for (const route of ["/academic-mappings/run/stream", "/academic-mappings/run"]) {
+      for (const invalidRequest of invalidRequests) {
+        const response = await originalFetch(`${baseUrl}${route}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(invalidRequest.body),
+        });
+
+        assert.equal(
+          response.status,
+          400,
+          `${route} should reject an ${invalidRequest.name}`,
+        );
+        assert.match(
+          response.headers.get("content-type") ?? "",
+          /application\/json/,
+          `${route} should return a JSON validation error`,
+        );
+        assert.doesNotMatch(
+          response.headers.get("content-type") ?? "",
+          /text\/event-stream/,
+          `${route} should not open an event stream for invalid input`,
+        );
+        assert.deepEqual(await response.json(), {
+          error: "The academic record or selected Georgia Tech program is invalid.",
+        });
+      }
+    }
+
+    assert.equal(mappingModelRequestCount, 0, "invalid requests must not start model work");
+  } finally {
+    restoreFetch();
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
+});
 
 test("stream progress follows completed mappings and preserves both final response contracts", async () => {
   const app = express();

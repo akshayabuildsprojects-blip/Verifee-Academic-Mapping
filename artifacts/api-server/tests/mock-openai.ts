@@ -3,12 +3,14 @@ type OpenAIRequestBody = {
 };
 
 export const stageCCompletionOrder: string[] = [];
+export let mappingModelRequestCount = 0;
 
 const originalFetch = globalThis.fetch;
 process.env.AI_INTEGRATIONS_OPENAI_BASE_URL = "https://academic-mapping-test.invalid/v1";
 process.env.AI_INTEGRATIONS_OPENAI_API_KEY = "academic-mapping-test-key";
 
 globalThis.fetch = (async (_input, init) => {
+  mappingModelRequestCount += 1;
   if (typeof init?.body !== "string") {
     throw new Error("Expected the mapping request to include a JSON body.");
   }
@@ -75,6 +77,10 @@ globalThis.fetch = (async (_input, init) => {
 
 export function resetStageCCompletionOrder(): void {
   stageCCompletionOrder.length = 0;
+}
+
+export function resetMappingModelRequestCount(): void {
+  mappingModelRequestCount = 0;
 }
 
 export { originalFetch };
