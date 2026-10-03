@@ -1,0 +1,422 @@
+Add a fifth and final step to Verifee called:
+
+5. Verifee Report
+
+Do not change the existing credential extraction, academic mapping, evidence retrieval, or Step 4 results.
+
+The purpose of Step 5 is to convert the completed Verifee analysis into a professional downloadable PDF report.
+
+The report should use the SAME completed mapping data already stored in application state. Do not rerun AI analysis when generating the report.
+
+--------------------------------------------------
+1. UPDATE THE STEPPER
+--------------------------------------------------
+
+The workflow should now be:
+
+1. Upload Credential
+2. Verify & Review
+3. Select Target
+4. Academic Mapping
+5. Verifee Report
+
+After Step 4 is complete, show a primary CTA:
+
+Generate Verifee Report
+
+Clicking it should move the user to Step 5 while preserving the full analysis state.
+
+--------------------------------------------------
+2. STEP 5 — VERIFEE REPORT
+--------------------------------------------------
+
+Title:
+
+Verifee Report
+
+Supporting text:
+
+"Generate a professional preliminary academic mapping report based on the completed analysis."
+
+Show a concise report summary:
+
+- issuing institution
+- mapped country / education system
+- broad academic field
+- specific discipline
+- target institution
+- target program
+- credential verification status
+- number of requirements analyzed
+- Covered count
+- Partially Covered count
+- Potential Gap count
+- Insufficient Evidence count
+
+Do not repeat the entire Step 4 UI.
+
+--------------------------------------------------
+3. PAYMENT / PRICING AREA
+--------------------------------------------------
+
+Add a clean payment-style section before report generation.
+
+This is a DEMO payment state only.
+
+Show:
+
+Verifee Preliminary Academic Mapping Report
+
+Report fee:
+$0.00
+
+Badge:
+Free in Demo Mode
+
+Supporting text:
+
+"Report pricing is disabled during the Verifee demo. No payment information is required."
+
+Primary CTA:
+
+Generate Report
+
+Do NOT:
+- integrate Stripe
+- collect payment-card details
+- simulate a fake transaction
+- ask for billing information
+
+Structure the component so real payment integration could be added later without redesigning Step 5.
+
+--------------------------------------------------
+4. REPORT PREVIEW
+--------------------------------------------------
+
+After the user clicks Generate Report, show a polished report preview before download.
+
+Use the existing Verifee visual identity:
+
+- off-white / warm-white background
+- deep muted green
+- pale sage / soft green accents
+- charcoal text
+- restrained gold / amber only for warning or review states
+- serif display typography where appropriate
+- clean sans-serif body text
+- thin borders
+- generous whitespace
+- professional academic / institutional aesthetic
+
+The report should visually feel like the same product as the current Verifee website.
+
+Do NOT make it look like a generic browser printout.
+
+--------------------------------------------------
+5. REPORT COVER PAGE
+--------------------------------------------------
+
+The PDF cover page should say:
+
+VERIFEE
+
+Preliminary Academic Mapping Report
+
+Generate a report ID such as:
+
+VF-0248
+
+Include:
+
+Issuing Institution
+[actual institution]
+
+Country / Education System
+[mapped country]
+
+Academic Field
+[broad field]
+
+Specific Discipline
+[specific discipline]
+
+Target Institution
+Georgia Institute of Technology
+
+Target Program
+[selected target program]
+
+Credential Verification
+[actual verification status]
+
+Academic Interpretation
+Completed
+
+Mapping Summary
+X Covered
+X Partially Covered
+X Potential Gaps
+X Insufficient Evidence
+
+Generated
+[current date/time]
+
+Include the Verifee brand line near the bottom:
+
+"A record, with context."
+
+--------------------------------------------------
+6. VERIFICATION WORDING
+--------------------------------------------------
+
+Do NOT label the whole report:
+
+"Verified by Verifee"
+
+unless the credential itself was actually digitally verified.
+
+For a normal PDF, show:
+
+Credential Verification
+Unavailable
+
+Explanation:
+
+"The academic record was interpreted from an uploaded PDF. Verifee did not independently authenticate the issuing institution or document provenance."
+
+For future verified OpenCerts / EDC credentials, the same report structure should support:
+
+Credential Verification
+Verified
+
+Verification Method
+OpenCerts
+
+or:
+
+European Digital Credential
+
+Keep this future capability in the report data model.
+
+--------------------------------------------------
+7. MAPPED ACADEMIC CONTEXT SECTION
+--------------------------------------------------
+
+Include a section:
+
+Mapped Academic Context
+
+Show:
+
+- institution
+- country / education system
+- broad field
+- specific discipline
+- source program
+- selected target program
+
+Where useful, distinguish:
+
+Source: Transcript
+
+from:
+
+Mapped by Verifee
+
+Do not imply mapped context is cryptographic verification.
+
+--------------------------------------------------
+8. ACADEMIC MAPPING SUMMARY
+--------------------------------------------------
+
+Create a concise visual summary:
+
+Requirements analyzed: X
+
+Covered: X
+Partially Covered: X
+Potential Gaps: X
+Insufficient Evidence: X
+
+Use subtle status styling consistent with Step 4.
+
+--------------------------------------------------
+9. DETAILED REQUIREMENT RESULTS
+--------------------------------------------------
+
+For every mapped requirement, include:
+
+Requirement name
+
+Status:
+Covered
+Partially Covered
+Potential Gap
+Insufficient Evidence
+
+Confidence:
+High
+Medium
+Low
+
+Relevant Prior Coursework:
+- course code
+- course title
+- credits if available
+- grade if available
+
+Evidence:
+- concepts
+- syllabus/course-description evidence
+- other official evidence already found by Step 4
+
+Reasoning:
+existing Step 4 rationale
+
+Sources:
+official issuing-university URLs used during mapping
+
+Do not regenerate or reinterpret the mapping.
+
+Use the stored Step 4 results exactly.
+
+--------------------------------------------------
+10. ITEMS REQUIRING REVIEW
+--------------------------------------------------
+
+Include a separate section:
+
+Items Requiring Review
+
+Populate it dynamically from the actual analysis.
+
+Examples may include:
+
+- credential could not be independently verified
+- course coverage requires additional syllabus evidence
+- grading scale or credit units may require institutional review
+- requirement classified as Insufficient Evidence
+- requirement classified as Potential Gap
+
+Do not show generic review warnings that do not apply to the current analysis.
+
+--------------------------------------------------
+11. DISCLAIMER
+--------------------------------------------------
+
+Include this clearly near the end:
+
+"Verifee provides preliminary academic interpretation and mapping. This report is not an official admissions decision, credential-equivalency evaluation, or transfer-credit determination. Final academic and admissions decisions remain with the receiving institution."
+
+--------------------------------------------------
+12. PDF GENERATION
+--------------------------------------------------
+
+Add a primary button:
+
+Download PDF
+
+Generate a real PDF file from the report data.
+
+Do not simply invoke browser Print.
+
+The PDF should:
+
+- have professional page margins
+- preserve the Verifee visual identity
+- avoid broken cards across page boundaries where possible
+- have readable typography
+- preserve headings and hierarchy
+- include page numbers
+- include report ID
+- include generation date
+- include clickable source URLs if technically supported
+- include the disclaimer
+
+Suggested filename:
+
+Verifee_Report_[Institution]_[TargetProgram]_[ReportID].pdf
+
+Example:
+
+Verifee_Report_NTU_MSAnalytics_VF-0248.pdf
+
+--------------------------------------------------
+13. REPORT STATE
+--------------------------------------------------
+
+The report should be generated entirely from the existing analysis state.
+
+Do not:
+
+- re-upload the transcript
+- rerun PDF extraction
+- rerun university research
+- rerun academic mapping
+- consume additional AI calls merely to create the PDF
+
+Step 5 is a presentation/export step.
+
+--------------------------------------------------
+14. ACTIONS
+--------------------------------------------------
+
+Provide:
+
+Download PDF
+
+Secondary action:
+
+Back to Academic Mapping
+
+Tertiary action:
+
+Start New Analysis
+
+Start New Analysis should clear:
+
+- uploaded credential
+- extracted academic record
+- mapped academic context
+- selected target
+- retrieved evidence
+- mapping results
+- generated report
+
+Downloading the report should NOT clear anything.
+
+--------------------------------------------------
+15. LANDING-PAGE REPORT CARD
+--------------------------------------------------
+
+Do not redesign the landing-page sample card yet.
+
+Once the real Step 5 report design is complete, we will update the landing-page report preview to match this final report style.
+
+The Step 5 report design should become the visual source of truth.
+
+--------------------------------------------------
+16. TEST
+--------------------------------------------------
+
+Test the complete path:
+
+Upload credential
+→ Verify & Review
+→ Select Target
+→ Academic Mapping
+→ Verifee Report
+→ Free in Demo Mode
+→ Generate Report
+→ Download PDF
+
+Confirm that:
+
+1. no additional AI analysis runs during report generation;
+2. the PDF contains the actual current analysis;
+3. verification language is accurate;
+4. mapped context is included;
+5. all requirement results are included;
+6. source links are preserved;
+7. PDF styling matches the Verifee website;
+8. report generation works without losing the user's current analysis state.
