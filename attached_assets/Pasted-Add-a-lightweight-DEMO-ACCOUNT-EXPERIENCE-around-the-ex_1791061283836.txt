@@ -1,0 +1,345 @@
+Add a lightweight DEMO ACCOUNT EXPERIENCE around the existing Verifee workflow.
+
+IMPORTANT:
+Do NOT implement real authentication.
+Do NOT add user registration.
+Do NOT add password management.
+Do NOT add OAuth.
+Do NOT add a production database.
+Do NOT change the existing transcript extraction, target selection, academic mapping, or Verifee Report logic.
+
+This is a presentation/demo layer only.
+
+==================================================
+1. LANDING PAGE
+==================================================
+
+Keep the existing landing page design.
+
+The existing:
+
+Try Verifee
+
+button should now navigate to:
+
+/login
+
+instead of immediately entering the transcript workflow.
+
+==================================================
+2. LOGIN PAGE
+==================================================
+
+Create a simple, polished Verifee login page using the existing visual identity.
+
+Heading:
+
+Welcome to Verifee
+
+Supporting text:
+
+Access your academic mappings and Verifee reports.
+
+Do NOT create real username/password functionality.
+
+Primary button:
+
+Continue with Verifee Demo
+
+Small supporting label:
+
+Demo access — no account required
+
+Clicking this button should enter the demo experience.
+
+Optionally visually show disabled email/password fields if useful for the design, but they must clearly NOT be functional.
+
+Do not imply that real authentication is implemented.
+
+==================================================
+3. DEMO USER STATE
+==================================================
+
+When the user clicks:
+
+Continue with Verifee Demo
+
+create a local demo-session state only.
+
+No backend authentication is required.
+
+The demo user can simply be represented internally as:
+
+{
+  mode: "DEMO",
+  displayName: "Verifee Demo"
+}
+
+The demo session only needs to survive normal navigation during the current browser session.
+
+==================================================
+4. DEMO HOME / DASHBOARD
+==================================================
+
+After entering Demo Mode, show a lightweight dashboard.
+
+Header:
+
+Verifee Demo
+
+Primary actions:
+
+Start New Mapping
+My Reports
+
+Do not overbuild this page.
+
+The main purpose is to show that Verifee can support reusable reports without implementing production account infrastructure.
+
+==================================================
+5. MY REPORTS
+==================================================
+
+Create a:
+
+My Reports
+
+page.
+
+Seed one existing fictional/demo report representing the current NTU example.
+
+Use the existing report design/data structure.
+
+Example card:
+
+Nanyang Technological University
+Electrical & Electronic Engineering
+
+Target:
+Georgia Institute of Technology
+MS Analytics
+
+Report ID:
+VF-DEMO-001
+
+Status:
+Ready
+
+Created:
+Demo Report
+
+Actions:
+
+View Report
+Download PDF
+
+If the existing NTU report generated in the app can be reused, use that same data.
+
+Do not expose real personal information from an uploaded transcript.
+
+Only use academic/demo-safe fields.
+
+==================================================
+6. START NEW MAPPING
+==================================================
+
+Start New Mapping should enter the existing workflow:
+
+1. Upload Credential
+2. Verify & Review
+3. Select Target
+4. Academic Mapping
+5. Verifee Report
+
+Do not change the current working logic.
+
+==================================================
+7. SAVE REPORT BUTTON
+==================================================
+
+On Step 5 add:
+
+Save to My Reports
+
+For now this is DEMO functionality only.
+
+When clicked:
+
+- show a success state:
+  "Saved to My Reports"
+- add the generated report to the local demo report list for the current browser session
+- do NOT create a production database
+- do NOT build persistent user storage
+
+It is acceptable if reports disappear after the browser session is reset.
+
+Label this architecture internally as demo-only.
+
+==================================================
+8. DUPLICATE REPORT CHECK
+==================================================
+
+Add a simple duplicate check before saving a new report.
+
+A report should be considered an existing equivalent report if the demo report list already contains the same:
+
+- source institution
+- source academic program/discipline
+- target institution
+- target program
+
+If a matching report already exists, do not silently create another identical report.
+
+Show:
+
+A Verifee report for this academic record and target program already exists.
+
+Actions:
+
+View Existing Report
+Continue Anyway
+
+Continue Anyway may create another report if the user deliberately chooses to.
+
+This is only a basic MVP duplicate check.
+
+Do NOT build complicated record-matching logic.
+
+==================================================
+9. DUPLICATE FILE CHECK
+==================================================
+
+Add a lightweight client-side duplicate-upload check where practical.
+
+During the current browser session, keep track of uploaded credential files.
+
+If the exact same file is selected again during the same session, show a non-blocking message:
+
+This credential has already been uploaded in this demo session.
+
+Actions:
+
+Continue
+View Existing Report
+
+Do not perform external identity matching.
+Do not build a document database.
+Do not use AI for duplicate detection.
+
+If exact client-side file comparison adds unnecessary complexity, use filename + file size as the MVP check.
+
+Keep this extremely simple.
+
+==================================================
+10. MY REPORTS BEHAVIOR
+==================================================
+
+The My Reports list should include:
+
+- the seeded NTU demo report
+- any reports saved during the current demo session
+
+Each report card should show:
+
+Source institution
+Academic discipline/program
+Target institution
+Target program
+Report ID
+Status
+
+Actions:
+
+View Report
+Download PDF
+
+Do not create edit/delete/account-management functionality.
+
+==================================================
+11. NAVIGATION
+==================================================
+
+While in Demo Mode, add simple navigation:
+
+Verifee
+New Mapping
+My Reports
+Demo
+
+Do not add account settings.
+
+The Demo label can simply indicate:
+
+Demo Mode
+
+No profile management is needed.
+
+==================================================
+12. SESSION / STORAGE
+==================================================
+
+Prefer simple browser-local state.
+
+sessionStorage or localStorage is acceptable for this demo.
+
+Do NOT add:
+
+- PostgreSQL
+- account tables
+- authentication tables
+- password storage
+- payment customer records
+
+The goal is to demonstrate the future account/report-wallet experience without introducing backend complexity.
+
+==================================================
+13. KEEP CURRENT REPORT LOGIC
+==================================================
+
+Do not modify:
+
+- PDF extraction
+- structured transcript JSON
+- Step 2 review
+- target program JSON
+- course shortlisting
+- academic-context mapping
+- web evidence retrieval
+- requirement mapping
+- mapping statuses
+- confidence rules
+- Step 5 PDF generation
+- report disclaimer
+
+This task only adds:
+
+Landing → Demo Login → Demo Dashboard → My Reports
+
+and lightweight Save / Duplicate-check behavior.
+
+==================================================
+14. TEST THE COMPLETE DEMO FLOW
+==================================================
+
+Test:
+
+Landing Page
+→ Try Verifee
+→ Login Page
+→ Continue with Verifee Demo
+→ My Reports
+→ seeded NTU report visible
+→ Start New Mapping
+→ upload transcript
+→ existing workflow
+→ generate report
+→ Save to My Reports
+→ report appears in My Reports
+
+Also test:
+
+Generate the same institution + target mapping again
+→ duplicate warning appears
+→ View Existing Report works
+
+Confirm that no real authentication or production database was added.
