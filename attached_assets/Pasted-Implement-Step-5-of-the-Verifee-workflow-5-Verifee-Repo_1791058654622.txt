@@ -1,0 +1,424 @@
+Implement Step 5 of the Verifee workflow:
+
+5. Verifee Report
+
+Do not change the existing PDF extraction, academic mapping, evidence retrieval, Georgia Tech target data, or Step 4 reasoning.
+
+The purpose of Step 5 is to convert the completed mapping into a professional report and demonstrate the future commercial/value-delivery workflow.
+
+CURRENT FLOW
+
+1. Upload Credential
+2. Verify & Review
+3. Select Target
+4. Academic Mapping
+5. Verifee Report
+
+--------------------------------------------------
+1. ENTER STEP 5
+--------------------------------------------------
+
+After Step 4 mapping is complete, show a primary CTA:
+
+Generate Verifee Report
+
+Move to Step 5 without rerunning:
+- transcript extraction
+- course research
+- AI mapping
+
+Use the analysis already stored in application state.
+
+--------------------------------------------------
+2. DEMO PAYMENT / VALUE-DELIVERY STEP
+--------------------------------------------------
+
+Before generating the report, show:
+
+Verifee Preliminary Academic Mapping Report
+
+Report fee:
+$0.00
+
+Badge:
+Free in Demo Mode
+
+Supporting copy:
+
+"Report pricing is disabled during the Verifee demo. No payment information is required."
+
+Primary CTA:
+
+Generate Report
+
+Do NOT:
+- integrate Stripe
+- collect card information
+- simulate a payment transaction
+- create fake payment-success claims
+
+This component should represent the future transaction boundary only.
+
+--------------------------------------------------
+3. REPORT ID
+--------------------------------------------------
+
+When Generate Report is clicked, assign the report a unique ID such as:
+
+VF-0248
+
+The report ID should remain associated with this generated report for the current session.
+
+Do not regenerate a different ID every time the same preview re-renders.
+
+--------------------------------------------------
+4. REPORT PREVIEW
+--------------------------------------------------
+
+Show a polished report preview using Verifee's existing visual identity:
+
+- warm white background
+- deep muted green
+- pale sage accents
+- charcoal text
+- restrained amber for review states
+- serif display headings
+- clean sans-serif body text
+- thin borders
+- generous whitespace
+- academic / institutional feel
+
+The report preview should become the visual source of truth for the later landing-page sample card.
+
+--------------------------------------------------
+5. COVER PAGE
+--------------------------------------------------
+
+Title:
+
+VERIFEE
+
+Preliminary Academic Mapping Report
+
+Include:
+
+Report ID
+[actual report ID]
+
+Issuing Institution
+[actual institution]
+
+Country / Education System
+[mapped academic context]
+
+Broad Field
+[mapped broad field]
+
+Specific Discipline
+[mapped discipline]
+
+Source Program
+[program extracted from transcript]
+
+Target Institution
+Georgia Institute of Technology
+
+Target Program
+[selected target program]
+
+Credential Verification
+[actual verification status]
+
+Academic Interpretation
+Completed
+
+Mapping Summary
+X Covered
+X Partially Covered
+X Potential Gaps
+X Insufficient Evidence
+
+Generated
+[current report-generation date/time]
+
+Brand line:
+
+"A record, with context."
+
+--------------------------------------------------
+6. VERIFICATION LANGUAGE
+--------------------------------------------------
+
+Do NOT label the entire report:
+
+"Verified by Verifee"
+
+unless the source credential was actually independently verified.
+
+For a normal PDF:
+
+Credential Verification:
+Unavailable
+
+Explanation:
+
+"The academic record was interpreted from an uploaded PDF. Verifee did not independently authenticate the issuing institution or document provenance."
+
+The report structure should later support:
+
+Credential Verification:
+Verified
+
+Verification Method:
+OpenCerts
+
+or:
+
+European Digital Credential
+
+--------------------------------------------------
+7. MAPPED ACADEMIC CONTEXT
+--------------------------------------------------
+
+Include:
+
+Mapped Academic Context
+
+Show:
+- institution
+- country / education system
+- broad academic field
+- specific discipline
+- source program
+- target institution
+- target program
+
+Where relevant distinguish:
+
+Source: Transcript
+
+from:
+
+Mapped by Verifee
+
+--------------------------------------------------
+8. MAPPING SUMMARY
+--------------------------------------------------
+
+Show:
+
+Requirements analyzed: X
+
+Covered: X
+Partially Covered: X
+Potential Gaps: X
+Insufficient Evidence: X
+
+Use the actual stored Step 4 results.
+
+Do not regenerate the mapping.
+
+--------------------------------------------------
+9. DETAILED REQUIREMENT RESULTS
+--------------------------------------------------
+
+For every target requirement include:
+
+Requirement Name
+
+Status:
+- Covered
+- Partially Covered
+- Potential Gap
+- Insufficient Evidence
+
+Confidence:
+- High
+- Medium
+- Low
+
+Relevant Prior Coursework:
+- course code
+- course title
+- credits / units if available
+- grade if available
+
+Evidence:
+existing evidence from Step 4
+
+Reasoning:
+existing rationale from Step 4
+
+Sources:
+official university URLs already retrieved during Step 4
+
+Do not perform new searches when generating the report.
+
+--------------------------------------------------
+10. ITEMS REQUIRING REVIEW
+--------------------------------------------------
+
+Generate this section dynamically from the real analysis.
+
+Examples:
+
+- credential verification unavailable
+- additional syllabus evidence needed
+- Insufficient Evidence requirement
+- Potential Gap requirement
+- grading/credit interpretation requiring human confirmation
+
+Do not show generic warnings that do not apply.
+
+--------------------------------------------------
+11. DOWNLOADABLE PDF
+--------------------------------------------------
+
+Add:
+
+Download PDF
+
+Generate a real professionally formatted PDF.
+
+Do NOT simply invoke browser Print.
+
+The PDF must include:
+
+- cover page
+- report ID
+- generated timestamp
+- mapped academic context
+- credential verification status
+- mapping summary
+- detailed requirement results
+- evidence
+- reasoning
+- source links
+- review items
+- disclaimer
+- page numbers
+
+Suggested filename:
+
+Verifee_Report_[Institution]_[TargetProgram]_[ReportID].pdf
+
+--------------------------------------------------
+12. SUBMISSION RECEIPT
+--------------------------------------------------
+
+Also provide:
+
+Download Submission Receipt
+
+For the MVP, this is a receipt for the generated Verifee report, not proof that an institution actually received it.
+
+Include:
+
+Verifee
+Report ID
+Student report generated
+Target institution
+Target program
+Generated date/time
+Report status: Ready for submission
+
+Include wording:
+
+"This receipt confirms that the listed Verifee report was generated. It does not confirm receipt or acceptance by the target institution."
+
+Do not falsely claim:
+- Sent
+- Delivered
+- Accepted
+
+unless an actual institution-delivery function exists later.
+
+--------------------------------------------------
+13. FUTURE REPORT WALLET DATA MODEL
+--------------------------------------------------
+
+Structure the generated report object so it could later be associated with a student account.
+
+Use fields such as:
+
+{
+  "reportId": "",
+  "createdAt": "",
+  "targetInstitution": "",
+  "targetProgram": "",
+  "sourceInstitution": "",
+  "verificationStatus": "",
+  "mappingSummary": {},
+  "mappingResults": [],
+  "paymentStatus": "DEMO_FREE",
+  "deliveryStatus": "NOT_SENT"
+}
+
+Do NOT build full authentication or payment persistence in this task.
+
+Do NOT store the original transcript permanently.
+
+The future production model will allow students to log in and retrieve previously purchased mappings/reports without paying again.
+
+--------------------------------------------------
+14. FUTURE TRUST MODEL
+--------------------------------------------------
+
+Leave the architecture ready for reports to later support:
+
+- digital signature / report hash
+- institution verification endpoint
+- direct institution delivery
+- delivery receipt
+
+Do not claim these are implemented unless they actually are.
+
+Do not require institutions to manually decrypt PDFs.
+
+--------------------------------------------------
+15. ACTIONS
+--------------------------------------------------
+
+Step 5 should provide:
+
+Download PDF
+Download Submission Receipt
+Back to Academic Mapping
+Start New Analysis
+
+Start New Analysis clears the current workflow state.
+
+Downloading a report or receipt must not clear the analysis.
+
+--------------------------------------------------
+16. DISCLAIMER
+--------------------------------------------------
+
+Include prominently:
+
+"Verifee provides preliminary academic interpretation and mapping. This report is not an official admissions decision, credential-equivalency evaluation, or transfer-credit determination. Final academic and admissions decisions remain with the receiving institution."
+
+--------------------------------------------------
+17. TEST
+--------------------------------------------------
+
+Test:
+
+Upload transcript
+→ Review extraction
+→ Select GT target
+→ Complete mapping
+→ Generate Verifee Report
+→ $0 Free in Demo Mode
+→ Preview report
+→ Download PDF
+→ Download Submission Receipt
+
+Confirm:
+
+1. no extra AI calls occur during report generation;
+2. all Step 4 results are preserved exactly;
+3. PDF styling matches Verifee;
+4. verification wording is accurate;
+5. receipt does not falsely claim institution delivery;
+6. report generation does not lose existing workflow state.
