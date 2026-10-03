@@ -1,0 +1,288 @@
+Improve Step 4 Academic Mapping so it focuses on contextualized academic mapping rather than repeating the Step 2 extraction screen.
+
+Do NOT change PDF extraction, course extraction, target-program JSON, or the existing academic-mapping reasoning.
+
+--------------------------------------------------
+1. REMOVE THE LARGE "EXTRACTED ACADEMIC RECORD" BOX FROM STEP 4
+--------------------------------------------------
+
+Step 2 already lets the user review the extracted academic record.
+
+Step 4 should not repeat a large card showing:
+
+- institution
+- country
+- qualification
+- program
+- field of study
+- graduation date
+
+Remove that large extracted-record box from Step 4.
+
+The original extracted academic JSON must still remain in application state and must still be used by the mapping engine.
+
+--------------------------------------------------
+2. MAKE CONTEXTUALIZATION THE FIRST MAPPING STAGE
+--------------------------------------------------
+
+Before mapping individual target requirements, Step 4 should first contextualize the academic record.
+
+Use the extracted transcript information to determine:
+
+- institution
+- country / education system
+- broad academic field
+- specific discipline / field of study
+- program, if present in the transcript
+
+Example:
+
+Extracted transcript:
+Institution:
+Nanyang Technological University
+
+Program:
+Engineering (Electrical & Electronic Engineering)
+
+Mapped context:
+
+Institution:
+Nanyang Technological University
+
+Country / education system:
+Singapore
+
+Broad field:
+Engineering
+
+Specific discipline:
+Electrical & Electronic Engineering
+
+Program:
+Engineering (Electrical & Electronic Engineering)
+
+--------------------------------------------------
+3. SOURCE VS MAPPED INFORMATION
+--------------------------------------------------
+
+Clearly distinguish information extracted directly from the document from information Verifee mapped or inferred.
+
+For example:
+
+Institution
+Nanyang Technological University
+Source: Transcript
+
+Program
+Engineering (Electrical & Electronic Engineering)
+Source: Transcript
+
+Country / education system
+Singapore
+Mapped by Verifee
+
+Broad field
+Engineering
+Mapped by Verifee
+
+Specific discipline
+Electrical & Electronic Engineering
+Mapped by Verifee
+
+Do NOT describe mapped information as credential verification.
+
+For an ordinary PDF, credential verification must remain:
+
+Verification unavailable
+
+--------------------------------------------------
+4. FIELD-OF-STUDY NORMALIZATION
+--------------------------------------------------
+
+The transcript may not contain a separate field called "field of study."
+
+When the program name clearly contains the discipline, Verifee may normalize it.
+
+Example:
+
+Program:
+ENGINEERING (ELECTRICAL & ELECTRONIC ENGINEERING)
+
+Normalized mapping:
+
+Broad field:
+Engineering
+
+Specific discipline:
+Electrical & Electronic Engineering
+
+Do not simply return "Not shown in transcript" when the academic discipline can reasonably be derived from the program information.
+
+However, preserve the original program value separately.
+
+Do not invent a discipline when the program does not provide enough evidence.
+
+--------------------------------------------------
+5. COUNTRY / EDUCATION-SYSTEM MAPPING
+--------------------------------------------------
+
+If country is not explicitly printed in the transcript but the institution can be reliably associated with a country, Verifee may add the country as contextual information.
+
+Example:
+
+Nanyang Technological University
+→ Singapore
+
+Label this:
+
+Mapped by Verifee
+
+not:
+
+Extracted from transcript
+
+and not:
+
+Verified
+
+If the institution cannot be confidently associated with one country, return:
+
+Country / education system:
+Unable to determine
+
+--------------------------------------------------
+6. SHOW A COMPACT "MAPPED ACADEMIC CONTEXT"
+--------------------------------------------------
+
+At the beginning of Step 4, show a compact section titled:
+
+Mapped Academic Context
+
+Suggested layout:
+
+Institution
+Nanyang Technological University
+
+Country / education system
+Singapore
+
+Broad field
+Engineering
+
+Specific discipline
+Electrical & Electronic Engineering
+
+Target
+Georgia Tech — MS Analytics
+
+Keep this section compact.
+
+Do not recreate the full Step 2 transcript review.
+
+--------------------------------------------------
+7. INTEGRATE THIS INTO THE MAPPING PROGRESS
+--------------------------------------------------
+
+The Step 4 progress experience should represent the real processing sequence.
+
+Example:
+
+Mapping academic record...
+
+Stage 1:
+Contextualizing academic record
+
+Then:
+
+Academic context mapped
+
+Singapore
+Engineering
+Electrical & Electronic Engineering
+
+Then continue:
+
+Stage 2:
+Evaluating target requirements
+
+2 of 4 requirements mapped
+
+Then complete the existing academic requirement mapping.
+
+Do not use artificial delays.
+
+Only update stages when the underlying processing step is actually complete.
+
+--------------------------------------------------
+8. TARGET REQUIREMENTS
+--------------------------------------------------
+
+After the academic context has been mapped, continue using the selected target program from the existing Georgia Tech JSON.
+
+The academic context should help the AI understand the applicant's background, but it must NOT alter or invent Georgia Tech requirements.
+
+The mapping sequence should now conceptually be:
+
+Extracted academic JSON
+→ contextualize institution / country / academic field
+→ load selected GT requirements
+→ shortlist relevant prior courses
+→ research shortlisted real-university courses where necessary
+→ map against requirements
+→ produce final results
+
+--------------------------------------------------
+9. PRESERVE CURRENT RESULT UI
+--------------------------------------------------
+
+Keep the existing Step 4 result behavior:
+
+- progress indicator
+- mapping-status summary
+- expandable/collapsible requirement cards
+- all cards collapsed after completion
+- Covered
+- Partially Covered
+- Insufficient Evidence
+- Potential Gap
+- confidence
+- supporting courses
+- evidence
+- rationale
+- official source links
+
+Do not change the actual course-mapping logic in this task.
+
+--------------------------------------------------
+10. TEST
+--------------------------------------------------
+
+Test using the existing private NTU Electrical & Electronic Engineering transcript.
+
+The contextualization stage should produce approximately:
+
+Institution:
+Nanyang Technological University
+
+Country / education system:
+Singapore
+
+Broad field:
+Engineering
+
+Specific discipline:
+Electrical & Electronic Engineering
+
+Program:
+Engineering (Electrical & Electronic Engineering)
+
+Target:
+the Georgia Tech program selected by the user
+
+Confirm that:
+
+1. Step 4 no longer repeats the large extracted-record box.
+2. The mapped academic context appears compactly.
+3. The UI distinguishes transcript-sourced information from Verifee-mapped context.
+4. Country and field-of-study mapping occur before requirement mapping.
+5. Existing requirement mapping continues to work unchanged.
