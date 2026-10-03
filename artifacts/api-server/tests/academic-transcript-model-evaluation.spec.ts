@@ -5,7 +5,7 @@ import { makeSyntheticPdf } from "./synthetic-transcript-pdf";
 const modelEvaluationEnabled = process.env.RUN_TRANSCRIPT_MODEL_EVAL === "1";
 
 test(
-  "configured model keeps English transcript text and omits other languages",
+  "configured model preserves complete and partial descriptions and leaves missing descriptions null",
   {
     skip: modelEvaluationEnabled
       ? false
@@ -87,6 +87,66 @@ test(
       assert.doesNotMatch(
         JSON.stringify(record),
         /Matemáticas|Observaciones|cálculo|线性代数|课程说明|高级计算/,
+      );
+
+      preflightRequests = 0;
+      extractionRequests = 0;
+      const printedDescription =
+        "This synthetic course fits calibration curves to standards at 265, 280, and 310 nanometers.";
+      const descriptionPdf = makeSyntheticPdf([
+        "Academic transcript",
+        "Institution: Verifee Synthetic University",
+        "Degree: Bachelor of Science",
+        "Program: Chemistry",
+        "Course code: CHEM 491",
+        "Course title: Spectroscopy Laboratory",
+        "Credits: 3",
+        "Grade: A",
+        `Description: ${printedDescription}`,
+        "Course code: CHEM 492",
+        "Course title: High-Temperature Sensor Calibration",
+        "Credits: 4",
+        "Grade: B+",
+        "Description: The experiment compared resistance changes under",
+      ]);
+      const describedRecord = await extractAcademicTranscript(descriptionPdf);
+      assert.equal(preflightRequests, 1);
+      assert.equal(extractionRequests, 1);
+      assert.equal(describedRecord.record.academicRecord.courses.length, 2);
+      assert.equal(
+        describedRecord.record.academicRecord.courses.find(
+          (course) => course.code === "CHEM 491",
+        )?.description,
+        printedDescription,
+      );
+      assert.equal(
+        describedRecord.record.academicRecord.courses.find(
+          (course) => course.code === "CHEM 492",
+        )?.description,
+        "The experiment compared resistance changes under",
+      );
+
+      preflightRequests = 0;
+      extractionRequests = 0;
+      const noDescriptionPdf = makeSyntheticPdf([
+        "Academic transcript",
+        "Institution: Verifee Synthetic University",
+        "Degree: Bachelor of Science",
+        "Program: Chemistry",
+        "Course code: CHEM 493",
+        "Course title: Advanced Instrumental Analysis",
+        "Credits: 4",
+        "Grade: B+",
+      ]);
+      const noDescriptionRecord = await extractAcademicTranscript(noDescriptionPdf);
+      assert.equal(preflightRequests, 1);
+      assert.equal(extractionRequests, 1);
+      assert.equal(noDescriptionRecord.record.academicRecord.courses.length, 1);
+      assert.equal(
+        noDescriptionRecord.record.academicRecord.courses.find(
+          (course) => course.code === "CHEM 493",
+        )?.description,
+        null,
       );
 
       preflightRequests = 0;
