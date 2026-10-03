@@ -5,12 +5,19 @@ import { test } from "node:test";
 import { RunAcademicMappingResponse } from "@workspace/api-zod";
 import {
   originalFetch,
+  configureStageCFailure,
+  installMockFetch,
   mappingModelRequestCount,
+  releaseFinalStageCAttempt,
+  resetStageCFailure,
   resetMappingModelRequestCount,
   resetStageCCompletionOrder,
   restoreFetch,
+  stageCFailureAttemptCount,
   stageCCompletionOrder,
+  waitForFinalStageCAttempt,
 } from "./mock-openai";
+import { openai } from "@workspace/integrations-openai-ai-server";
 import academicMappingsRouter from "../src/routes/academic-mappings";
 
 const mappingRequest = {
@@ -143,6 +150,7 @@ test("invalid mapping requests return JSON 400 responses without starting mappin
 });
 
 test("stream progress follows completed mappings and preserves both final response contracts", async () => {
+  installMockFetch();
   const app = express();
   app.use(express.json());
   app.use("/api", academicMappingsRouter);
@@ -217,6 +225,133 @@ test("stream progress follows completed mappings and preserves both final respon
     assert.deepEqual(legacyResult, streamedResult);
     assert.equal(stageCCompletionOrder.length, 4);
   } finally {
+    restoreFetch();
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+  }
+});
+
+test("failed requirement fallbacks appear only after retries and remain retryable", async () => {
+  installMockFetch();
+  const failedRequirementId = "msa-linear-algebra";
+  const originalMaxRetries = openai.maxRetries;
+  openai.maxRetries = 0;
+  configureStageCFailure(failedRequirementId);
+
+  const app = express();
+  app.use(express.json());
+  app.use("/api", academicMappingsRouter);
+  const server = createServer(app);
+  const baseUrl = await listen(server);
+
+  try {
+    const streamResponse = await originalFetch(
+      `${baseUrl}/academic-mappings/run/stream`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mappingRequest),
+      },
+    );
+    assert.equal(streamResponse.status, 200);
+    assert.ok(streamResponse.body);
+
+    const events: MappingEvent[] = [];
+    let resolveEventCount: (() => void) | null = null;
+    const collectEvents = async (): Promise<MappingEvent[]> => {
+      const reader = streamResponse.body!.getReader();
+      const decoder = new TextDecoder();
+      let bufferedText = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        bufferedText += decoder.decode(value, { stream: !done });
+        let separatorIndex = bufferedText.indexOf("\n\n");
+        while (separatorIndex >= 0) {
+          const block = bufferedText.slice(0, separatorIndex);
+          bufferedText = bufferedText.slice(separatorIndex + 2);
+          events.push(...parseServerSentEvents(block));
+          resolveEventCount?.();
+          resolveEventCount = null;
+          separatorIndex = bufferedText.indexOf("\n\n");
+        }
+        if (done) break;
+      }
+      if (bufferedText.trim()) events.push(...parseServerSentEvents(bufferedText));
+      return events;
+    };
+    const waitForProgressCount = async (count: number): Promise<void> => {
+      while (events.filter(({ event }) => event === "progress").length < count) {
+        await new Promise<void>((resolve) => {
+          resolveEventCount = resolve;
+        });
+      }
+    };
+    const eventsPromise = collectEvents();
+
+    await waitForFinalStageCAttempt();
+    await waitForProgressCount(3);
+    const progressBeforeFallback = events
+      .filter(({ event }) => event === "progress")
+      .map(({ data }) => RunAcademicMappingResponse.parse(data));
+    assert.equal(stageCFailureAttemptCount, 4);
+    assert.equal(progressBeforeFallback.length, 3);
+    assert.ok(progressBeforeFallback.every((snapshot) => !snapshot.retryable));
+    assert.ok(
+      progressBeforeFallback.every((snapshot) =>
+        snapshot.requirements.every(({ requirementId }) => requirementId !== failedRequirementId),
+      ),
+      "the failed requirement must remain absent while its final retry is still unsettled",
+    );
+
+    releaseFinalStageCAttempt();
+    const completedEvents = await eventsPromise;
+    const progressEvents = completedEvents.filter(({ event }) => event === "progress");
+    const progressSnapshots = progressEvents.map(({ data }) =>
+      RunAcademicMappingResponse.parse(data),
+    );
+    const failedRequirementSnapshots = progressSnapshots.filter((snapshot) =>
+      snapshot.requirements.some(({ requirementId }) => requirementId === failedRequirementId),
+    );
+    assert.equal(failedRequirementSnapshots.length, 1);
+    const fallbackSnapshot = failedRequirementSnapshots[0];
+    assert.equal(fallbackSnapshot.retryable, true);
+    const streamedFallback = fallbackSnapshot.requirements.find(
+      ({ requirementId }) => requirementId === failedRequirementId,
+    );
+    assert.ok(streamedFallback);
+    assert.equal(streamedFallback.status, "INSUFFICIENT_EVIDENCE");
+    assert.equal(streamedFallback.confidence, "LOW");
+    assert.match(streamedFallback.rationale, /Retry the mapping to try again/);
+    assert.ok(
+      fallbackSnapshot.requirements
+        .filter(({ requirementId }) => requirementId !== failedRequirementId)
+        .every(({ status }) => status === "COVERED"),
+      "other completed requirements should remain successful in the fallback snapshot",
+    );
+
+    const completeEvents = completedEvents.filter(({ event }) => event === "complete");
+    assert.equal(completeEvents.length, 1);
+    const terminalResult = RunAcademicMappingResponse.parse(completeEvents[0].data);
+    assert.equal(terminalResult.retryable, true);
+    assert.equal(terminalResult.requirements.length, 4);
+    const terminalFallback = terminalResult.requirements.find(
+      ({ requirementId }) => requirementId === failedRequirementId,
+    );
+    assert.ok(terminalFallback);
+    assert.equal(terminalFallback.status, "INSUFFICIENT_EVIDENCE");
+    assert.equal(terminalFallback.confidence, "LOW");
+    assert.match(terminalFallback.rationale, /Retry the mapping to try again/);
+    assert.ok(
+      terminalResult.requirements
+        .filter(({ requirementId }) => requirementId !== failedRequirementId)
+        .every(({ status }) => status === "COVERED"),
+      "the terminal result should retain other completed assessments without a false success for the failure",
+    );
+  } finally {
+    releaseFinalStageCAttempt();
+    resetStageCFailure();
+    openai.maxRetries = originalMaxRetries;
     restoreFetch();
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));

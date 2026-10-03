@@ -4,12 +4,19 @@ type OpenAIRequestBody = {
 
 export const stageCCompletionOrder: string[] = [];
 export let mappingModelRequestCount = 0;
+export let stageCFailureAttemptCount = 0;
+
+let failingStageCRequirementId: string | null = null;
+let finalStageCAttemptStarted = Promise.resolve();
+let signalFinalStageCAttemptStarted: () => void = () => undefined;
+let finalStageCAttemptGate = Promise.resolve();
+let releaseFinalStageCAttemptGate: () => void = () => undefined;
 
 const originalFetch = globalThis.fetch;
 process.env.AI_INTEGRATIONS_OPENAI_BASE_URL = "https://academic-mapping-test.invalid/v1";
 process.env.AI_INTEGRATIONS_OPENAI_API_KEY = "academic-mapping-test-key";
 
-globalThis.fetch = (async (_input, init) => {
+const mockFetch = (async (_input, init) => {
   mappingModelRequestCount += 1;
   if (typeof init?.body !== "string") {
     throw new Error("Expected the mapping request to include a JSON body.");
@@ -30,6 +37,18 @@ globalThis.fetch = (async (_input, init) => {
       candidates: [{ courseIndex: 0, relevance: "LIKELY_RELEVANT" }],
     });
   } else if (input.startsWith("Stage C")) {
+    if (requirement.id === failingStageCRequirementId) {
+      stageCFailureAttemptCount += 1;
+      if (stageCFailureAttemptCount === 4) {
+        signalFinalStageCAttemptStarted();
+        await finalStageCAttemptGate;
+      }
+      return new Response(JSON.stringify({ error: "Simulated requirement analysis failure." }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const delayMsByRequirement: Record<string, number> = {
       "msa-calculus": 250,
       "msa-probability-statistics": 10,
@@ -74,6 +93,7 @@ globalThis.fetch = (async (_input, init) => {
     },
   );
 }) as typeof fetch;
+globalThis.fetch = mockFetch;
 
 export function resetStageCCompletionOrder(): void {
   stageCCompletionOrder.length = 0;
@@ -83,7 +103,40 @@ export function resetMappingModelRequestCount(): void {
   mappingModelRequestCount = 0;
 }
 
+export function configureStageCFailure(requirementId: string): void {
+  failingStageCRequirementId = requirementId;
+  stageCFailureAttemptCount = 0;
+  finalStageCAttemptStarted = new Promise((resolve) => {
+    signalFinalStageCAttemptStarted = resolve;
+  });
+  finalStageCAttemptGate = new Promise((resolve) => {
+    releaseFinalStageCAttemptGate = resolve;
+  });
+}
+
+export function waitForFinalStageCAttempt(): Promise<void> {
+  return finalStageCAttemptStarted;
+}
+
+export function releaseFinalStageCAttempt(): void {
+  releaseFinalStageCAttemptGate();
+}
+
+export function resetStageCFailure(): void {
+  releaseFinalStageCAttempt();
+  failingStageCRequirementId = null;
+  stageCFailureAttemptCount = 0;
+  signalFinalStageCAttemptStarted = () => undefined;
+  releaseFinalStageCAttemptGate = () => undefined;
+  finalStageCAttemptStarted = Promise.resolve();
+  finalStageCAttemptGate = Promise.resolve();
+}
+
 export { originalFetch };
+
+export function installMockFetch(): void {
+  globalThis.fetch = mockFetch;
+}
 
 export function restoreFetch(): void {
   globalThis.fetch = originalFetch;
