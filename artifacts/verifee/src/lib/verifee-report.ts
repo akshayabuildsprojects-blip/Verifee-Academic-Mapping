@@ -19,6 +19,18 @@ export interface VerifeeReportContextField {
   sourceUrl: string | null;
 }
 
+export interface VerifeeReportInstitutionStatus {
+  status: 'LISTED' | 'NOT_LISTED' | 'UNABLE_TO_CHECK';
+  jurisdiction: string | null;
+  sourceName: string | null;
+  sourceUrl: string | null;
+  checkedAt: string;
+  matchedName: string | null;
+  registryStatus: string | null;
+  summary: string;
+  coverageLimits: string;
+}
+
 export interface VerifeeReportCourse {
   courseIndex: number;
   code: string | null;
@@ -63,6 +75,7 @@ export interface VerifeeReportData {
     method: string | null;
     explanation: string;
   };
+  institutionStatus: VerifeeReportInstitutionStatus;
   academicInterpretation: 'Completed';
   requirementsAnalyzed: number;
   counts: {
@@ -78,7 +91,28 @@ export interface VerifeeReportData {
 export interface GeneratedReportMetadata {
   reportId: string;
   generatedAt: string;
+  createdAt: string;
+  sourceInstitution: string;
+  targetInstitution: string;
+  targetProgram: string;
+  verificationStatus: string;
+  mappingSummary: {
+    requirementsAnalyzed: number;
+    covered: number;
+    partiallyCovered: number;
+    potentialGap: number;
+    insufficientEvidence: number;
+  };
+  mappingResults: VerifeeReportRequirement[];
+  institutionStatus: VerifeeReportInstitutionStatus;
+  paymentStatus: 'DEMO_FREE';
+  deliveryStatus: 'NOT_SENT';
 }
+
+export type GeneratedReportIdentity = Pick<
+  GeneratedReportMetadata,
+  'reportId' | 'generatedAt'
+>;
 
 const verificationUnavailableForPdf =
   'The academic record was interpreted from an uploaded PDF. Verifee did not independently authenticate the issuing institution or document provenance.';
@@ -144,12 +178,23 @@ function createReviewItems(
   requirements: VerifeeReportRequirement[],
   fields: VerifeeReportContextField[],
   verificationStatus: string,
+  institutionStatus: VerifeeReportInstitutionStatus,
 ) {
   const items: string[] = [];
 
   if (verificationStatus !== 'Verified') {
     items.push(
       'Credential provenance has not been independently authenticated; confirm it with the issuing institution.',
+    );
+  }
+
+  if (institutionStatus.status === 'NOT_LISTED') {
+    items.push(
+      'No exact institution-name match was found in the checked directory. Confirm the name and jurisdiction if needed; this is not a conclusion about recognition or legitimacy.',
+    );
+  } else if (institutionStatus.status === 'UNABLE_TO_CHECK') {
+    items.push(
+      'Institution status could not be checked within the source coverage shown in this report; no institution status was inferred.',
     );
   }
 
@@ -227,6 +272,7 @@ export function buildVerifeeReportData(input: {
   verificationExplanation: string;
   verificationMethod?: string | null;
   fileFormat: string;
+  institutionStatus: VerifeeReportInstitutionStatus;
 }): VerifeeReportData {
   const courseEvidenceByIndex = new Map(
     input.mapping.courseEvidence.map((evidence) => [evidence.courseIndex, evidence]),
@@ -315,6 +361,7 @@ export function buildVerifeeReportData(input: {
       school: input.program.school,
     },
     credentialVerification,
+    institutionStatus: input.institutionStatus,
     academicInterpretation: 'Completed',
     requirementsAnalyzed: requirements.length,
     counts: {
@@ -334,7 +381,30 @@ export function buildVerifeeReportData(input: {
       requirements,
       [institution, ...contextFields],
       credentialVerification.status,
+      input.institutionStatus,
     ),
+  };
+}
+
+export function createGeneratedReportMetadata(
+  data: VerifeeReportData,
+  identity: GeneratedReportIdentity,
+): GeneratedReportMetadata {
+  return {
+    ...identity,
+    createdAt: identity.generatedAt,
+    sourceInstitution: data.issuingInstitution,
+    targetInstitution: data.targetInstitution,
+    targetProgram: data.targetProgram.name,
+    verificationStatus: data.credentialVerification.status,
+    mappingSummary: {
+      requirementsAnalyzed: data.requirementsAnalyzed,
+      ...data.counts,
+    },
+    mappingResults: data.requirements,
+    institutionStatus: data.institutionStatus,
+    paymentStatus: 'DEMO_FREE',
+    deliveryStatus: 'NOT_SENT',
   };
 }
 

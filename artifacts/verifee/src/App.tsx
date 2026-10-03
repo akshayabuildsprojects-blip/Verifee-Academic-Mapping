@@ -13,8 +13,13 @@ import { georgiaTechDataset } from '@workspace/georgia-tech-programs';
 import { checkVerification, extractMockRecord, sampleCourses, sampleCredential, uploadSchema, type CredentialVerification } from '@/lib/mock-analysis';
 import { runAcademicMappingWithProgress } from '@/lib/academic-mapping-stream';
 import VerifeeReportView from '@/components/verifee-report-view';
-import { buildVerifeeReportData, type GeneratedReportMetadata } from '@/lib/verifee-report';
-import { downloadVerifeeReportPdf } from '@/lib/verifee-report-pdf';
+import {
+  buildVerifeeReportData,
+  createGeneratedReportMetadata,
+  type GeneratedReportIdentity,
+  type GeneratedReportMetadata,
+} from '@/lib/verifee-report';
+import { downloadVerifeeReportPdf, downloadVerifeeSubmissionReceiptPdf } from '@/lib/verifee-report-pdf';
 
 type InstitutionStatusView = (typeof RunInstitutionStatusCheckResponse)['_output'];
 
@@ -174,7 +179,7 @@ function formatInstitutionStatusTime(value: Date | string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
 }
 
-function readStoredGeneratedReport(): GeneratedReportMetadata | null {
+function readStoredGeneratedReport(): GeneratedReportIdentity | null {
   const serialized = sessionStorage.getItem('verifee-generated-report');
   if (!serialized) return null;
   try {
@@ -183,15 +188,20 @@ function readStoredGeneratedReport(): GeneratedReportMetadata | null {
       return null;
     }
     const value = candidate as Record<string, unknown>;
+    const generatedAt =
+      typeof value.generatedAt === 'string' && !Number.isNaN(Date.parse(value.generatedAt))
+        ? value.generatedAt
+        : typeof value.createdAt === 'string' && !Number.isNaN(Date.parse(value.createdAt))
+          ? value.createdAt
+          : null;
     if (
       typeof value.reportId !== 'string' ||
       !/^VF-[A-Z0-9-]{4,16}$/i.test(value.reportId) ||
-      typeof value.generatedAt !== 'string' ||
-      Number.isNaN(Date.parse(value.generatedAt))
+      !generatedAt
     ) {
       return null;
     }
-    return { reportId: value.reportId, generatedAt: value.generatedAt };
+    return { reportId: value.reportId, generatedAt };
   } catch {
     return null;
   }
@@ -1205,7 +1215,7 @@ function Report() {
         <section className="panel section-card"><p className="report-aside-title">Items requiring review</p><ul className="review-list"><li><span className="review-dot" />Confirm detailed course coverage with official catalog pages, syllabi, or learning outcomes.</li><li><span className="review-dot" />Confirm grading scale, credit units, and instructional hours with the issuing institution.</li><li><span className="review-dot" />Verify the credential independently; no verification was performed here.</li><li><span className="review-dot" />These preliminary mappings are not admissions, approval, equivalency, or transfer-credit decisions.</li></ul></section>
       </aside>
     </div>
-    {currentMapping && !loading && !mappingError && allRequirementsCompleted && !currentMapping.retryable && !contextLoading && <div className="report-finalize-cta" data-testid="card-generate-verifee-report">
+    {currentMapping && !loading && !mappingError && allRequirementsCompleted && !currentMapping.retryable && !contextLoading && !institutionStatusLoading && <div className="report-finalize-cta" data-testid="card-generate-verifee-report">
       <div>
         <span className="small-label">Analysis complete</span>
         <p>Continue to a downloadable report built from these completed results.</p>
@@ -1238,6 +1248,11 @@ function FinalReport() {
     }
 
     const context = readStoredAcademicContext() ?? createFallbackAcademicContext(record);
+    const checkedInstitutionStatus = readStoredInstitutionStatus()
+      ?? createUnavailableInstitutionStatus(
+        record,
+        'The institution status check was not stored in this session. No institution status was inferred.',
+      );
     return buildVerifeeReportData({
       record,
       context,
@@ -1251,22 +1266,36 @@ function FinalReport() {
         'No independent credential verification was performed.',
       verificationMethod: sessionStorage.getItem('verifee-verification-method'),
       fileFormat: sessionStorage.getItem('verifee-file-format') || 'PDF transcript',
+      institutionStatus: {
+        ...checkedInstitutionStatus,
+        checkedAt: checkedInstitutionStatus.checkedAt.toISOString(),
+      },
     });
   }, [started]);
-  const [generatedReport, setGeneratedReport] = useState(readStoredGeneratedReport);
+  const [generatedReport, setGeneratedReport] = useState<GeneratedReportMetadata | null>(() => {
+    const identity = readStoredGeneratedReport();
+    return identity && reportData
+      ? createGeneratedReportMetadata(reportData, identity)
+      : null;
+  });
 
   useEffect(() => {
     if (!reportData) setLocation(started ? '/report' : '/start');
   }, [reportData, setLocation, started]);
+  useEffect(() => {
+    if (generatedReport) {
+      sessionStorage.setItem('verifee-generated-report', JSON.stringify(generatedReport));
+    }
+  }, [generatedReport]);
 
   if (!reportData) return null;
 
   const generateReport = () => {
-    const metadata = readStoredGeneratedReport() ?? {
+    const identity = readStoredGeneratedReport() ?? {
       reportId: createReportId(),
       generatedAt: new Date().toISOString(),
     };
-    sessionStorage.setItem('verifee-generated-report', JSON.stringify(metadata));
+    const metadata = createGeneratedReportMetadata(reportData, identity);
     setGeneratedReport(metadata);
   };
 
@@ -1280,6 +1309,11 @@ function FinalReport() {
     downloadVerifeeReportPdf(reportData, generatedReport);
   };
 
+  const downloadSubmissionReceipt = () => {
+    if (!generatedReport) return;
+    downloadVerifeeSubmissionReceiptPdf(generatedReport);
+  };
+
   return <div className="shell">
     <Header />
     <div className="page-wrap wizard-wrap final-report-stepper">
@@ -1290,6 +1324,7 @@ function FinalReport() {
       generatedReport={generatedReport}
       onGenerate={generateReport}
       onDownload={downloadReport}
+      onDownloadReceipt={downloadSubmissionReceipt}
       onBackToMapping={() => setLocation('/report')}
       onStartNewAnalysis={startNewAnalysis}
     />

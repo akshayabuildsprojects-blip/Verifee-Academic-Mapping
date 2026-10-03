@@ -23,6 +23,7 @@ export interface VerifeeReportViewProps {
   generatedReport: GeneratedReportMetadata | null;
   onGenerate(): void;
   onDownload(): void;
+  onDownloadReceipt(): void;
   onBackToMapping(): void;
   onStartNewAnalysis(): void;
 }
@@ -98,6 +99,12 @@ function statusTone(status: string) {
     default:
       return 'evidence';
   }
+}
+
+function institutionStatusLabel(status: VerifeeReportData['institutionStatus']['status']) {
+  if (status === 'LISTED') return 'Listed in source';
+  if (status === 'NOT_LISTED') return 'No exact match found';
+  return 'Unable to check';
 }
 
 function RequirementCard({ requirement, index }: { requirement: VerifeeReportRequirement; index: number }) {
@@ -191,6 +198,7 @@ export function VerifeeReportView({
   generatedReport,
   onGenerate,
   onDownload,
+  onDownloadReceipt,
   onBackToMapping,
   onStartNewAnalysis,
 }: VerifeeReportViewProps) {
@@ -285,9 +293,14 @@ export function VerifeeReportView({
                   <span className="v-report-label">Generated academic report</span>
                   <h2 id="v-report-preview-title">Report preview</h2>
                 </div>
-                <button className="v-report-button v-report-button-primary" type="button" onClick={onDownload} aria-label="Download report as PDF" data-testid="button-download-report">
-                  <ArrowDownToLine size={16} aria-hidden="true" /> Download PDF
-                </button>
+                <div className="v-report-download-actions">
+                  <button className="v-report-button v-report-button-secondary" type="button" onClick={onDownloadReceipt} data-testid="button-download-submission-receipt">
+                    <FileText size={15} aria-hidden="true" /> Download Submission Receipt
+                  </button>
+                  <button className="v-report-button v-report-button-primary" type="button" onClick={onDownload} aria-label="Download report as PDF" data-testid="button-download-report">
+                    <ArrowDownToLine size={16} aria-hidden="true" /> Download PDF
+                  </button>
+                </div>
               </div>
 
               <article className="v-report-cover" aria-label="Report cover page">
@@ -304,6 +317,7 @@ export function VerifeeReportView({
                     <div><span>Country / education system</span><strong>{display(data.countryEducationSystem.value)}</strong></div>
                     <div><span>Broad academic field</span><strong>{display(data.broadAcademicField.value)}</strong></div>
                     <div><span>Specific discipline</span><strong>{display(data.specificDiscipline.value)}</strong></div>
+                    <div><span>Source program</span><strong>{display(data.sourceProgram.value)}</strong></div>
                     <div><span>Target institution</span><strong>{data.targetInstitution}</strong></div>
                     <div><span>Target program</span><strong>{data.targetProgram.name} ({data.targetProgram.shortName}) · {data.targetProgram.school}</strong></div>
                   </div>
@@ -354,9 +368,48 @@ export function VerifeeReportView({
                 </div>
               </section>
 
+              <section className="v-report-document-section v-report-institution-section" aria-labelledby="v-report-institution-heading">
+                <div className="v-report-section-heading">
+                  <span>02 / INSTITUTION STATUS</span>
+                  <h2 id="v-report-institution-heading">Institution status check</h2>
+                  <p>This source-scoped directory result is separate from credential authenticity, academic mapping, and admissions.</p>
+                </div>
+                <div className={`v-report-institution-result v-report-institution-result-${data.institutionStatus.status.toLowerCase().replaceAll('_', '-')}`}>
+                  <span className="v-report-label">Directory result</span>
+                  <strong>{institutionStatusLabel(data.institutionStatus.status)}</strong>
+                  <p>{data.institutionStatus.summary}</p>
+                </div>
+                <div className="v-report-document-context v-report-institution-context">
+                  <div className="v-report-context-item">
+                    <span className="v-report-label">Jurisdiction</span>
+                    <strong>{display(data.institutionStatus.jurisdiction)}</strong>
+                  </div>
+                  <div className="v-report-context-item">
+                    <span className="v-report-label">Source</span>
+                    {data.institutionStatus.sourceName && data.institutionStatus.sourceUrl
+                      ? <a className="v-report-context-link" href={data.institutionStatus.sourceUrl} target="_blank" rel="noreferrer">{data.institutionStatus.sourceName} <ExternalLink size={12} aria-hidden="true" /></a>
+                      : <strong>Not available for this jurisdiction</strong>}
+                  </div>
+                  {data.institutionStatus.matchedName && <div className="v-report-context-item">
+                    <span className="v-report-label">Registry entry</span>
+                    <strong>{data.institutionStatus.matchedName}</strong>
+                  </div>}
+                  {data.institutionStatus.registryStatus && <div className="v-report-context-item">
+                    <span className="v-report-label">Registry status</span>
+                    <strong>{data.institutionStatus.registryStatus}</strong>
+                    <span className="v-report-context-origin">Status text published by source</span>
+                  </div>}
+                  <div className="v-report-context-item">
+                    <span className="v-report-label">Checked at</span>
+                    <strong><GeneratedDate value={data.institutionStatus.checkedAt} /></strong>
+                  </div>
+                </div>
+                <p className="v-report-institution-coverage"><strong>Coverage limits:</strong> {data.institutionStatus.coverageLimits}</p>
+              </section>
+
               <section className="v-report-document-section" aria-labelledby="v-report-mapping-heading">
                 <div className="v-report-section-heading">
-                  <span>02 / MAPPING SUMMARY</span>
+                  <span>03 / MAPPING SUMMARY</span>
                   <h2 id="v-report-mapping-heading">Requirement overview</h2>
                   <p>{data.requirementsAnalyzed} requirements assessed against {data.targetProgram.name}.</p>
                 </div>
@@ -375,7 +428,7 @@ export function VerifeeReportView({
 
               <section className="v-report-document-section" aria-labelledby="v-report-requirements-heading">
                 <div className="v-report-section-heading">
-                  <span>03 / REQUIREMENT DETAIL</span>
+                  <span>04 / REQUIREMENT DETAIL</span>
                   <h2 id="v-report-requirements-heading">Coursework against requirements</h2>
                   <p>Each stored requirement is presented with its assessment, confidence, supporting coursework, evidence, reasoning, and available sources.</p>
                 </div>
@@ -388,7 +441,7 @@ export function VerifeeReportView({
 
               {data.itemsRequiringReview.length > 0 && (
                 <section className="v-report-review-section" aria-labelledby="v-report-review-heading">
-                  <span className="v-report-review-kicker">REVIEW NOTES</span>
+                  <span className="v-report-review-kicker">05 / REVIEW NOTES</span>
                   <h2 id="v-report-review-heading">Items requiring review</h2>
                   <ul>
                     {data.itemsRequiringReview.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}

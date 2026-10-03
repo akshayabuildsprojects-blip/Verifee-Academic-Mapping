@@ -68,6 +68,12 @@ function statusColor(status: VerifeeReportRequirement['status']) {
   }
 }
 
+function institutionStatusLabel(status: VerifeeReportData['institutionStatus']['status']) {
+  if (status === 'LISTED') return 'Listed in source';
+  if (status === 'NOT_LISTED') return 'No exact name match found';
+  return 'Unable to check';
+}
+
 function generatedDateLabel(generatedAt: string) {
   const date = new Date(generatedAt);
   return Number.isNaN(date.getTime())
@@ -272,8 +278,9 @@ export function downloadVerifeeReportPdf(
     doc.text(`REPORT ID  ${metadata.reportId}`, margin, 292);
     doc.text(`GENERATED  ${generatedAt}`, right, 292, { align: 'right' });
 
+    const columns = 3;
     const gap = 9;
-    const fieldWidth = (contentWidth - gap) / 2;
+    const fieldWidth = (contentWidth - gap * (columns - 1)) / columns;
     const rowTop = 311;
     const rowHeight = 59;
     const fields = [
@@ -293,6 +300,11 @@ export function downloadVerifeeReportPdf(
         data.specificDiscipline.value,
         sourceLabel(data.specificDiscipline),
       ],
+      [
+        'Source Program',
+        data.sourceProgram.value,
+        sourceLabel(data.sourceProgram),
+      ],
       ['Target Institution', data.targetInstitution, 'Selected target'],
       [
         'Target Program',
@@ -309,8 +321,8 @@ export function downloadVerifeeReportPdf(
       ['Academic Interpretation', data.academicInterpretation, 'Completed'],
     ];
     fields.forEach(([label, value, detail], index) => {
-      const column = index % 2;
-      const row = Math.floor(index / 2);
+      const column = index % columns;
+      const row = Math.floor(index / columns);
       drawCoverField(
         margin + column * (fieldWidth + gap),
         rowTop + row * rowHeight,
@@ -321,7 +333,7 @@ export function downloadVerifeeReportPdf(
       );
     });
 
-    const summaryTop = rowTop + 4 * rowHeight + 2;
+    const summaryTop = rowTop + Math.ceil(fields.length / columns) * rowHeight + 2;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
     setColor(palette.green);
@@ -628,7 +640,57 @@ export function downloadVerifeeReportPdf(
   );
 
   addSectionHeading(
-    '02 / MAPPING SUMMARY',
+    '02 / INSTITUTION STATUS',
+    'Institution status check',
+    'This source-scoped directory result is separate from credential authenticity, academic mapping, and admissions.',
+  );
+  const institutionStatus = data.institutionStatus;
+  addContextRow(
+    'Status',
+    institutionStatusLabel(institutionStatus.status),
+    'Institution directory result',
+  );
+  addContextRow(
+    'Jurisdiction',
+    institutionStatus.jurisdiction || 'Not stated in the transcript',
+    'Jurisdiction checked',
+  );
+  if (institutionStatus.sourceName) {
+    addContextRow(
+      'Source',
+      institutionStatus.sourceName,
+      'Authoritative source',
+      institutionStatus.sourceUrl,
+    );
+  }
+  if (institutionStatus.matchedName) {
+    addContextRow(
+      'Registry entry',
+      institutionStatus.matchedName,
+      'Institution name shown in source',
+    );
+  }
+  if (institutionStatus.registryStatus) {
+    addContextRow(
+      'Registry status',
+      institutionStatus.registryStatus,
+      'Status text published by source',
+    );
+  }
+  addContextRow(
+    'Checked at',
+    generatedDateLabel(institutionStatus.checkedAt),
+    'Registry check time',
+  );
+  addWrapped(institutionStatus.summary, { size: 8, color: palette.ink });
+  addWrapped(`Coverage limits: ${institutionStatus.coverageLimits}`, {
+    size: 8,
+    color: palette.muted,
+    gap: 8,
+  });
+
+  addSectionHeading(
+    '03 / MAPPING SUMMARY',
     'Academic Mapping Summary',
     `${data.requirementsAnalyzed} requirements analyzed against ${data.targetProgram.name}.`,
   );
@@ -681,14 +743,14 @@ export function downloadVerifeeReportPdf(
 
   nextPage();
   addSectionHeading(
-    '03 / REQUIREMENT RESULTS',
+    '04 / REQUIREMENT RESULTS',
     'Detailed Requirement Results',
     'Results below use the completed Step 4 mapping exactly as stored. No additional analysis was run to prepare this report.',
   );
   data.requirements.forEach(drawRequirement);
 
   addSectionHeading(
-    '04 / REVIEW',
+    '05 / REVIEW',
     'Items Requiring Review',
     'These items are derived from the current academic context, verification state, and requirement results.',
   );
@@ -709,7 +771,7 @@ export function downloadVerifeeReportPdf(
     });
   }
 
-  addSectionHeading('05 / IMPORTANT INFORMATION', 'Interpretation Disclaimer');
+  addSectionHeading('06 / IMPORTANT INFORMATION', 'Interpretation Disclaimer');
   addWrapped(VERIFEE_REPORT_DISCLAIMER, {
     size: 8.5,
     color: palette.ink,
@@ -741,4 +803,114 @@ export function downloadVerifeeReportPdf(
     metadata.reportId.replace(/[^a-z0-9-]/gi, ''),
   ].join('_');
   doc.save(`${fileName}.pdf`);
+}
+
+export function downloadVerifeeSubmissionReceiptPdf(
+  metadata: GeneratedReportMetadata,
+) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const right = pageWidth - margin;
+  const generatedAt = generatedDateLabel(metadata.generatedAt);
+
+  doc.setProperties({
+    title: `Verifee Submission Receipt ${metadata.reportId}`,
+    subject: `Receipt for generated academic mapping report ${metadata.reportId}`,
+    author: 'Verifee',
+    creator: 'Verifee',
+  });
+
+  doc.setFillColor(...palette.pale);
+  doc.rect(0, 0, pageWidth, pageHeight, 'F');
+  doc.setFillColor(...palette.green);
+  doc.rect(0, 0, 17, pageHeight, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(...palette.green);
+  doc.text('VERIFEE', margin, 64);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(...palette.muted);
+  doc.text('REPORT RECEIPT', right, 64, { align: 'right' });
+  doc.setDrawColor(...palette.line);
+  doc.line(margin, 79, right, 79);
+
+  doc.setFont('times', 'normal');
+  doc.setFontSize(30);
+  doc.setTextColor(...palette.ink);
+  doc.text('Student report generated', margin, 142, { maxWidth: contentWidth });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.setTextColor(...palette.muted);
+  doc.text(
+    'Receipt for a Verifee preliminary academic mapping report.',
+    margin,
+    166,
+    { maxWidth: contentWidth },
+  );
+
+  doc.setFillColor(...palette.white);
+  doc.setDrawColor(...palette.line);
+  doc.roundedRect(margin, 205, contentWidth, 214, 5, 5, 'FD');
+
+  const receiptRows: Array<[string, string]> = [
+    ['Report ID', metadata.reportId],
+    ['Target institution', metadata.targetInstitution],
+    ['Target program', metadata.targetProgram],
+    ['Source institution', metadata.sourceInstitution],
+    ['Generated', generatedAt],
+    ['Report status', 'Ready for submission'],
+    ['Delivery status', 'Not sent'],
+    ['Payment status', 'Free in Demo Mode · $0.00'],
+  ];
+  let y = 232;
+  for (const [label, value] of receiptRows) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(...palette.muted);
+    doc.text(label.toUpperCase(), margin + 16, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...palette.ink);
+    const valueLines = doc.splitTextToSize(value || 'Not available', contentWidth - 180);
+    doc.text(valueLines, margin + 155, y);
+    y += Math.max(23, valueLines.length * 12 + 8);
+  }
+
+  doc.setFillColor(...palette.sage);
+  doc.roundedRect(margin, 452, contentWidth, 83, 5, 5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(...palette.green);
+  doc.text('RECEIPT SCOPE', margin + 14, 474);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...palette.ink);
+  doc.text(
+    doc.splitTextToSize(
+      'This receipt confirms that the listed Verifee report was generated. It does not confirm receipt or acceptance by the target institution.',
+      contentWidth - 28,
+    ),
+    margin + 14,
+    493,
+  );
+
+  doc.setFont('times', 'italic');
+  doc.setFontSize(12);
+  doc.setTextColor(...palette.green);
+  doc.text('A record, with context.', margin, 700);
+  doc.setDrawColor(...palette.line);
+  doc.line(margin, footerTop, right, footerTop);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...palette.muted);
+  doc.text('Verifee · Report generation receipt', margin, footerTop + 15);
+  doc.text(`${metadata.reportId} · ${generatedAt}`, right, footerTop + 15, {
+    align: 'right',
+  });
+
+  const safeReportId = metadata.reportId.replace(/[^a-z0-9-]/gi, '');
+  doc.save(`Verifee_Submission_Receipt_${safeReportId}.pdf`);
 }

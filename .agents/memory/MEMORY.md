@@ -3,3 +3,4 @@
 - [Academic mapping progress stream](academic-mapping-progress-stream.md) — stream genuine per-requirement completions without changing mapping results or the legacy endpoint.
 - [Academic mapping test mock order](academic-mapping-test-mock-order.md) — initialize the mocked fetch before the shared OpenAI client and reinstall it after test cleanup.
 - [GTEC directory checks](gtec-directory-checks.md) — the search parameter is unreliable; only a complete count-validated category scan can support “not listed.”
+- [Verifee report wallet boundary](verifee-report-wallet-scope.md) — reports stay free and unsent in the demo; account retrieval is future scope and transcripts must not be retained permanently.

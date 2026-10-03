@@ -271,8 +271,20 @@ const detectedLanguages = {
   ],
 } as const;
 
+const institutionStatus = {
+  status: "LISTED",
+  jurisdiction: "United States",
+  sourceName: "Example institution registry",
+  sourceUrl: "https://registry.example.edu/institutions/example-university",
+  checkedAt: "2026-01-12T15:00:00.000Z",
+  matchedName: "Example University",
+  registryStatus: "Active",
+  summary: "A matching institution record appears in the example directory.",
+  coverageLimits: "Test fixture coverage is limited to the example directory.",
+} as const;
+
 async function openReport(page: Page) {
-  await page.addInitScript(({ record, languageDetection }) => {
+  await page.addInitScript(({ record, languageDetection, institutionStatus }) => {
     if (sessionStorage.getItem("verifee-started") !== "yes") {
       sessionStorage.setItem("verifee-file-name", "sample-transcript.pdf");
       sessionStorage.setItem("verifee-file-format", "PDF transcript");
@@ -286,6 +298,10 @@ async function openReport(page: Page) {
       sessionStorage.setItem(
         "verifee-language-detection",
         JSON.stringify(languageDetection),
+      );
+      sessionStorage.setItem(
+        "verifee-institution-status",
+        JSON.stringify(institutionStatus),
       );
       sessionStorage.setItem("verifee-program", "ms-analytics");
       sessionStorage.setItem("verifee-started", "yes");
@@ -336,7 +352,11 @@ async function openReport(page: Page) {
         headers: { "Content-Type": "text/event-stream" },
       });
     };
-  }, { record: academicRecord, languageDetection: detectedLanguages });
+  }, {
+    record: academicRecord,
+    languageDetection: detectedLanguages,
+    institutionStatus,
+  });
   await page.goto("/report");
   await page.getByRole("heading", { name: "Academic mapping" }).waitFor();
   await page.waitForFunction(
@@ -735,6 +755,13 @@ test("generates a PDF from the completed mapping without rerunning analysis", as
   await expect(page.getByText("Academic Interpretation · Completed")).toBeVisible();
   await expect(page.getByTestId(`report-requirement-${requirementIds[0]}`)).toContainText("Calculus");
   await expect(page.getByTestId(`report-requirement-${requirementIds[0]}`)).toContainText("Covered");
+  await expect(page.getByRole("heading", { name: "Institution status check" })).toBeVisible();
+  await expect(page.getByText("Listed in source")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Example institution registry" })).toHaveAttribute(
+    "href",
+    institutionStatus.sourceUrl,
+  );
+  await expect(page.getByText(/Test fixture coverage is limited/)).toBeVisible();
   await expect(
     page.getByRole("link", { name: "Example University course catalog: Calculus I" }).first(),
   ).toHaveAttribute("href", "https://catalog.example.edu/courses/math-101");
@@ -754,7 +781,31 @@ test("generates a PDF from the completed mapping without rerunning analysis", as
   expect(pdfContents).toContain("Preliminary Academic");
   expect(pdfContents).toContain("Final academic and admissions decisions");
   expect(pdfContents).toContain("https://catalog.example.edu/courses/math-101");
+  expect(pdfContents).toContain("Institution status check");
+  expect(pdfContents).toContain("Example institution registry");
+  expect(pdfContents).toContain("Test fixture coverage is limited");
   expect(pdfContents).toContain("/Annots");
+
+  const [receiptDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    page.getByTestId("button-download-submission-receipt").click(),
+  ]);
+  expect(receiptDownload.suggestedFilename()).toMatch(/^Verifee_Submission_Receipt_VF-.*\.pdf$/);
+  const receiptPath = await receiptDownload.path();
+  expect(receiptPath).not.toBeNull();
+  const receiptPdf = await readFile(receiptPath!);
+  expect(receiptPdf.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+  const receiptContents = receiptPdf.toString("latin1");
+  expect(receiptContents).toContain("Student report generated");
+  expect(receiptContents).toContain("Ready for submission");
+  expect(receiptContents).toContain("Not sent");
+  expect(receiptContents).toContain(
+    "This receipt confirms that the listed Verifee report was generated.",
+  );
+  expect(receiptContents).toContain(
+    "It does not confirm receipt or acceptance by the target",
+  );
+  expect(receiptContents).toContain("(institution.) Tj");
 
   expect(
     await page.evaluate(() => window.__verifeeMappingTest?.requests.length),
@@ -768,10 +819,35 @@ test("generates a PDF from the completed mapping without rerunning analysis", as
     await page.evaluate(() =>
       JSON.parse(sessionStorage.getItem("verifee-generated-report") ?? "null"),
     ),
-  ).toMatchObject({ reportId: expect.stringMatching(/^VF-/), generatedAt: expect.any(String) });
+  ).toMatchObject({
+    reportId: expect.stringMatching(/^VF-/),
+    generatedAt: expect.any(String),
+    createdAt: expect.any(String),
+    sourceInstitution: "Example University",
+    targetInstitution: "Georgia Institute of Technology",
+    targetProgram: "Master of Science in Analytics",
+    verificationStatus: "Unavailable",
+    mappingSummary: { requirementsAnalyzed: 4 },
+    mappingResults: expect.arrayContaining([
+      expect.objectContaining({ requirementId: requirementIds[0], status: "COVERED" }),
+    ]),
+    institutionStatus: { status: "LISTED", matchedName: "Example University" },
+    paymentStatus: "DEMO_FREE",
+    deliveryStatus: "NOT_SENT",
+  });
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("verifee-extracted-record")),
+  ).not.toBeNull();
 
+  const generatedReportId = await page.evaluate(() => {
+    const value = JSON.parse(
+      sessionStorage.getItem("verifee-generated-report") ?? "null",
+    ) as { reportId?: string } | null;
+    return value?.reportId ?? "";
+  });
   await page.reload();
   await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
+  await expect(page.getByText(`Report ${generatedReportId}`)).toBeVisible();
   expect(
     await page.evaluate(() => window.__verifeeMappingTest?.requests.length),
   ).toBe(0);

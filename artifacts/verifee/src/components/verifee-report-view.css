@@ -366,6 +366,63 @@
   margin-bottom: 21px;
 }
 
+.v-report-download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.v-report-institution-result {
+  margin-bottom: 12px;
+  padding: 15px 17px;
+  border-left: 3px solid #648a76;
+  background: #f2f7f1;
+}
+
+.v-report-institution-result > strong {
+  display: block;
+  margin-top: 5px;
+  color: #3c6552;
+  font-size: 13px;
+}
+
+.v-report-institution-result > p {
+  margin: 7px 0 0;
+  color: #66786f;
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.v-report-institution-result-not-listed {
+  border-left-color: #b18c54;
+  background: #fbf8ef;
+}
+
+.v-report-institution-result-not-listed > strong {
+  color: #8b7046;
+}
+
+.v-report-institution-result-unable-to-check {
+  border-left-color: #838d88;
+  background: #f2f4f1;
+}
+
+.v-report-institution-result-unable-to-check > strong {
+  color: #66756e;
+}
+
+.v-report-institution-coverage {
+  margin: 12px 0 0;
+  color: #74817c;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.v-report-institution-coverage strong {
+  color: #53675d;
+}
+
 .v-report-preview-toolbar h2 {
   margin: 5px 0 0;
   color: #304640;
@@ -1127,6 +1184,11 @@
 
   .v-report-preview-toolbar {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .v-report-download-actions {
+    width: 100%;
     flex-direction: column;
   }
 
