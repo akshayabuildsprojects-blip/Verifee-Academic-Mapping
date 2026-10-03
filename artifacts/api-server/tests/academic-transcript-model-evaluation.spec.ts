@@ -1,8 +1,52 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { test } from "node:test";
 import { makeSyntheticPdf } from "./synthetic-transcript-pdf";
 
 const modelEvaluationEnabled = process.env.RUN_TRANSCRIPT_MODEL_EVAL === "1";
+const printedCourseDescription =
+  "This synthetic course fits calibration curves to standards at 265, 280, and 310 nanometers.";
+const hiddenCourseDescription =
+  "Description: Hidden synthetic fact.";
+
+test("synthetic PDFs expose invisible text only through their text layer", () => {
+  const pdf = makeSyntheticPdf(
+    [
+      "Academic transcript",
+      "Course code: SYN 401",
+      "Course title: Synthetic Instrumentation",
+      "Credits: 3",
+      "Grade: A",
+      `Description: ${printedCourseDescription}`,
+    ],
+    { invisibleLines: [hiddenCourseDescription] },
+  );
+  const embeddedText = execFileSync(
+    "pdftotext",
+    ["-layout", "-enc", "UTF-8", "-", "-"],
+    { input: pdf, encoding: "utf8" },
+  );
+  const hiddenLineHex = [...hiddenCourseDescription]
+    .map((character) =>
+      (character.codePointAt(0) ?? 0).toString(16).padStart(4, "0"),
+    )
+    .join("");
+  const pdfContent = pdf.toString("ascii");
+  const invisibleTextMode = pdfContent.indexOf("3 Tr");
+  const normalizedEmbeddedText = embeddedText.replace(/\s+/g, " ").trim();
+
+  assert.match(embeddedText, /Course code: SYN 401/);
+  assert.ok(normalizedEmbeddedText.includes(printedCourseDescription));
+  assert.ok(
+    normalizedEmbeddedText.includes(hiddenCourseDescription),
+    JSON.stringify(normalizedEmbeddedText),
+  );
+  assert.notEqual(invisibleTextMode, -1);
+  assert.ok(
+    pdfContent.indexOf(`<${hiddenLineHex}> Tj`, invisibleTextMode) >
+      invisibleTextMode,
+  );
+});
 
 test(
   "configured model preserves complete and partial descriptions and leaves missing descriptions null",
@@ -91,8 +135,7 @@ test(
 
       preflightRequests = 0;
       extractionRequests = 0;
-      const printedDescription =
-        "This synthetic course fits calibration curves to standards at 265, 280, and 310 nanometers.";
+      const printedDescription = printedCourseDescription;
       const descriptionPdf = makeSyntheticPdf([
         "Academic transcript",
         "Institution: Verifee Synthetic University",
@@ -145,6 +188,33 @@ test(
       assert.equal(
         noDescriptionRecord.record.academicRecord.courses.find(
           (course) => course.code === "CHEM 493",
+        )?.description,
+        null,
+      );
+
+      preflightRequests = 0;
+      extractionRequests = 0;
+      const hiddenDescriptionPdf = makeSyntheticPdf(
+        [
+          "Academic transcript",
+          "Institution: Verifee Synthetic University",
+          "Degree: Bachelor of Science",
+          "Program: Chemistry",
+          "Course code: CHEM 494",
+          "Course title: Advanced Instrumental Analysis",
+          "Credits: 4",
+          "Grade: B+",
+        ],
+        { invisibleLines: [hiddenCourseDescription] },
+      );
+      const hiddenDescriptionRecord =
+        await extractAcademicTranscript(hiddenDescriptionPdf);
+      assert.equal(preflightRequests, 1);
+      assert.equal(extractionRequests, 1);
+      assert.equal(hiddenDescriptionRecord.record.academicRecord.courses.length, 1);
+      assert.equal(
+        hiddenDescriptionRecord.record.academicRecord.courses.find(
+          (course) => course.code === "CHEM 494",
         )?.description,
         null,
       );
