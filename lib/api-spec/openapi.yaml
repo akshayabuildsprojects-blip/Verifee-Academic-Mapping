@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: credential-extraction
     description: Academic transcript PDF interpretation
+  - name: academic-context
+    description: Contextualized interpretation of extracted institution and program information
   - name: academic-mapping
     description: Preliminary course-to-requirement mapping
 paths:
@@ -132,6 +134,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /academic-context/run:
+    post:
+      operationId: runAcademicContext
+      tags: [academic-context]
+      summary: Contextualize extracted institution and credential fields
+      description: Uses only institution and credential fields from the extracted academic record. Country is mapped only from an official institutional source when it is absent from the transcript.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcademicContextInput"
+      responses:
+        "200":
+          description: Contextualized academic fields with source attribution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcademicContext"
+        "400":
+          description: The academic context request is invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: The academic context request limit was reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: The academic context service is temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /academic-mappings/run/stream:
     post:
       operationId: streamAcademicMapping
@@ -231,6 +270,63 @@ components:
         - program
         - fieldOfStudy
         - graduationDate
+    AcademicContextInput:
+      type: object
+      additionalProperties: false
+      properties:
+        institution:
+          $ref: "#/components/schemas/AcademicInstitution"
+        credential:
+          $ref: "#/components/schemas/AcademicCredential"
+      required:
+        - institution
+        - credential
+    AcademicContextField:
+      type: object
+      additionalProperties: false
+      properties:
+        value:
+          type: string
+        source:
+          type: string
+          enum:
+            - TRANSCRIPT
+            - MAPPED
+            - UNAVAILABLE
+        sourceUrl:
+          type: ["string", "null"]
+          format: uri
+      required:
+        - value
+        - source
+        - sourceUrl
+    AcademicContext:
+      type: object
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum:
+            - MAPPED
+            - PARTIAL
+            - UNAVAILABLE
+        institution:
+          $ref: "#/components/schemas/AcademicContextField"
+        country:
+          $ref: "#/components/schemas/AcademicContextField"
+        broadField:
+          $ref: "#/components/schemas/AcademicContextField"
+        specificDiscipline:
+          $ref: "#/components/schemas/AcademicContextField"
+        program:
+          $ref: "#/components/schemas/AcademicContextField"
+      required:
+        - status
+        - institution
+        - country
+        - broadField
+        - specificDiscipline
+        - program
     AcademicRecordDetails:
       type: object
       additionalProperties: false

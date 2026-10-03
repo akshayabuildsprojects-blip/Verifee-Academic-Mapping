@@ -6,6 +6,11 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './academicContext';
+export * from './academicContextField';
+export * from './academicContextFieldSource';
+export * from './academicContextInput';
+export * from './academicContextStatus';
 export * from './academicCourse';
 export * from './academicCourseCandidate';
 export * from './academicCourseCandidateRelevance';

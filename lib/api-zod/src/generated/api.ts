@@ -131,6 +131,53 @@ export const RunAcademicMappingResponse = zod.object({
 
 
 /**
+ * Uses only institution and credential fields from the extracted academic record. Country is mapped only from an official institutional source when it is absent from the transcript.
+ * @summary Contextualize extracted institution and credential fields
+ */
+export const RunAcademicContextBody = zod.object({
+  "institution": zod.object({
+  "name": zod.string().nullable(),
+  "country": zod.string().nullable()
+}),
+  "credential": zod.object({
+  "degree": zod.string().nullable(),
+  "program": zod.string().nullable(),
+  "fieldOfStudy": zod.string().nullable(),
+  "graduationDate": zod.string().nullable()
+})
+})
+
+export const RunAcademicContextResponse = zod.object({
+  "status": zod.enum(['MAPPED', 'PARTIAL', 'UNAVAILABLE']),
+  "institution": zod.object({
+  "value": zod.string(),
+  "source": zod.enum(['TRANSCRIPT', 'MAPPED', 'UNAVAILABLE']),
+  "sourceUrl": zod.string().url().nullable()
+}),
+  "country": zod.object({
+  "value": zod.string(),
+  "source": zod.enum(['TRANSCRIPT', 'MAPPED', 'UNAVAILABLE']),
+  "sourceUrl": zod.string().url().nullable()
+}),
+  "broadField": zod.object({
+  "value": zod.string(),
+  "source": zod.enum(['TRANSCRIPT', 'MAPPED', 'UNAVAILABLE']),
+  "sourceUrl": zod.string().url().nullable()
+}),
+  "specificDiscipline": zod.object({
+  "value": zod.string(),
+  "source": zod.enum(['TRANSCRIPT', 'MAPPED', 'UNAVAILABLE']),
+  "sourceUrl": zod.string().url().nullable()
+}),
+  "program": zod.object({
+  "value": zod.string(),
+  "source": zod.enum(['TRANSCRIPT', 'MAPPED', 'UNAVAILABLE']),
+  "sourceUrl": zod.string().url().nullable()
+})
+})
+
+
+/**
  * Uses the same mapper and input as runAcademicMapping. Each progress event contains an AcademicMappingResult snapshot with only completed requirements; the complete event contains the unchanged final AcademicMappingResult.
  * @summary Stream completed academic mapping requirements
  */

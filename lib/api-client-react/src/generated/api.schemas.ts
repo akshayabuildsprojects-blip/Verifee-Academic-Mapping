@@ -59,6 +59,45 @@ export interface AcademicRecord {
   academicRecord: AcademicRecordDetails;
 }
 
+export interface AcademicContextInput {
+  institution: AcademicInstitution;
+  credential: AcademicCredential;
+}
+
+export type AcademicContextFieldSource = typeof AcademicContextFieldSource[keyof typeof AcademicContextFieldSource];
+
+
+export const AcademicContextFieldSource = {
+  TRANSCRIPT: 'TRANSCRIPT',
+  MAPPED: 'MAPPED',
+  UNAVAILABLE: 'UNAVAILABLE',
+} as const;
+
+export interface AcademicContextField {
+  value: string;
+  source: AcademicContextFieldSource;
+  /** @nullable */
+  sourceUrl: string | null;
+}
+
+export type AcademicContextStatus = typeof AcademicContextStatus[keyof typeof AcademicContextStatus];
+
+
+export const AcademicContextStatus = {
+  MAPPED: 'MAPPED',
+  PARTIAL: 'PARTIAL',
+  UNAVAILABLE: 'UNAVAILABLE',
+} as const;
+
+export interface AcademicContext {
+  status: AcademicContextStatus;
+  institution: AcademicContextField;
+  country: AcademicContextField;
+  broadField: AcademicContextField;
+  specificDiscipline: AcademicContextField;
+  program: AcademicContextField;
+}
+
 export type AcademicMappingInputProgramId = typeof AcademicMappingInputProgramId[keyof typeof AcademicMappingInputProgramId];
 
 

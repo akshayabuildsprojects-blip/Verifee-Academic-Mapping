@@ -7,8 +7,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
 import { Route, Switch, useLocation, Router as WouterRouter, Link } from 'wouter';
 import { AlertCircle, ArrowLeft, ArrowRight, ArrowDown, ArrowUpRight, BookOpen, Check, ChevronRight, ExternalLink, FileText, GraduationCap, Landmark, LoaderCircle, RotateCcw, ScanText, ShieldAlert, Upload, X } from 'lucide-react';
-import { extractAcademicTranscript, type AcademicMappingInput, type AcademicMappingResult, type AcademicRecord } from '@workspace/api-client-react';
-import { ExtractAcademicTranscriptResponse, RunAcademicMappingResponse } from '@workspace/api-zod';
+import { extractAcademicTranscript, runAcademicContext, type AcademicContext, type AcademicContextInput, type AcademicMappingInput, type AcademicMappingResult, type AcademicRecord } from '@workspace/api-client-react';
+import { ExtractAcademicTranscriptResponse, RunAcademicContextResponse, RunAcademicMappingResponse } from '@workspace/api-zod';
 import { georgiaTechDataset } from '@workspace/georgia-tech-programs';
 import { checkVerification, extractMockRecord, sampleCourses, sampleCredential, uploadSchema, type CredentialVerification } from '@/lib/mock-analysis';
 import { runAcademicMappingWithProgress } from '@/lib/academic-mapping-stream';
@@ -71,6 +71,53 @@ function readStoredMapping(programId: string): AcademicMappingResult | null {
   } catch {
     return null;
   }
+}
+
+function readStoredAcademicContext(): AcademicContext | null {
+  const serialized = sessionStorage.getItem('verifee-academic-context');
+  if (!serialized) return null;
+  try {
+    const candidate: unknown = JSON.parse(serialized);
+    const parsed = RunAcademicContextResponse.safeParse(candidate);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function createFallbackAcademicContext(record: AcademicRecord): AcademicContext {
+  const transcriptField = (value: string | null | undefined) => value?.trim()
+    ? { value: value.trim(), source: 'TRANSCRIPT' as const, sourceUrl: null }
+    : { value: 'Not shown in transcript', source: 'UNAVAILABLE' as const, sourceUrl: null };
+  const unavailableField = (label: 'transcript' | 'mapped') => ({
+    value: label === 'transcript' ? 'Not shown in transcript' : 'Unable to determine',
+    source: 'UNAVAILABLE' as const,
+    sourceUrl: null,
+  });
+  const institution = transcriptField(record.institution.name);
+  const country = record.institution.country?.trim()
+    ? transcriptField(record.institution.country)
+    : unavailableField('mapped');
+  const broadField = unavailableField('mapped');
+  const specificDiscipline = unavailableField('mapped');
+  const program = transcriptField(record.credential.program);
+  const fields = [institution, country, broadField, specificDiscipline, program];
+  const availableCount = fields.filter(({ source }) => source !== 'UNAVAILABLE').length;
+
+  return {
+    status: availableCount === 0 ? 'UNAVAILABLE' : availableCount === fields.length ? 'MAPPED' : 'PARTIAL',
+    institution,
+    country,
+    broadField,
+    specificDiscipline,
+    program,
+  };
+}
+
+function academicContextSourceLabel(source: AcademicContext['institution']['source']) {
+  if (source === 'TRANSCRIPT') return 'Source: Transcript';
+  if (source === 'MAPPED') return 'Mapped by Verifee';
+  return 'Not available';
 }
 
 function createSampleAcademicRecord(): AcademicRecord {
@@ -142,6 +189,7 @@ function UploadStep() {
     if (record) sessionStorage.setItem('verifee-extracted-record', JSON.stringify(record));
     else sessionStorage.removeItem('verifee-extracted-record');
     sessionStorage.removeItem('verifee-mapping-result');
+    sessionStorage.removeItem('verifee-academic-context');
     sessionStorage.removeItem('verifee-visible-course-count');
     sessionStorage.removeItem('verifee-target');
     sessionStorage.removeItem('verifee-program');
@@ -170,7 +218,7 @@ function UploadStep() {
       if (isPdfFile(file)) {
         const record = await extractAcademicTranscript(file);
         saveReviewState('extracted', {
-          status: 'Digital verification unavailable',
+          status: 'Verification unavailable',
           explanation: 'This PDF was read for academic interpretation only. No digital authenticity check was performed.',
         }, record);
       } else {
@@ -545,6 +593,10 @@ function Report() {
   const savedProgramId = sessionStorage.getItem('verifee-program');
   const program = georgiaTechDataset.programs.find((item) => item.id === savedProgramId) || georgiaTechDataset.programs[0];
   const [mapping, setMapping] = useState<AcademicMappingResult | null>(() => readStoredMapping(program.id));
+  const [academicContext, setAcademicContext] = useState<AcademicContext | null>(() => readStoredAcademicContext());
+  const [contextLoading, setContextLoading] = useState(() => !readStoredAcademicContext());
+  const [contextFailure, setContextFailure] = useState(false);
+  const [mappingStage, setMappingStage] = useState<'context' | 'requirements' | 'complete'>(() => readStoredAcademicContext() ? 'requirements' : 'context');
   const [loading, setLoading] = useState(() => !readStoredMapping(program.id));
   const [mappingError, setMappingError] = useState('');
   const [progressRequirements, setProgressRequirements] = useState<RequirementMapping[]>([]);
@@ -556,6 +608,55 @@ function Report() {
     if (!started || !sessionStorage.getItem('verifee-file-name') || !academicRecord) setLocation('/start');
   }, [academicRecord, started, setLocation]);
 
+  const ensureAcademicContext = async (cancelled: () => boolean = () => false): Promise<AcademicContext> => {
+    const cachedContext = readStoredAcademicContext();
+    if (cachedContext) {
+      if (!cancelled()) {
+        flushSync(() => {
+          setAcademicContext(cachedContext);
+          setContextLoading(false);
+          setContextFailure(false);
+          setMappingStage('requirements');
+        });
+      }
+      return cachedContext;
+    }
+
+    if (!academicRecord) throw new Error('An academic record is required before mapping context.');
+    setContextLoading(true);
+    setContextFailure(false);
+    setMappingStage('context');
+    let resolvedContext: AcademicContext;
+    let failed = false;
+
+    try {
+      const input: AcademicContextInput = {
+        institution: academicRecord.institution,
+        credential: academicRecord.credential,
+      };
+      const candidate = await runAcademicContext(input);
+      const parsed = RunAcademicContextResponse.safeParse(candidate);
+      if (!parsed.success) throw new Error('The academic context response was invalid.');
+      resolvedContext = parsed.data;
+      if (!cancelled()) {
+        sessionStorage.setItem('verifee-academic-context', JSON.stringify(resolvedContext));
+      }
+    } catch {
+      resolvedContext = createFallbackAcademicContext(academicRecord);
+      failed = true;
+    }
+
+    if (!cancelled()) {
+      flushSync(() => {
+        setAcademicContext(resolvedContext);
+        setContextLoading(false);
+        setContextFailure(failed);
+        setMappingStage('requirements');
+      });
+    }
+    return resolvedContext;
+  };
+
   const requestMapping = async (cancelled: () => boolean = () => false) => {
     if (!academicRecord) return;
     setLoading(true);
@@ -563,7 +664,10 @@ function Report() {
     setProgressRequirements([]);
     setProgressCourseEvidence([]);
     setExpandedRequirementId(null);
+    setMappingStage(academicContext ? 'requirements' : 'context');
     try {
+      await ensureAcademicContext(cancelled);
+      if (cancelled()) return;
       const request: AcademicMappingInput = {
         programId: program.id as AcademicMappingInput['programId'],
         record: academicRecord,
@@ -582,6 +686,7 @@ function Report() {
       if (cancelled()) return;
       sessionStorage.setItem('verifee-mapping-result', JSON.stringify(parsed.data));
       setMapping(parsed.data);
+      setMappingStage('complete');
     } catch {
       if (!cancelled()) {
         setMappingError('The preliminary mapping could not be completed. Your academic record is still saved in this browser session; retry without uploading the PDF again.');
@@ -602,6 +707,15 @@ function Report() {
       setProgressCourseEvidence([]);
       setExpandedRequirementId(null);
       setLoading(false);
+      setMappingStage('complete');
+      const cachedContext = readStoredAcademicContext();
+      if (cachedContext) {
+        setAcademicContext(cachedContext);
+        setContextLoading(false);
+        setContextFailure(false);
+      } else {
+        void ensureAcademicContext(() => cancelled);
+      }
     } else {
       setMapping(null);
       void requestMapping(() => cancelled);
@@ -626,6 +740,7 @@ function Report() {
       'verifee-analysis-mode',
       'verifee-extracted-record',
       'verifee-mapping-result',
+      'verifee-academic-context',
       'verifee-visible-course-count',
     ].forEach((key) => sessionStorage.removeItem(key));
     setLocation('/start');
@@ -693,16 +808,40 @@ function Report() {
     </span></div>
     <div className="report-grid">
       <div className="report-main">
-        <section className="panel section-card">
-          <div className="section-title"><h2>{isExtracted ? 'Extracted academic record' : 'Synthetic sample record'}</h2><span className="small-label">{academicRecord?.academicRecord.courses.length ?? 0} courses</span></div>
-          {academicRecord && <div className="credential-grid">
-            <div><span className="data-label">Institution</span><span className="data-value">{displayTranscriptValue(academicRecord.institution.name)}</span></div>
-            <div><span className="data-label">Country</span><span className="data-value">{displayTranscriptValue(academicRecord.institution.country)}</span></div>
-            <div><span className="data-label">Qualification</span><span className="data-value">{displayTranscriptValue(academicRecord.credential.degree)}</span></div>
-            <div><span className="data-label">Program</span><span className="data-value">{displayTranscriptValue(academicRecord.credential.program)}</span></div>
-            <div><span className="data-label">Field of study</span><span className="data-value">{displayTranscriptValue(academicRecord.credential.fieldOfStudy)}</span></div>
-            <div><span className="data-label">Graduation date</span><span className="data-value">{displayTranscriptValue(academicRecord.credential.graduationDate)}</span></div>
+        <section className="panel section-card academic-context-card" aria-live="polite" aria-busy={contextLoading} data-testid="card-academic-context">
+          <div className="section-title">
+            <div>
+              <h2>Mapped Academic Context</h2>
+              <p className="form-note mapping-section-note">Transcript facts and contextual mappings are labeled separately.</p>
+            </div>
+            <span className="small-label">{contextLoading ? 'Contextualizing' : contextFailure ? 'Context unavailable' : 'Preliminary context'}</span>
+          </div>
+          {academicContext ? <div className="academic-context-grid">
+            {[
+              { label: 'Institution', field: academicContext.institution },
+              { label: 'Country / education system', field: academicContext.country },
+              { label: 'Broad field', field: academicContext.broadField },
+              { label: 'Specific discipline', field: academicContext.specificDiscipline },
+              { label: 'Program', field: academicContext.program },
+            ].map(({ label, field }) => <div className="academic-context-item" key={label}>
+              <span className="data-label">{label}</span>
+              <span className="data-value">{field.value}</span>
+              <span className="academic-context-source">
+                {academicContextSourceLabel(field.source)}
+                {field.sourceUrl && <a href={field.sourceUrl} target="_blank" rel="noreferrer noopener" className="academic-context-link">View institution source <ExternalLink size={11} /></a>}
+              </span>
+            </div>)}
+            <div className="academic-context-item">
+              <span className="data-label">Target</span>
+              <span className="data-value">{program.school} — {program.shortName}</span>
+              <span className="academic-context-source">Selected in Step 3</span>
+            </div>
+          </div> : <div className="academic-context-loading" role="status" data-testid="status-academic-context-loading">
+            <LoaderCircle size={15} className="animate-spin" /> Contextualizing academic record…
           </div>}
+          {contextFailure && <p className="academic-context-note" role="status">Contextualization was unavailable. Requirement mapping still uses the original extracted academic JSON.</p>}
+          {!contextFailure && academicContext && academicContext.status !== 'MAPPED' && <p className="academic-context-note">Some fields could not be confidently mapped from the available transcript or official institution source.</p>}
+          <p className="academic-context-disclaimer">This context is informational only and does not verify credential authenticity.</p>
         </section>
 
         <section className="panel section-card" aria-live="polite">
@@ -723,31 +862,38 @@ function Report() {
                   ? <Check size={18} />
                   : <LoaderCircle size={18} className="animate-spin" />}
               <div>
-                <strong>{mappingError ? 'Mapping did not finish' : allRequirementsCompleted ? 'Academic mapping complete' : 'Mapping academic requirements…'}</strong>
-                <div className="mapping-progress-count" data-testid="mapping-progress-count">
-                  <strong>{requirements.length} of {program.requirements.length} requirements mapped</strong>
-                  <span>{mappingError ? 'Mapping stopped' : allRequirementsCompleted ? 'All requirements completed' : 'Still in progress'}</span>
-                </div>
-                <div className="mapping-progress-meter">
-                  <div
-                    className="mapping-progress-bar"
-                    role="progressbar"
-                    aria-label="Requirements mapped"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={progressPercent}
-                    aria-valuetext={`${requirements.length} of ${program.requirements.length} requirements mapped, ${progressPercent}%`}
-                    data-testid="mapping-progress-bar"
-                  >
-                    <span className="mapping-progress-fill" style={{ width: `${progressPercent}%` }} />
+                <strong>{mappingError ? 'Mapping did not finish' : allRequirementsCompleted ? 'Academic mapping complete' : mappingStage === 'context' ? 'Mapping academic record…' : 'Mapping academic requirements…'}</strong>
+                {loading && mappingStage === 'context' && !mappingError
+                  ? <div className="mapping-context-stage" data-testid="mapping-stage-context">
+                    <strong>Stage 1 of 2 · Contextualizing academic record</strong>
+                    <p>Requirement evaluation starts after academic context has been mapped.</p>
                   </div>
-                  <span className="mapping-progress-percent">{progressPercent}%</span>
-                </div>
-                <p>{mappingError
-                  ? 'Your academic record is saved. Retry without uploading the PDF again.'
-                  : allRequirementsCompleted
-                    ? 'All stored requirements have been compared. Review the result cards below.'
-                    : 'Shortlisting courses, checking official course sources where available, and comparing each stored requirement.'}</p>
+                  : <>
+                    <div className="mapping-progress-count" data-testid="mapping-progress-count">
+                      <strong>{requirements.length} of {program.requirements.length} requirements mapped</strong>
+                      <span>{mappingError ? 'Mapping stopped' : allRequirementsCompleted ? 'All requirements completed' : 'Stage 2 of 2 · Evaluating target requirements'}</span>
+                    </div>
+                    <div className="mapping-progress-meter">
+                      <div
+                        className="mapping-progress-bar"
+                        role="progressbar"
+                        aria-label="Requirements mapped"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progressPercent}
+                        aria-valuetext={`${requirements.length} of ${program.requirements.length} requirements mapped, ${progressPercent}%`}
+                        data-testid="mapping-progress-bar"
+                      >
+                        <span className="mapping-progress-fill" style={{ width: `${progressPercent}%` }} />
+                      </div>
+                      <span className="mapping-progress-percent">{progressPercent}%</span>
+                    </div>
+                    <p>{mappingError
+                      ? 'Your academic record is saved. Retry without uploading the PDF again.'
+                      : allRequirementsCompleted
+                        ? 'All stored requirements have been compared. Review the result cards below.'
+                        : 'Shortlisting courses, checking official course sources where available, and comparing each stored requirement.'}</p>
+                  </>}
               </div>
             </div>}
             {mappingError && <div className="mapping-error" role="alert" data-testid="status-mapping-error"><div><strong>Mapping did not finish</strong><p>{mappingError}</p></div><button className="secondary-btn" type="button" onClick={retryMapping} disabled={loading} data-testid="button-retry-mapping"><RotateCcw size={14} /> Retry mapping</button></div>}
