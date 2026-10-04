@@ -9,6 +9,8 @@ test('enters the demo account and opens the seeded NTU report', async ({ page })
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByTestId('text-report-count')).toHaveText('1');
+  await expect(page.getByRole('button', { name: 'Start a new mapping' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Understand the context behind a credential.' })).toBeVisible();
   expect(
     await page.evaluate(() =>
       JSON.parse(sessionStorage.getItem('verifee-demo-session') ?? 'null'),
@@ -58,4 +60,34 @@ test('protects mapping routes until the demo session starts and clears it on exi
 
   await page.goto('/analysis');
   await expect(page).toHaveURL(/\/login$/);
+});
+
+test('starts a fresh mapping from the workspace overview card', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('link-try-verifee-hero').click();
+  await page.getByTestId('button-enter-demo').click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+
+  await page.evaluate(() => {
+    sessionStorage.setItem('verifee-started', 'yes');
+    sessionStorage.setItem('verifee-file-name', 'previous-transcript.pdf');
+    sessionStorage.setItem('verifee-generated-report', JSON.stringify({
+      reportId: 'VF-OLD1234',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+    }));
+  });
+
+  const startMapping = page.getByRole('button', { name: 'Start a new mapping' });
+  await expect(startMapping).toBeVisible();
+  await startMapping.focus();
+  await page.keyboard.press('Enter');
+
+  await expect(page).toHaveURL(/\/start$/);
+  await expect(page.getByRole('heading', { name: 'Upload an academic credential' })).toBeVisible();
+  await expect(page.getByTestId('button-resume-analysis')).toHaveCount(0);
+  expect(await page.evaluate(() => ({
+    started: sessionStorage.getItem('verifee-started'),
+    fileName: sessionStorage.getItem('verifee-file-name'),
+    generatedReport: sessionStorage.getItem('verifee-generated-report'),
+  }))).toEqual({ started: null, fileName: null, generatedReport: null });
 });

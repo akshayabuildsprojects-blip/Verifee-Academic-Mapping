@@ -247,11 +247,8 @@ export function DemoDashboardPage({
           <div>
             <span className="demo-account__eyebrow">YOUR VERIFEE WORKSPACE</span>
             <h1 id="demo-dashboard-title">Good to have you here, <em>{displayName}.</em></h1>
-            <p>Pick up where you left off, or begin a new academic mapping.</p>
+            <p>Review the reports saved in this session or start a new academic mapping below.</p>
           </div>
-          <button className="demo-account__primary-button" type="button" onClick={onNewMapping} data-testid="button-new-mapping">
-            <Plus size={17} aria-hidden="true" /> Start a new mapping
-          </button>
         </section>
 
         <section className="demo-account__dashboard-grid" aria-label="Workspace overview">
@@ -268,12 +265,23 @@ export function DemoDashboardPage({
               View saved reports <ArrowRight size={15} aria-hidden="true" />
             </button>
           </article>
-          <aside className="demo-account__support-note">
+          <button
+            className="demo-account__support-note demo-account__mapping-cta"
+            type="button"
+            onClick={onNewMapping}
+            aria-labelledby="dashboard-mapping-action"
+            data-testid="button-dashboard-start-mapping"
+          >
             <div className="demo-account__support-icon" aria-hidden="true"><GraduationCap size={20} /></div>
             <span className="demo-account__eyebrow">A CAREFUL FIRST PASS</span>
-            <h2>Understand the context behind a credential.</h2>
-            <p>Mappings help make academic preparation more legible. They are preliminary and do not replace formal review.</p>
-          </aside>
+            <span className="demo-account__support-title" role="heading" aria-level={2}>Understand the context behind a credential.</span>
+            <span className="demo-account__support-copy">Mappings help make academic preparation more legible. They are preliminary and do not replace formal review.</span>
+            <span className="demo-account__mapping-cta-action" id="dashboard-mapping-action">
+              <Plus size={16} aria-hidden="true" />
+              Start a new mapping
+              <ArrowRight size={15} aria-hidden="true" />
+            </span>
+          </button>
         </section>
 
         <section className="demo-account__boundary" aria-label="Demo account details">
