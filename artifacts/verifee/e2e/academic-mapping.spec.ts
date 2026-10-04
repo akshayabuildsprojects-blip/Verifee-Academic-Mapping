@@ -739,7 +739,7 @@ test("keeps completed requirement results visible after a stream failure and ret
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
 });
 
-test("generates a PDF from the completed mapping without rerunning analysis", async ({
+test("shows the report preview immediately and keeps its downloads, save choices, and identity", async ({
   page,
 }) => {
   await openReport(page);
@@ -754,12 +754,15 @@ test("generates a PDF from the completed mapping without rerunning analysis", as
   );
   await page.getByTestId("button-open-verifee-report").click();
   await expect(page).toHaveURL(/\/final-report$/);
+  await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
+  await expect(page.getByText("Your preliminary academic mapping report is ready to review or download.")).toBeVisible();
+  await expect(page.getByTestId("button-generate-report")).toHaveCount(0);
+  await expect(page.getByTestId("button-save-to-my-reports")).toBeVisible();
+  await expect(page.getByTestId("button-download-submission-receipt")).toBeVisible();
+  await expect(page.getByTestId("button-download-report")).toBeVisible();
   await expect(page.getByText("$0.00")).toBeVisible();
   await expect(page.getByText("Free in Demo Mode")).toBeVisible();
   await expect(page.getByText("Report pricing is disabled during the Verifee demo. No payment information is required.")).toBeVisible();
-  await page.getByTestId("button-generate-report").click();
-
-  await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
   await expect(page.getByText("Preliminary Academic Mapping Report").first()).toBeVisible();
   await expect(page.getByRole("heading", { name: "Example University", exact: true })).toBeVisible();
   await expect(page.getByText("Academic Interpretation · Completed")).toBeVisible();
@@ -777,6 +780,18 @@ test("generates a PDF from the completed mapping without rerunning analysis", as
   ).toHaveAttribute("href", "https://catalog.example.edu/courses/math-101");
   await expect(page.getByRole("heading", { name: "Items requiring review" })).toBeVisible();
   await expect(page.getByText(/Confirm the transcript grading scale/)).toBeVisible();
+
+  const firstReportIdentity = await page.evaluate(() => {
+    const value = JSON.parse(
+      sessionStorage.getItem("verifee-generated-report") ?? "null",
+    ) as { reportId?: string; generatedAt?: string } | null;
+    return {
+      reportId: value?.reportId ?? "",
+      generatedAt: value?.generatedAt ?? "",
+    };
+  });
+  expect(firstReportIdentity.reportId).toMatch(/^VF-/);
+  expect(Date.parse(firstReportIdentity.generatedAt)).not.toBeNaN();
 
   const [download] = await Promise.all([
     page.waitForEvent("download"),
@@ -828,6 +843,7 @@ test("generates a PDF from the completed mapping without rerunning analysis", as
     return reports[0]?.metadata.reportId ?? "";
   });
   expect(firstSavedReportId).toMatch(/^VF-/);
+  expect(firstSavedReportId).toBe(firstReportIdentity.reportId);
   expect(
     await page.evaluate(() => {
       const reports = JSON.parse(
@@ -837,9 +853,52 @@ test("generates a PDF from the completed mapping without rerunning analysis", as
     }),
   ).toMatchObject({ paymentStatus: "DEMO_FREE", deliveryStatus: "NOT_SENT" });
 
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
+  await expect(page.getByTestId("button-generate-report")).toHaveCount(0);
+  await expect(page.getByText(`Report ${firstReportIdentity.reportId}`)).toBeVisible();
+  const restoredIdentity = await page.evaluate(() => {
+    const value = JSON.parse(
+      sessionStorage.getItem("verifee-generated-report") ?? "null",
+    ) as { reportId?: string; generatedAt?: string } | null;
+    return {
+      reportId: value?.reportId ?? "",
+      generatedAt: value?.generatedAt ?? "",
+    };
+  });
+  expect(restoredIdentity).toEqual(firstReportIdentity);
+
+  await page.getByTestId("button-back-to-mapping").click();
+  await expect(page).toHaveURL(/\/report$/);
+  await page.getByTestId("button-open-verifee-report").click();
+  await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
+  await expect(page.getByText(`Report ${firstReportIdentity.reportId}`)).toBeVisible();
+  const reopenedIdentity = await page.evaluate(() => {
+    const value = JSON.parse(
+      sessionStorage.getItem("verifee-generated-report") ?? "null",
+    ) as { reportId?: string; generatedAt?: string } | null;
+    return {
+      reportId: value?.reportId ?? "",
+      generatedAt: value?.generatedAt ?? "",
+    };
+  });
+  expect(reopenedIdentity).toEqual(firstReportIdentity);
+
+  // Simulate a fresh report identity for the same program/target so duplicate-save choices remain covered.
   await page.evaluate(() => sessionStorage.removeItem("verifee-generated-report"));
   await page.reload();
-  await page.getByTestId("button-generate-report").click();
+  await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
+  const duplicateReportIdentity = await page.evaluate(() => {
+    const value = JSON.parse(
+      sessionStorage.getItem("verifee-generated-report") ?? "null",
+    ) as { reportId?: string; generatedAt?: string } | null;
+    return {
+      reportId: value?.reportId ?? "",
+      generatedAt: value?.generatedAt ?? "",
+    };
+  });
+  expect(duplicateReportIdentity.reportId).toMatch(/^VF-/);
+  expect(duplicateReportIdentity.reportId).not.toBe(firstReportIdentity.reportId);
   await page.getByTestId("button-save-to-my-reports").click();
   await expect(page.getByTestId("button-view-existing-report")).toBeVisible();
   await page.getByTestId("button-save-duplicate-anyway").click();
@@ -860,8 +919,8 @@ test("generates a PDF from the completed mapping without rerunning analysis", as
       JSON.parse(sessionStorage.getItem("verifee-generated-report") ?? "null"),
     ),
   ).toMatchObject({
-    reportId: expect.stringMatching(/^VF-/),
-    generatedAt: expect.any(String),
+    reportId: duplicateReportIdentity.reportId,
+    generatedAt: duplicateReportIdentity.generatedAt,
     createdAt: expect.any(String),
     sourceInstitution: "Example University",
     targetInstitution: "Georgia Institute of Technology",

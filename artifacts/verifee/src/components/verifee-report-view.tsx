@@ -21,14 +21,14 @@ import './verifee-report-view.css';
 
 export interface VerifeeReportViewProps {
   data: VerifeeReportData;
-  generatedReport: GeneratedReportMetadata | null;
-  onGenerate(): void;
+  generatedReport: GeneratedReportMetadata;
   onDownload(): void;
   onDownloadReceipt(): void;
   onBackToMapping(): void;
   onStartNewAnalysis(): void;
   onSaveToMyReports?(): void;
   isSavedToMyReports?: boolean;
+  showDemoPricingNotice?: boolean;
 }
 
 const statusLabels: Record<string, string> = {
@@ -199,13 +199,13 @@ function GeneratedDate({ value }: { value: string }) {
 export function VerifeeReportView({
   data,
   generatedReport,
-  onGenerate,
   onDownload,
   onDownloadReceipt,
   onBackToMapping,
   onStartNewAnalysis,
   onSaveToMyReports,
   isSavedToMyReports,
+  showDemoPricingNotice = false,
 }: VerifeeReportViewProps) {
   const counts = [
     { label: 'Covered', count: data.counts.covered, tone: 'covered' },
@@ -220,7 +220,7 @@ export function VerifeeReportView({
         <header className="v-report-intro">
           <div className="v-report-overline"><span /> Preliminary academic interpretation</div>
           <h1>Verifee Report</h1>
-          <p>Generate a professional preliminary academic mapping report based on the completed analysis.</p>
+          <p>Your preliminary academic mapping report is ready to review or download.</p>
         </header>
 
         <section className="v-report-summary" aria-labelledby="v-report-summary-title">
@@ -269,8 +269,7 @@ export function VerifeeReportView({
           </div>
         </section>
 
-        {!generatedReport ? (
-          <>
+        {showDemoPricingNotice && (
             <section className="v-report-fee" aria-labelledby="v-report-fee-title">
               <div className="v-report-fee-icon"><FileText size={19} aria-hidden="true" /></div>
               <div className="v-report-fee-copy">
@@ -282,16 +281,7 @@ export function VerifeeReportView({
                 <span>Free in Demo Mode</span>
               </div>
             </section>
-
-            <div className="v-report-generate">
-              <button className="v-report-button v-report-button-primary" type="button" onClick={onGenerate} data-testid="button-generate-report">
-                Generate Report <ArrowRight size={16} aria-hidden="true" />
-              </button>
-              <p>Generate a report preview from the completed academic mapping.</p>
-            </div>
-          </>
-        ) : (
-          <>
+        )}
             <section className="v-report-preview" aria-labelledby="v-report-preview-title">
               <div className="v-report-preview-toolbar">
                 <div>
@@ -479,8 +469,6 @@ export function VerifeeReportView({
                 Start New Analysis <ArrowRight size={15} aria-hidden="true" />
               </button>
             </div>
-          </>
-        )}
       </div>
     </main>
   );

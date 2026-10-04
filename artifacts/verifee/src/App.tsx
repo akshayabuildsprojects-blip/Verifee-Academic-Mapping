@@ -1362,11 +1362,13 @@ function FinalReport() {
       },
     });
   }, [started]);
-  const [generatedReport, setGeneratedReport] = useState<GeneratedReportMetadata | null>(() => {
-    const identity = readStoredGeneratedReport();
-    return identity && reportData
-      ? createGeneratedReportMetadata(reportData, identity)
-      : null;
+  const [generatedReport] = useState<GeneratedReportMetadata | null>(() => {
+    if (!reportData) return null;
+    const identity = readStoredGeneratedReport() ?? {
+      reportId: createReportId(),
+      generatedAt: new Date().toISOString(),
+    };
+    return createGeneratedReportMetadata(reportData, identity);
   });
   const [savedReports, setSavedReports] = useState<DemoSavedReport[]>(readDemoSavedReports);
   const [saveConflict, setSaveConflict] = useState<DemoSavedReport | null>(null);
@@ -1381,16 +1383,7 @@ function FinalReport() {
     }
   }, [generatedReport]);
 
-  if (!reportData) return null;
-
-  const generateReport = () => {
-    const identity = readStoredGeneratedReport() ?? {
-      reportId: createReportId(),
-      generatedAt: new Date().toISOString(),
-    };
-    const metadata = createGeneratedReportMetadata(reportData, identity);
-    setGeneratedReport(metadata);
-  };
+  if (!reportData || !generatedReport) return null;
 
   const startNewAnalysis = () => {
     clearVerifeeSession();
@@ -1467,12 +1460,12 @@ function FinalReport() {
     <VerifeeReportView
       data={reportData}
       generatedReport={generatedReport}
-      onGenerate={generateReport}
       onDownload={downloadReport}
       onDownloadReceipt={downloadSubmissionReceipt}
       onBackToMapping={() => setLocation('/report')}
       onStartNewAnalysis={startNewAnalysis}
       onSaveToMyReports={() => saveToMyReports()}
+      showDemoPricingNotice
       isSavedToMyReports={Boolean(generatedReport && savedReports.some(
         (item) => item.metadata.reportId === generatedReport.reportId,
       ))}
@@ -1582,7 +1575,6 @@ function SavedReportRoute() {
       <VerifeeReportView
         data={report.data}
         generatedReport={report.metadata}
-        onGenerate={() => undefined}
         onDownload={() => downloadVerifeeReportPdf(report.data, report.metadata)}
         onDownloadReceipt={() => downloadVerifeeSubmissionReceiptPdf(report.metadata)}
         onBackToMapping={() => setLocation('/my-reports')}
