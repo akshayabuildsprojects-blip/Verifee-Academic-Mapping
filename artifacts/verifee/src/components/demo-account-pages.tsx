@@ -272,7 +272,7 @@ export function DemoDashboardPage({
             aria-labelledby="dashboard-mapping-action"
             data-testid="button-dashboard-start-mapping"
           >
-            <div className="demo-account__support-icon" aria-hidden="true"><GraduationCap size={20} /></div>
+            <span className="demo-account__support-icon" aria-hidden="true"><GraduationCap size={20} /></span>
             <span className="demo-account__eyebrow">A CAREFUL FIRST PASS</span>
             <span className="demo-account__support-title" role="heading" aria-level={2}>Understand the context behind a credential.</span>
             <span className="demo-account__support-copy">Mappings help make academic preparation more legible. They are preliminary and do not replace formal review.</span>

@@ -79,6 +79,10 @@ test('starts a fresh mapping from the workspace overview card', async ({ page })
 
   const startMapping = page.getByRole('button', { name: 'Start a new mapping' });
   await expect(startMapping).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const cardBounds = await startMapping.boundingBox();
+  expect(cardBounds).not.toBeNull();
+  expect(cardBounds!.x + cardBounds!.width).toBeLessThanOrEqual(390);
   await startMapping.focus();
   await page.keyboard.press('Enter');
 
