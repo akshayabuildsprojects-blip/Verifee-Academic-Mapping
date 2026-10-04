@@ -1,0 +1,174 @@
+Fix the Institution Status Check logic only.
+
+Do NOT change transcript extraction, academic mapping, target-program logic, report generation, or other workflow behavior.
+
+PROBLEM
+
+The current status check requires the transcript itself to explicitly contain a jurisdiction before selecting an institution registry.
+
+This causes valid institutions such as the University of Strathclyde to return:
+
+"Unable to check"
+
+because the transcript does not literally state the jurisdiction.
+
+That is too restrictive.
+
+--------------------------------------------------
+NEW INSTITUTION RESOLUTION FLOW
+--------------------------------------------------
+
+Before selecting a registry:
+
+1. Read the institution name extracted from the transcript.
+
+2. Attempt to resolve:
+   - canonical institution name
+   - country
+   - subnational jurisdiction where relevant
+
+3. Use authoritative evidence to resolve jurisdiction where possible.
+
+Examples:
+
+University of Strathclyde
+→ Scotland
+→ United Kingdom
+
+Nanyang Technological University
+→ Singapore
+
+Georgia Institute of Technology
+→ Georgia
+→ United States
+
+Do not require the jurisdiction to be literally stated in the transcript.
+
+--------------------------------------------------
+SOURCE LABELING
+--------------------------------------------------
+
+Clearly distinguish:
+
+Source: Transcript
+
+from:
+
+Resolved by Verifee
+
+Example:
+
+Institution:
+University of Strathclyde
+Source: Transcript
+
+Jurisdiction:
+Scotland, United Kingdom
+Source: Resolved by Verifee
+
+--------------------------------------------------
+REGISTRY SELECTION
+--------------------------------------------------
+
+After jurisdiction resolution, select the appropriate authoritative source.
+
+Do NOT treat the United Kingdom as one registry jurisdiction.
+
+At minimum distinguish:
+
+England
+→ Office for Students where appropriate
+
+Scotland
+→ Scottish/UK authoritative recognised-institution source
+
+Do not send Scottish universities to the Office for Students registry.
+
+If no supported authoritative source exists for the resolved jurisdiction, show:
+
+Institution identified
+Jurisdiction resolved
+Status check unavailable for this jurisdiction
+
+Do not show:
+"Jurisdiction not stated in transcript"
+
+if Verifee has successfully resolved it.
+
+--------------------------------------------------
+STATUS TERMINOLOGY
+--------------------------------------------------
+
+Do not use the generic term "accredited" unless the authoritative source itself establishes accreditation.
+
+Prefer source-specific language such as:
+
+Listed
+Recognised
+Registered
+Found in official institution registry
+
+Show the exact source used.
+
+--------------------------------------------------
+NO GUESSING
+--------------------------------------------------
+
+If institution identity is ambiguous, do not guess.
+
+Return:
+
+Institution identity requires review
+
+If jurisdiction cannot be resolved confidently, return:
+
+Jurisdiction unresolved
+
+Only perform the registry check after the institution and jurisdiction have been resolved with sufficient confidence.
+
+--------------------------------------------------
+UI
+--------------------------------------------------
+
+Update the Institution Status Check card to show:
+
+Institution
+[canonical institution]
+
+Jurisdiction
+[resolved jurisdiction]
+
+Jurisdiction source
+Transcript / Resolved by Verifee
+
+Status
+[Listed / Recognised / Registered / Unable to check]
+
+Source
+[name of authoritative registry/source]
+
+Checked
+[timestamp]
+
+Keep the existing coverage-limits note.
+
+--------------------------------------------------
+TEST CASE
+--------------------------------------------------
+
+Test using the existing University of Strathclyde transcript example.
+
+Expected behavior:
+
+Institution:
+University of Strathclyde
+
+Jurisdiction:
+Scotland, United Kingdom
+
+Jurisdiction source:
+Resolved by Verifee
+
+The system should no longer fail solely because the transcript omitted the jurisdiction.
+
+Confirm that Strathclyde is not checked against the Office for Students because OfS covers English higher-education providers.
