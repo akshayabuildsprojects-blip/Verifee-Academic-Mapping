@@ -6,10 +6,12 @@ import {
   createInstitutionStatusResult,
   createUnableInstitutionStatusResult,
   normalizeText,
+  type InstitutionStatusCheckInput,
   type InstitutionStatusInput,
   type InstitutionStatusResult,
   type InstitutionStatusSource,
 } from "./institution-status-shared";
+import { resolveInstitutionStatusInput } from "./institution-status-resolution";
 
 type RegistryCategory = {
   name: string;
@@ -455,7 +457,7 @@ function isGhana(value: string | null): boolean {
 }
 
 function unableResult(
-  input: InstitutionStatusInput,
+  input: InstitutionStatusCheckInput,
   summary: string,
   checkedAt = new Date(),
   supportedGhana = false,
@@ -463,41 +465,70 @@ function unableResult(
   return createUnableInstitutionStatusResult(
     input,
     summary,
-    supportedGhana
-      ? gtecSource
-      : getAdditionalInstitutionStatusSource(input.jurisdiction),
+    input.identityReviewMessage
+      ? null
+      : supportedGhana
+        ? gtecSource
+        : getAdditionalInstitutionStatusSource(
+            input.registryJurisdiction ?? input.jurisdiction,
+          ),
     checkedAt,
   );
+}
+
+function isUnitedKingdom(value: string | null): boolean {
+  if (!value?.trim()) return false;
+  return [
+    "united kingdom",
+    "united kingdom of great britain and northern ireland",
+    "great britain",
+    "uk",
+    "gb",
+  ].includes(normalizeText(value));
 }
 
 export async function checkInstitutionStatus(
   input: InstitutionStatusInput,
   fetcher: typeof fetch = globalThis.fetch,
 ): Promise<InstitutionStatusResult> {
-  const institutionName = input.institutionName?.trim() || null;
-  const jurisdiction = input.jurisdiction?.trim() || null;
+  const resolvedInput = resolveInstitutionStatusInput(input);
+  const institutionName = resolvedInput.institutionName?.trim() || null;
+  const jurisdiction = resolvedInput.registryJurisdiction?.trim() || null;
   const normalizedInput = institutionName ? normalizeText(institutionName) : "";
+
+  if (resolvedInput.identityReviewMessage) {
+    return unableResult(resolvedInput, resolvedInput.identityReviewMessage);
+  }
 
   if (!jurisdiction) {
     return unableResult(
-      input,
-      "The record does not include a jurisdiction, so a registry could not be selected. No institution status was inferred.",
+      resolvedInput,
+      institutionName
+        ? "Jurisdiction unresolved. The exact institution name did not identify a jurisdiction in the available authoritative records, so no registry was selected."
+        : "Institution identity requires review. The record does not provide a usable institution name or jurisdiction, so no registry was selected.",
     );
   }
 
-  const additionalResult = await checkAdditionalInstitutionStatus(input, fetcher);
+  const additionalResult = await checkAdditionalInstitutionStatus(resolvedInput, fetcher);
   if (additionalResult) return additionalResult;
+
+  if (isUnitedKingdom(resolvedInput.jurisdiction)) {
+    return unableResult(
+      resolvedInput,
+      "The United Kingdom was supplied without a resolved nation. The exact institution name did not identify England, Scotland, Wales, or Northern Ireland, so no registry was selected.",
+    );
+  }
 
   if (!isGhana(jurisdiction)) {
     return unableResult(
-      input,
+      resolvedInput,
       "This jurisdiction is not supported by the implemented registry check. No institution status was inferred.",
     );
   }
 
   if (!institutionName || !normalizedInput) {
     return unableResult(
-      input,
+      resolvedInput,
       "The record does not include a usable institution name, so the GTEC directory could not be searched.",
       new Date(),
       true,
@@ -512,7 +543,7 @@ export async function checkInstitutionStatus(
       if (!lookup.snapshot) {
         throw new Error("The GTEC directory check did not produce a complete result.");
       }
-      return createInstitutionStatusResult(input, gtecSource, {
+      return createInstitutionStatusResult(resolvedInput, gtecSource, {
         status: "NOT_LISTED",
         checkedAt: lookup.checkedAt,
         matchedName: null,
@@ -522,7 +553,7 @@ export async function checkInstitutionStatus(
       });
     }
 
-    return createInstitutionStatusResult(input, gtecSource, {
+    return createInstitutionStatusResult(resolvedInput, gtecSource, {
       status: "LISTED",
       sourceUrl: matchedRecord.sourceUrl,
       checkedAt: lookup.checkedAt,
@@ -534,7 +565,7 @@ export async function checkInstitutionStatus(
     });
   } catch {
     return unableResult(
-      input,
+      resolvedInput,
       "The GTEC directory could not be checked completely. No institution status was inferred.",
       new Date(),
       true,
@@ -546,5 +577,11 @@ export function unableToCheckInstitutionStatus(
   input: InstitutionStatusInput,
   summary: string,
 ): InstitutionStatusResult {
-  return unableResult(input, summary, new Date(), isGhana(input.jurisdiction));
+  const resolvedInput = resolveInstitutionStatusInput(input);
+  return unableResult(
+    resolvedInput,
+    summary,
+    new Date(),
+    isGhana(resolvedInput.registryJurisdiction ?? resolvedInput.jurisdiction),
+  );
 }

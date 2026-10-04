@@ -221,21 +221,37 @@ function createUnavailableInstitutionStatus(
 ): InstitutionStatusView {
   return {
     status: 'UNABLE_TO_CHECK',
+    statusLabel: 'Unable to check',
+    institutionName: record.institution.name?.trim() || null,
+    institutionNameSource: record.institution.name?.trim() ? 'TRANSCRIPT' : 'UNRESOLVED',
     jurisdiction: record.institution.country?.trim() || null,
+    jurisdictionSource: record.institution.country?.trim() ? 'TRANSCRIPT' : 'UNRESOLVED',
     sourceName: null,
     sourceUrl: null,
     checkedAt: new Date(),
     matchedName: null,
     registryStatus: null,
     summary,
-    coverageLimits: 'Institution checks use source-specific public records for Ghana (GTEC), the United States (DAPIP), India (UGC), Singapore (SSG registered PEIs), and England (OfS). Other jurisdictions and institution categories may not be covered; no universal legitimacy claim is made.',
+    coverageLimits: 'Institution checks use source-specific public records for Ghana (GTEC), the United States (DAPIP), India (UGC), Singapore (SSG registered PEIs), Scotland (Scottish Government recognised bodies), and England (OfS). Other jurisdictions and institution categories may not be covered; no universal legitimacy claim is made.',
   };
 }
 
-function institutionStatusLabel(status: InstitutionStatusView['status']) {
+function institutionStatusLabel(
+  status: InstitutionStatusView['status'],
+  statusLabel: string,
+) {
+  if (statusLabel) return statusLabel;
   if (status === 'LISTED') return 'Listed in source';
   if (status === 'NOT_LISTED') return 'No exact match found';
   return 'Unable to check';
+}
+
+function institutionStatusResolutionSourceLabel(
+  source: InstitutionStatusView['institutionNameSource'],
+) {
+  if (source === 'TRANSCRIPT') return 'Transcript';
+  if (source === 'RESOLVED_BY_VERIFEE') return 'Resolved by Verifee';
+  return 'Unresolved';
 }
 
 function formatInstitutionStatusTime(value: Date | string) {
@@ -1125,18 +1141,30 @@ function Report() {
       <div className="report-verification-top">
         <p className="verify-heading"><Landmark size={16} color="#55766c" /> Institution status check</p>
         <span className="status-pill review" data-testid="status-institution-registry">
-          {institutionStatusLoading ? 'Checking registry…' : institutionStatus ? institutionStatusLabel(institutionStatus.status) : 'Unable to check'}
+          {institutionStatusLoading ? 'Checking registry…' : institutionStatus ? institutionStatusLabel(institutionStatus.status, institutionStatus.statusLabel) : 'Unable to check'}
         </span>
       </div>
       {institutionStatus ? <>
         <p className="verify-copy">{institutionStatus.summary}</p>
         <dl className="institution-status-details">
           <div>
-            <dt>Jurisdiction</dt>
-            <dd>{institutionStatus.jurisdiction || 'Not stated in the transcript'}</dd>
+            <dt>Institution</dt>
+            <dd>{institutionStatus.institutionName || 'Institution identity requires review'}</dd>
           </div>
           <div>
-            <dt>Source</dt>
+            <dt>Institution source</dt>
+            <dd>{institutionStatusResolutionSourceLabel(institutionStatus.institutionNameSource)}</dd>
+          </div>
+          <div>
+            <dt>Jurisdiction</dt>
+            <dd>{institutionStatus.jurisdiction || 'Jurisdiction unresolved'}</dd>
+          </div>
+          <div>
+            <dt>Jurisdiction source</dt>
+            <dd>{institutionStatusResolutionSourceLabel(institutionStatus.jurisdictionSource)}</dd>
+          </div>
+          <div>
+            <dt>Registry source</dt>
             <dd>
               {institutionStatus.sourceName
                 ? institutionStatus.sourceUrl

@@ -8,6 +8,7 @@ const ugcUrl =
 const singaporeUrl =
   "https://www.tpgateway.gov.sg/internal/TPportal/trainingpartners/SSGContentInterface/pei/PeiListing";
 const ofsUrl = "https://register-api.officeforstudents.org.uk/api/Provider";
+const scotlandUrl = "https://www.gov.scot/policies/universities";
 
 type MockRequest = {
   url: string;
@@ -18,6 +19,13 @@ function jsonResponse(value: unknown, status = 200): Response {
   return new Response(JSON.stringify(value), {
     status,
     headers: { "content-type": "application/json; charset=utf-8" },
+  });
+}
+
+function htmlResponse(value: string, status = 200): Response {
+  return new Response(value, {
+    status,
+    headers: { "content-type": "text/html; charset=utf-8" },
   });
 }
 
@@ -39,16 +47,51 @@ function dapipPage(
   page: number,
   results: unknown[],
   allUnitIds: unknown[] = results,
+  expectedName = "Example University",
 ) {
   return {
     Results: results,
     Criteria: {
-      LocationName: "Example University",
+      LocationName: expectedName,
       RecordsPerPage: 100,
       PageNumber: page,
     },
     AllUnitIds: allUnitIds,
   };
+}
+
+const scottishRecognisedBodies = [
+  "University of Aberdeen",
+  "Abertay University",
+  "University of Dundee",
+  "University of Edinburgh",
+  "Edinburgh Napier University",
+  "University of Glasgow",
+  "Glasgow Caledonian University",
+  "Heriot-Watt University",
+  "University of the Highlands and Islands",
+  "The Open University in Scotland",
+  "Queen Margaret University",
+  "Robert Gordon University",
+  "Royal Conservatoire of Scotland",
+  "Scotland’s Rural College",
+  "University of St Andrews",
+  "University of Stirling",
+  "University of Strathclyde",
+  "University of the West of Scotland",
+];
+
+function scottishRecognisedBodiesHtml(): string {
+  const recognized = scottishRecognisedBodies
+    .map((name) => `<li><a href="https://example.gov.scot/${encodeURIComponent(name)}">${name}</a></li>`)
+    .join("");
+  return `<html><body>
+    <h3>Recognised bodies</h3>
+    <p>The following higher education institutions in Scotland have degree awarding powers, and are recognised bodies:</p>
+    <ul>${recognized}</ul>
+    <p>The following institution does not have degree awarding powers.</p>
+    <ul><li>The Glasgow School of Art</li></ul>
+    </body></html>`;
 }
 
 function dapipRecord(name: string, unitId: number) {
@@ -316,4 +359,126 @@ test("does not treat the United Kingdom as England or call the OfS source", asyn
   assert.equal(result.status, "UNABLE_TO_CHECK");
   assert.equal(result.sourceName, null);
   assert.equal(requestCount, 0);
+});
+
+test("resolves the University of Strathclyde to Scotland and checks the Scottish Government list", async () => {
+  const requested: MockRequest[] = [];
+  const result = await checkInstitutionStatus(
+    { institutionName: "University of Strathclyde", jurisdiction: null },
+    mockFetcher((request) => {
+      requested.push(request);
+      return htmlResponse(scottishRecognisedBodiesHtml());
+    }),
+  );
+
+  assert.equal(result.status, "LISTED");
+  assert.equal(result.statusLabel, "Recognised");
+  assert.equal(result.institutionName, "University of Strathclyde");
+  assert.equal(result.institutionNameSource, "TRANSCRIPT");
+  assert.equal(result.jurisdiction, "Scotland, United Kingdom");
+  assert.equal(result.jurisdictionSource, "RESOLVED_BY_VERIFEE");
+  assert.equal(result.matchedName, "University of Strathclyde");
+  assert.equal(result.sourceName, "Scottish Government — Recognised bodies");
+  assert.equal(result.sourceUrl, scotlandUrl);
+  assert.match(result.registryStatus ?? "", /degree-awarding powers/);
+  assert.match(result.coverageLimits, /Scottish Government/);
+  assert.deepEqual(requested.map((request) => request.url), [scotlandUrl]);
+  assert.doesNotMatch(result.sourceName ?? "", /Office for Students|OfS/);
+});
+
+test("resolves a broad United Kingdom transcript jurisdiction to Scotland for Strathclyde", async () => {
+  const requested: MockRequest[] = [];
+  const result = await checkInstitutionStatus(
+    { institutionName: "University of Strathclyde", jurisdiction: "United Kingdom" },
+    mockFetcher((request) => {
+      requested.push(request);
+      return htmlResponse(scottishRecognisedBodiesHtml());
+    }),
+  );
+
+  assert.equal(result.status, "LISTED");
+  assert.equal(result.jurisdiction, "Scotland, United Kingdom");
+  assert.equal(result.jurisdictionSource, "RESOLVED_BY_VERIFEE");
+  assert.deepEqual(requested.map((request) => request.url), [scotlandUrl]);
+});
+
+test("requires review when the transcript jurisdiction conflicts with the exact institution identity", async () => {
+  let requestCount = 0;
+  const result = await checkInstitutionStatus(
+    { institutionName: "University of Strathclyde", jurisdiction: "England" },
+    mockFetcher(() => {
+      requestCount += 1;
+      return jsonResponse([]);
+    }),
+  );
+
+  assert.equal(result.status, "UNABLE_TO_CHECK");
+  assert.equal(result.sourceName, null);
+  assert.match(result.summary, /Institution identity requires review/);
+  assert.equal(requestCount, 0);
+});
+
+test("resolves Nanyang Technological University to Singapore when the transcript omits jurisdiction", async () => {
+  const requested: MockRequest[] = [];
+  const result = await checkInstitutionStatus(
+    { institutionName: "Nanyang Technological University", jurisdiction: null },
+    mockFetcher((request) => {
+      requested.push(request);
+      return jsonResponse({ pages: 0, totalItemsCount: 0, list: [] });
+    }),
+  );
+
+  assert.equal(result.status, "NOT_LISTED");
+  assert.equal(result.institutionName, "Nanyang Technological University");
+  assert.equal(result.jurisdiction, "Singapore");
+  assert.equal(result.jurisdictionSource, "RESOLVED_BY_VERIFEE");
+  assert.equal(result.sourceName?.includes("SkillsFuture Singapore"), true);
+  assert.equal(requested[0]?.url, singaporeUrl);
+});
+
+test("resolves Georgia Tech to Georgia, United States before selecting DAPIP", async () => {
+  const name = "Georgia Institute of Technology";
+  const requested: MockRequest[] = [];
+  const result = await checkInstitutionStatus(
+    { institutionName: name, jurisdiction: null },
+    mockFetcher((request) => {
+      requested.push(request);
+      return jsonResponse(dapipPage(1, [dapipRecord(name, 12345)], undefined, name));
+    }),
+  );
+
+  assert.equal(result.status, "LISTED");
+  assert.equal(result.jurisdiction, "Georgia, United States");
+  assert.equal(result.jurisdictionSource, "RESOLVED_BY_VERIFEE");
+  assert.equal(result.sourceName?.includes("DAPIP"), true);
+  assert.equal(requested[0]?.url, dapipUrl);
+});
+
+test("does not choose a provider when the OfS register returns duplicate exact identities", async () => {
+  const duplicateProviders = [
+    {
+      Ukprn: "10001234",
+      LegalName: "Example University",
+      TradingName: "",
+      SearchNames: [],
+      RegistrationStatus: "Approved",
+      RegisteredCategory: "Approved",
+    },
+    {
+      Ukprn: "10005678",
+      LegalName: "Example University",
+      TradingName: "",
+      SearchNames: [],
+      RegistrationStatus: "Approved",
+      RegisteredCategory: "Approved",
+    },
+  ];
+  const result = await checkInstitutionStatus(
+    { institutionName: "Example University", jurisdiction: "England" },
+    mockFetcher(() => jsonResponse(duplicateProviders)),
+  );
+
+  assert.equal(result.status, "UNABLE_TO_CHECK");
+  assert.equal(result.matchedName, null);
+  assert.match(result.summary, /Institution identity requires review/);
 });

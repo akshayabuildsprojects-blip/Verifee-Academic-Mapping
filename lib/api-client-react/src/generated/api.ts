@@ -413,7 +413,7 @@ export const getRunInstitutionStatusCheckUrl = () => {
 }
 
 /**
- * Checks only the explicitly supplied jurisdiction in a supported registry. A missing match means only that no exact name was found in the checked source; it is not a judgment about legitimacy, credential authenticity, academic mapping, or admissions.
+ * Checks the supplied jurisdiction, or an exact institution-name resolution backed by authoritative evidence, against a supported registry. A missing match means only that no exact name was found in the checked source; it is not a judgment about legitimacy, credential authenticity, academic mapping, or admissions.
  * @summary Check an institution against an implemented official registry
  */
 export const runInstitutionStatusCheck = async (institutionStatusInput: InstitutionStatusInput, options?: Parameters<typeof customFetch>[1]): Promise<InstitutionStatusResult> => {

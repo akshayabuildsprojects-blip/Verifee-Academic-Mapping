@@ -196,7 +196,7 @@ export const RunAcademicContextResponse = zod.object({
 
 
 /**
- * Checks only the explicitly supplied jurisdiction in a supported registry. A missing match means only that no exact name was found in the checked source; it is not a judgment about legitimacy, credential authenticity, academic mapping, or admissions.
+ * Checks the supplied jurisdiction, or an exact institution-name resolution backed by authoritative evidence, against a supported registry. A missing match means only that no exact name was found in the checked source; it is not a judgment about legitimacy, credential authenticity, academic mapping, or admissions.
  * @summary Check an institution against an implemented official registry
  */
 export const runInstitutionStatusCheckBodyInstitutionNameMax = 200;
@@ -210,6 +210,8 @@ export const RunInstitutionStatusCheckBody = zod.object({
   "jurisdiction": zod.string().max(runInstitutionStatusCheckBodyJurisdictionMax).nullable()
 })
 
+export const runInstitutionStatusCheckResponseStatusLabelMax = 80;
+
 export const runInstitutionStatusCheckResponseSummaryMax = 500;
 
 export const runInstitutionStatusCheckResponseCoverageLimitsMax = 1000;
@@ -218,7 +220,11 @@ export const runInstitutionStatusCheckResponseCoverageLimitsMax = 1000;
 
 export const RunInstitutionStatusCheckResponse = zod.object({
   "status": zod.enum(['LISTED', 'NOT_LISTED', 'UNABLE_TO_CHECK']),
-  "jurisdiction": zod.string().nullable(),
+  "statusLabel": zod.string().max(runInstitutionStatusCheckResponseStatusLabelMax).describe('Source-appropriate label such as Listed, Recognised, or Unable to check.'),
+  "institutionName": zod.string().nullable().describe('Canonical institution name when resolved, otherwise the transcript name or null.'),
+  "institutionNameSource": zod.enum(['TRANSCRIPT', 'RESOLVED_BY_VERIFEE', 'UNRESOLVED']),
+  "jurisdiction": zod.string().nullable().describe('Country and subnational jurisdiction when available.'),
+  "jurisdictionSource": zod.enum(['TRANSCRIPT', 'RESOLVED_BY_VERIFEE', 'UNRESOLVED']),
   "sourceName": zod.string().nullable(),
   "sourceUrl": zod.string().url().nullable(),
   "checkedAt": zod.coerce.date(),

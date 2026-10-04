@@ -33,6 +33,8 @@ export * from './errorResponse';
 export * from './healthStatus';
 export * from './institutionStatusInput';
 export * from './institutionStatusResult';
+export * from './institutionStatusResultInstitutionNameSource';
+export * from './institutionStatusResultJurisdictionSource';
 export * from './institutionStatusResultStatus';
 export * from './transcriptDetectedLanguage';
 export * from './transcriptExtractionProblem';

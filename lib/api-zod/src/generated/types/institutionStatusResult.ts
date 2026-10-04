@@ -5,12 +5,29 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { InstitutionStatusResultInstitutionNameSource } from './institutionStatusResultInstitutionNameSource';
+import type { InstitutionStatusResultJurisdictionSource } from './institutionStatusResultJurisdictionSource';
 import type { InstitutionStatusResultStatus } from './institutionStatusResultStatus';
 
 export interface InstitutionStatusResult {
   status: InstitutionStatusResultStatus;
-  /** @nullable */
+  /**
+     * Source-appropriate label such as Listed, Recognised, or Unable to check.
+     * @maxLength 80
+     */
+  statusLabel: string;
+  /**
+     * Canonical institution name when resolved, otherwise the transcript name or null.
+     * @nullable
+     */
+  institutionName: string | null;
+  institutionNameSource: InstitutionStatusResultInstitutionNameSource;
+  /**
+     * Country and subnational jurisdiction when available.
+     * @nullable
+     */
   jurisdiction: string | null;
+  jurisdictionSource: InstitutionStatusResultJurisdictionSource;
   /** @nullable */
   sourceName: string | null;
   /** @nullable */

@@ -273,7 +273,11 @@ const detectedLanguages = {
 
 const institutionStatus = {
   status: "LISTED",
+  statusLabel: "Listed",
+  institutionName: "Example University",
+  institutionNameSource: "TRANSCRIPT",
   jurisdiction: "United States",
+  jurisdictionSource: "TRANSCRIPT",
   sourceName: "Example institution registry",
   sourceUrl: "https://registry.example.edu/institutions/example-university",
   checkedAt: "2026-01-12T15:00:00.000Z",
@@ -283,7 +287,15 @@ const institutionStatus = {
   coverageLimits: "Test fixture coverage is limited to the example directory.",
 } as const;
 
-async function openReport(page: Page) {
+async function openReport(
+  page: Page,
+  options: {
+    record?: typeof academicRecord;
+    status?: Record<string, unknown>;
+  } = {},
+) {
+  const record = options.record ?? academicRecord;
+  const status = options.status ?? institutionStatus;
   await page.addInitScript(({ record, languageDetection, institutionStatus }) => {
     if (sessionStorage.getItem("verifee-started") !== "yes") {
       sessionStorage.setItem("verifee-file-name", "sample-transcript.pdf");
@@ -354,9 +366,9 @@ async function openReport(page: Page) {
       });
     };
   }, {
-    record: academicRecord,
+    record,
     languageDetection: detectedLanguages,
-    institutionStatus,
+    institutionStatus: status,
   });
   await page.goto("/report");
   await page.getByRole("heading", { name: "Academic mapping" }).waitFor();
@@ -409,6 +421,46 @@ test.beforeEach(async ({ page }) => {
       JSON.stringify({ mode: "DEMO", displayName: "Verifee Demo" }),
     );
   });
+});
+
+test("shows institution and jurisdiction provenance with the exact Scottish source", async ({ page }) => {
+  const record = {
+    ...academicRecord,
+    institution: {
+      ...academicRecord.institution,
+      name: "University of Strathclyde",
+      country: "United Kingdom",
+    },
+  };
+  const status = {
+    ...institutionStatus,
+    statusLabel: "Recognised",
+    institutionName: "University of Strathclyde",
+    institutionNameSource: "TRANSCRIPT",
+    jurisdiction: "Scotland, United Kingdom",
+    jurisdictionSource: "RESOLVED_BY_VERIFEE",
+    sourceName: "Scottish Government — Recognised bodies",
+    sourceUrl: "https://www.gov.scot/policies/universities",
+    matchedName: "University of Strathclyde",
+    registryStatus: "Recognised body with degree-awarding powers",
+    summary: "The Scottish Government recognises the University of Strathclyde as a degree-awarding body.",
+    coverageLimits: "This check searches the Scottish Government's recognised-bodies list only.",
+  };
+  await openReport(page, { record, status });
+
+  const card = page.getByTestId("card-institution-status");
+  await expect(page.getByTestId("status-institution-registry")).toHaveText("Recognised");
+  await expect(card).toContainText("University of Strathclyde");
+  await expect(card).toContainText("Institution source");
+  await expect(card).toContainText("Transcript");
+  await expect(card).toContainText("Scotland, United Kingdom");
+  await expect(card).toContainText("Jurisdiction source");
+  await expect(card).toContainText("Resolved by Verifee");
+  await expect(card.getByTestId("institution-status-source-link")).toHaveAttribute(
+    "href",
+    "https://www.gov.scot/policies/universities",
+  );
+  await expect(card).toContainText("Coverage limits:");
 });
 
 test("shows detected languages and scripts in transcript review", async ({ page }) => {

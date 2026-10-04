@@ -165,10 +165,43 @@ export const InstitutionStatusResultStatus = {
   UNABLE_TO_CHECK: 'UNABLE_TO_CHECK',
 } as const;
 
+export type InstitutionStatusResultInstitutionNameSource = typeof InstitutionStatusResultInstitutionNameSource[keyof typeof InstitutionStatusResultInstitutionNameSource];
+
+
+export const InstitutionStatusResultInstitutionNameSource = {
+  TRANSCRIPT: 'TRANSCRIPT',
+  RESOLVED_BY_VERIFEE: 'RESOLVED_BY_VERIFEE',
+  UNRESOLVED: 'UNRESOLVED',
+} as const;
+
+export type InstitutionStatusResultJurisdictionSource = typeof InstitutionStatusResultJurisdictionSource[keyof typeof InstitutionStatusResultJurisdictionSource];
+
+
+export const InstitutionStatusResultJurisdictionSource = {
+  TRANSCRIPT: 'TRANSCRIPT',
+  RESOLVED_BY_VERIFEE: 'RESOLVED_BY_VERIFEE',
+  UNRESOLVED: 'UNRESOLVED',
+} as const;
+
 export interface InstitutionStatusResult {
   status: InstitutionStatusResultStatus;
-  /** @nullable */
+  /**
+     * Source-appropriate label such as Listed, Recognised, or Unable to check.
+     * @maxLength 80
+     */
+  statusLabel: string;
+  /**
+     * Canonical institution name when resolved, otherwise the transcript name or null.
+     * @nullable
+     */
+  institutionName: string | null;
+  institutionNameSource: InstitutionStatusResultInstitutionNameSource;
+  /**
+     * Country and subnational jurisdiction when available.
+     * @nullable
+     */
   jurisdiction: string | null;
+  jurisdictionSource: InstitutionStatusResultJurisdictionSource;
   /** @nullable */
   sourceName: string | null;
   /** @nullable */

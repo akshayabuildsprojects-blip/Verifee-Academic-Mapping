@@ -2,7 +2,7 @@ import {
   createInstitutionStatusResult,
   createUnableInstitutionStatusResult,
   normalizeText,
-  type InstitutionStatusInput,
+  type InstitutionStatusCheckInput,
   type InstitutionStatusResult,
   type InstitutionStatusSource,
 } from "./institution-status-shared";
@@ -47,11 +47,20 @@ const ofsSource: InstitutionStatusSource = {
     "This check searches the OfS Register of English higher-education providers and reports the register's own status. It does not cover Scotland, Wales, Northern Ireland, or all education providers, and a missing exact match is not proof that an institution is unrecognized, illegitimate, or that its programmes lack recognition.",
 };
 
+const scottishGovernmentUrl = "https://www.gov.scot/policies/universities";
+const scotlandSource: InstitutionStatusSource = {
+  name: "Scottish Government — Recognised bodies",
+  url: scottishGovernmentUrl,
+  coverageLimits:
+    "This check searches the Scottish Government's list of Scottish higher-education institutions with degree-awarding powers that are recognised bodies. A missing exact match applies only to this list; it is not a conclusion about legitimacy or an individual qualification.",
+};
+
 const requestTimeoutMs = 15_000;
 const maxResponseBytes = 8_000_000;
 const directoryCacheDurationMs = 6 * 60 * 60 * 1000;
 const maxDapipPages = 50;
 const maxSingaporePages = 100;
+const minimumScottishRecognisedBodies = 18;
 
 type CachedDirectory = {
   value: unknown;
@@ -120,10 +129,15 @@ function identifierValue(value: unknown): string | null {
 
 function matchesJurisdiction(value: string, names: string[]): boolean {
   const normalized = normalizeText(value);
-  return names.some((name) => normalizeText(name) === normalized);
+  return names.some((name) => {
+    const normalizedName = normalizeText(name);
+    return normalized === normalizedName ||
+      normalized.startsWith(`${normalizedName} `) ||
+      normalized.endsWith(` ${normalizedName}`);
+  });
 }
 
-function requestedInstitutionName(input: InstitutionStatusInput): string | null {
+function requestedInstitutionName(input: InstitutionStatusCheckInput): string | null {
   return input.institutionName?.trim() || null;
 }
 
@@ -217,7 +231,7 @@ function parseDapipResponse(
 type DapipMatch = DapipLocation;
 
 async function checkUnitedStates(
-  input: InstitutionStatusInput,
+  input: InstitutionStatusCheckInput,
   institutionName: string,
   fetcher: typeof fetch,
 ): Promise<InstitutionStatusResult> {
@@ -264,10 +278,16 @@ async function checkUnitedStates(
     });
   }
 
+  if (matches.length > 1) {
+    return createUnableInstitutionStatusResult(
+      input,
+      "Institution identity requires review. DAPIP returned multiple exact-name records, so no institution or campus record was selected.",
+      dapipSource,
+      checkedAt,
+    );
+  }
+
   const match = matches[0]!;
-  const ambiguity = matches.length > 1
-    ? ` The search returned ${matches.length} exact-name records; this report shows one of them and does not determine which campus or record corresponds to the transcript.`
-    : "";
   const registryStatus = match.activeStatus
     ? `Source active-status field: ${match.activeStatus}`
     : "The source did not provide an active-status value for this record";
@@ -278,7 +298,7 @@ async function checkUnitedStates(
     sourceUrl: dapipProfileUrl(match.unitId, match.parentUnitId ?? undefined),
     checkedAt,
     summary:
-      `An exact name appears in the U.S. Department of Education's DAPIP database. ${registryStatus}. DAPIP cautions that its agency-reported data may be inaccurate, outdated, or incomplete; this is not an independent accreditation or recognition judgment.${ambiguity}`,
+      `An exact name appears in the U.S. Department of Education's DAPIP database. ${registryStatus}. DAPIP cautions that its agency-reported data may be inaccurate, outdated, or incomplete; this is not an independent accreditation or recognition judgment.`,
   });
 }
 
@@ -337,7 +357,7 @@ async function loadUgcDirectory(fetcher: typeof fetch): Promise<UgcRecord[]> {
 }
 
 async function checkIndia(
-  input: InstitutionStatusInput,
+  input: InstitutionStatusCheckInput,
   institutionName: string,
   fetcher: typeof fetch,
 ): Promise<InstitutionStatusResult> {
@@ -361,19 +381,25 @@ async function checkIndia(
     });
   }
 
+  if (matches.length > 1) {
+    return createUnableInstitutionStatusResult(
+      input,
+      "Institution identity requires review. The UGC directory returned multiple exact-name records, so no record was selected.",
+      ugcSource,
+      checkedAt,
+    );
+  }
+
   const match = matches[0]!;
   const registryStatus =
     `${match.uni_type}${match.status ? `; UGC status field: ${match.status}` : "; no UGC status value supplied"}`;
-  const ambiguity = matches.length > 1
-    ? ` The directory contains ${matches.length} exact-name records; this report shows one and does not determine which record corresponds to the transcript.`
-    : "";
   return createInstitutionStatusResult(input, ugcSource, {
     status: "LISTED",
     matchedName: match.uni_name,
     registryStatus,
     checkedAt,
     summary:
-      `The UGC university list contains this exact name under “${match.uni_type}.” The published UGC status field is ${match.status ? `“${match.status}”` : "blank"}; that field is not a general accreditation rating.${ambiguity}`,
+      `The UGC university list contains this exact name under “${match.uni_type}.” The published UGC status field is ${match.status ? `“${match.status}”` : "blank"}; that field is not a general accreditation rating.`,
   });
 }
 
@@ -487,7 +513,7 @@ async function searchSingaporePeis(
 }
 
 async function checkSingapore(
-  input: InstitutionStatusInput,
+  input: InstitutionStatusCheckInput,
   institutionName: string,
   fetcher: typeof fetch,
 ): Promise<InstitutionStatusResult> {
@@ -507,6 +533,15 @@ async function checkSingapore(
     });
   }
 
+  if (matches.length > 1) {
+    return createUnableInstitutionStatusResult(
+      input,
+      "Institution identity requires review. SSG returned multiple exact-name PEI records, so no record was selected.",
+      singaporeSource,
+      checkedAt,
+    );
+  }
+
   const match = matches[0]!;
   const statusParts = [
     match.status_cd_desc ? `Source status: ${match.status_cd_desc}` : null,
@@ -516,16 +551,13 @@ async function checkSingapore(
   const registryStatus = statusParts.length
     ? statusParts.join("; ")
     : "The source lists this PEI but supplies no registration status or validity value.";
-  const ambiguity = matches.length > 1
-    ? ` The source returned ${matches.length} exact-name records; this report shows one and does not resolve the difference.`
-    : "";
   return createInstitutionStatusResult(input, singaporeSource, {
     status: "LISTED",
     matchedName: match.pei_name,
     registryStatus,
     checkedAt,
     summary:
-      `An exact record appears in SkillsFuture Singapore's registered PEI listing. ${registryStatus}. This is a source-specific registration record, not a determination of degree recognition or institutional legitimacy.${ambiguity}`,
+      `An exact record appears in SkillsFuture Singapore's registered PEI listing. ${registryStatus}. This is a source-specific registration record, not a determination of degree recognition or institutional legitimacy.`,
   });
 }
 
@@ -590,7 +622,7 @@ function ofsNameMatches(provider: OfsProvider, normalizedName: string): boolean 
 }
 
 async function checkEngland(
-  input: InstitutionStatusInput,
+  input: InstitutionStatusCheckInput,
   institutionName: string,
   fetcher: typeof fetch,
 ): Promise<InstitutionStatusResult> {
@@ -615,14 +647,20 @@ async function checkEngland(
     });
   }
 
+  if (matches.length > 1) {
+    return createUnableInstitutionStatusResult(
+      input,
+      "Institution identity requires review. The OfS Register returned multiple exact-name provider records, so no provider was selected.",
+      ofsSource,
+      checkedAt,
+    );
+  }
+
   const match = matches[0]!;
   const category = stringValue(match.RegisteredCategory);
   const registryStatus = category
     ? `${match.RegistrationStatus}; category: ${category}`
     : match.RegistrationStatus;
-  const ambiguity = matches.length > 1
-    ? ` The source returned ${matches.length} exact-name provider records; this report shows one and does not determine which record corresponds to the transcript.`
-    : "";
   const recordUrl =
     `${ofsRegisterUrl}/#/provider/${encodeURIComponent(match.Ukprn)}`;
   return createInstitutionStatusResult(input, ofsSource, {
@@ -632,7 +670,127 @@ async function checkEngland(
     sourceUrl: recordUrl,
     checkedAt,
     summary:
-      `An exact legal, trading, or search-name match appears in the OfS Register for England. The register's published status is “${match.RegistrationStatus}”${category ? ` and its category is “${category}”` : ""}. This describes the OfS record only; it is not a universal recognition or legitimacy judgment.${ambiguity}`,
+      `An exact legal, trading, or search-name match appears in the OfS Register for England. The register's published status is “${match.RegistrationStatus}”${category ? ` and its category is “${category}”` : ""}. This describes the OfS record only; it is not a universal recognition or legitimacy judgment.`,
+  });
+}
+
+function plainHtmlText(value: string): string {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&#x27;/gi, "'")
+    .replace(/&rsquo;|&#x2019;/gi, "’")
+    .replace(/&ndash;|&#x2013;/gi, "–")
+    .replace(/&mdash;|&#x2014;/gi, "—")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseScottishRecognisedBodies(html: string): string[] {
+  const headings = [...html.matchAll(/<h[1-6]\b[^>]*>([\s\S]*?)<\/h[1-6]>/gi)];
+  const heading = headings.find(
+    (match) => normalizeText(plainHtmlText(match[1] ?? "")) === "recognised bodies",
+  );
+  if (!heading || heading.index === undefined) {
+    throw new Error("The Scottish Government recognised-bodies section was not found.");
+  }
+
+  const sectionStart = heading.index + heading[0].length;
+  const nextHeading = headings.find(
+    (match) => match.index !== undefined && match.index > heading.index!,
+  );
+  const section = html.slice(
+    sectionStart,
+    nextHeading?.index ?? html.length,
+  );
+  const list = section.match(/<ul\b[^>]*>([\s\S]*?)<\/ul>/i)?.[1];
+  if (!list) {
+    throw new Error("The Scottish Government recognised-bodies list was missing.");
+  }
+
+  const names = [...list.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)]
+    .map((match) => plainHtmlText(match[1] ?? ""))
+    .filter(Boolean);
+  const seenNames = new Set<string>();
+  for (const name of names) {
+    const normalized = normalizeText(name);
+    if (!normalized || seenNames.has(normalized)) {
+      throw new Error("The Scottish Government list contains a duplicate or unnamed record.");
+    }
+    seenNames.add(normalized);
+  }
+  if (
+    names.length < minimumScottishRecognisedBodies ||
+    names.length > 1000
+  ) {
+    throw new Error("The Scottish Government list was incomplete or outside supported limits.");
+  }
+  return names;
+}
+
+async function loadScottishRecognisedBodies(fetcher: typeof fetch): Promise<string[]> {
+  const response = await fetcher(scottishGovernmentUrl, {
+    headers: { Accept: "text/html" },
+    signal: AbortSignal.timeout(requestTimeoutMs),
+  });
+  if (!response.ok) {
+    throw new Error(`Scottish Government returned HTTP ${response.status}.`);
+  }
+  if (!(response.headers.get("content-type") ?? "").toLowerCase().includes("html")) {
+    throw new Error("Scottish Government returned an unexpected content type.");
+  }
+  const html = await response.text();
+  if (!html || html.length > maxResponseBytes) {
+    throw new Error("Scottish Government response was empty or exceeded the supported size.");
+  }
+  return parseScottishRecognisedBodies(html);
+}
+
+async function checkScotland(
+  input: InstitutionStatusCheckInput,
+  institutionName: string,
+  fetcher: typeof fetch,
+): Promise<InstitutionStatusResult> {
+  const { value: names, checkedAt } = await fetchCachedDirectory(
+    "scottish-government-recognised-bodies",
+    fetcher,
+    loadScottishRecognisedBodies,
+  );
+  const matches = names.filter(
+    (name) => normalizeText(name) === normalizeText(institutionName),
+  );
+
+  if (matches.length === 0) {
+    return createInstitutionStatusResult(input, scotlandSource, {
+      status: "NOT_LISTED",
+      matchedName: null,
+      registryStatus: null,
+      checkedAt,
+      summary:
+        "No exact institution-name match was found in the complete Scottish Government recognised-bodies list. This result is limited to that list and is not a conclusion about legitimacy or an individual qualification.",
+    });
+  }
+
+  if (matches.length > 1) {
+    return createUnableInstitutionStatusResult(
+      input,
+      "Institution identity requires review. The Scottish Government list returned multiple exact-name records, so no record was selected.",
+      scotlandSource,
+      checkedAt,
+    );
+  }
+
+  const matchedName = matches[0]!;
+  return createInstitutionStatusResult(input, scotlandSource, {
+    status: "LISTED",
+    statusLabel: "Recognised",
+    matchedName,
+    registryStatus: "Recognised body with degree-awarding powers",
+    checkedAt,
+    summary:
+      `The Scottish Government's recognised-bodies list identifies ${matchedName} as having degree-awarding powers. This source does not verify a transcript, an individual qualification, or programme accreditation.`,
   });
 }
 
@@ -663,15 +821,18 @@ export function getAdditionalInstitutionStatusSource(
   ])) {
     return singaporeSource;
   }
+  if (matchesJurisdiction(jurisdiction, ["Scotland"])) return scotlandSource;
   if (matchesJurisdiction(jurisdiction, ["England"])) return ofsSource;
   return null;
 }
 
 export async function checkAdditionalInstitutionStatus(
-  input: InstitutionStatusInput,
+  input: InstitutionStatusCheckInput,
   fetcher: typeof fetch,
 ): Promise<InstitutionStatusResult | null> {
-  const source = getAdditionalInstitutionStatusSource(input.jurisdiction);
+  const source = getAdditionalInstitutionStatusSource(
+    input.registryJurisdiction ?? input.jurisdiction,
+  );
   if (!source) return null;
 
   let check: (name: string) => Promise<InstitutionStatusResult>;
@@ -681,6 +842,8 @@ export async function checkAdditionalInstitutionStatus(
     check = (name) => checkIndia(input, name, fetcher);
   } else if (source === singaporeSource) {
     check = (name) => checkSingapore(input, name, fetcher);
+  } else if (source === scotlandSource) {
+    check = (name) => checkScotland(input, name, fetcher);
   } else {
     check = (name) => checkEngland(input, name, fetcher);
   }

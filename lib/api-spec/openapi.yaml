@@ -178,7 +178,7 @@ paths:
       operationId: runInstitutionStatusCheck
       tags: [institution-status]
       summary: Check an institution against an implemented official registry
-      description: Checks only the explicitly supplied jurisdiction in a supported registry. A missing match means only that no exact name was found in the checked source; it is not a judgment about legitimacy, credential authenticity, academic mapping, or admissions.
+      description: Checks the supplied jurisdiction, or an exact institution-name resolution backed by authoritative evidence, against a supported registry. A missing match means only that no exact name was found in the checked source; it is not a judgment about legitimacy, credential authenticity, academic mapping, or admissions.
       requestBody:
         required: true
         content:
@@ -444,8 +444,28 @@ components:
             - LISTED
             - NOT_LISTED
             - UNABLE_TO_CHECK
+        statusLabel:
+          type: string
+          maxLength: 80
+          description: Source-appropriate label such as Listed, Recognised, or Unable to check.
+        institutionName:
+          type: ["string", "null"]
+          description: Canonical institution name when resolved, otherwise the transcript name or null.
+        institutionNameSource:
+          type: string
+          enum:
+            - TRANSCRIPT
+            - RESOLVED_BY_VERIFEE
+            - UNRESOLVED
         jurisdiction:
           type: ["string", "null"]
+          description: Country and subnational jurisdiction when available.
+        jurisdictionSource:
+          type: string
+          enum:
+            - TRANSCRIPT
+            - RESOLVED_BY_VERIFEE
+            - UNRESOLVED
         sourceName:
           type: ["string", "null"]
         sourceUrl:
@@ -466,7 +486,11 @@ components:
           maxLength: 1000
       required:
         - status
+        - statusLabel
+        - institutionName
+        - institutionNameSource
         - jurisdiction
+        - jurisdictionSource
         - sourceName
         - sourceUrl
         - checkedAt
