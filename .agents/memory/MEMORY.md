@@ -5,3 +5,4 @@
 - [GTEC directory checks](gtec-directory-checks.md) — the search parameter is unreliable; only a complete count-validated category scan can support “not listed.”
 - [Verifee report wallet boundary](verifee-report-wallet-scope.md) — reports stay free and unsent in the demo; account retrieval is future scope and transcripts must not be retained permanently.
 - [Synthetic PDF fixture layout](synthetic-pdf-fixture-layout.md) — simplified glyph widths can clip long lines and Poppler layout adds whitespace; normalize extraction checks and keep visible text within page bounds.
+- [UGC source data handling](ugc-source-data-handling.md) — the live UGC response includes a credential-like field; only extract fields needed for registry results and never log the raw payload.

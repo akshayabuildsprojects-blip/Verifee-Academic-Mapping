@@ -228,7 +228,7 @@ function createUnavailableInstitutionStatus(
     matchedName: null,
     registryStatus: null,
     summary,
-    coverageLimits: 'This implementation checks Ghana through the GTEC public institution directory only. Other jurisdictions are not checked, and no comprehensive worldwide coverage is claimed.',
+    coverageLimits: 'Institution checks use source-specific public records for Ghana (GTEC), the United States (DAPIP), India (UGC), Singapore (SSG registered PEIs), and England (OfS). Other jurisdictions and institution categories may not be covered; no universal legitimacy claim is made.',
   };
 }
 

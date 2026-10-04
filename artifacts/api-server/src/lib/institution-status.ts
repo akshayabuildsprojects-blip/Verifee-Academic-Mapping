@@ -1,10 +1,15 @@
-import type {
-  RunInstitutionStatusCheckBody,
-  RunInstitutionStatusCheckResponse,
-} from "@workspace/api-zod";
-
-type InstitutionStatusInput = (typeof RunInstitutionStatusCheckBody)["_output"];
-type InstitutionStatusResult = (typeof RunInstitutionStatusCheckResponse)["_output"];
+import {
+  checkAdditionalInstitutionStatus,
+  getAdditionalInstitutionStatusSource,
+} from "./institution-status-additional";
+import {
+  createInstitutionStatusResult,
+  createUnableInstitutionStatusResult,
+  normalizeText,
+  type InstitutionStatusInput,
+  type InstitutionStatusResult,
+  type InstitutionStatusSource,
+} from "./institution-status-shared";
 
 type RegistryCategory = {
   name: string;
@@ -38,8 +43,11 @@ const gtecExploreUrl = `${gtecOrigin}/explore-institutions/`;
 const gtecSourceName = "Ghana Tertiary Education Commission (GTEC) institution directory";
 const ghanaCoverageLimits =
   "This check searches the public GTEC institutions-by-category directory for Ghana only. A missing exact name means only that no match was found in the fetched directory pages; it does not establish that an institution is unrecognized, fraudulent, or invalid. This check does not verify credential authenticity or affect academic mapping or admissions.";
-const unsupportedCoverageLimits =
-  "This implementation checks Ghana through GTEC's public institution directory only. Other jurisdictions are not checked, and no comprehensive worldwide coverage is claimed.";
+const gtecSource: InstitutionStatusSource = {
+  name: gtecSourceName,
+  url: gtecExploreUrl,
+  coverageLimits: ghanaCoverageLimits,
+};
 const cacheDurationMs = 6 * 60 * 60 * 1000;
 const maxCategoryCount = 40;
 const maxPagesPerCategory = 50;
@@ -49,15 +57,6 @@ const registryPageConcurrency = 8;
 let registryCache: RegistrySnapshot | null = null;
 const positiveRecordCache = new Map<string, { record: RegistryRecord; checkedAt: Date }>();
 const pendingRegistryLookups = new Map<string, Promise<RegistryLookup>>();
-
-function normalizeText(value: string): string {
-  return value
-    .normalize("NFKD")
-    .replace(/\p{M}/gu, "")
-    .toLocaleLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim();
-}
 
 function decodeHtmlEntities(value: string): string {
   return value
@@ -461,17 +460,14 @@ function unableResult(
   checkedAt = new Date(),
   supportedGhana = false,
 ): InstitutionStatusResult {
-  return {
-    status: "UNABLE_TO_CHECK",
-    jurisdiction: input.jurisdiction?.trim() || null,
-    sourceName: supportedGhana ? gtecSourceName : null,
-    sourceUrl: supportedGhana ? gtecExploreUrl : null,
-    checkedAt,
-    matchedName: null,
-    registryStatus: null,
+  return createUnableInstitutionStatusResult(
+    input,
     summary,
-    coverageLimits: supportedGhana ? ghanaCoverageLimits : unsupportedCoverageLimits,
-  };
+    supportedGhana
+      ? gtecSource
+      : getAdditionalInstitutionStatusSource(input.jurisdiction),
+    checkedAt,
+  );
 }
 
 export async function checkInstitutionStatus(
@@ -488,6 +484,9 @@ export async function checkInstitutionStatus(
       "The record does not include a jurisdiction, so a registry could not be selected. No institution status was inferred.",
     );
   }
+
+  const additionalResult = await checkAdditionalInstitutionStatus(input, fetcher);
+  if (additionalResult) return additionalResult;
 
   if (!isGhana(jurisdiction)) {
     return unableResult(
@@ -513,24 +512,18 @@ export async function checkInstitutionStatus(
       if (!lookup.snapshot) {
         throw new Error("The GTEC directory check did not produce a complete result.");
       }
-      return {
+      return createInstitutionStatusResult(input, gtecSource, {
         status: "NOT_LISTED",
-        jurisdiction,
-        sourceName: gtecSourceName,
-        sourceUrl: gtecExploreUrl,
         checkedAt: lookup.checkedAt,
         matchedName: null,
         registryStatus: null,
         summary:
           "No exact institution-name match was found in the checked GTEC directory pages. This is not a conclusion about the institution's recognition or legitimacy.",
-        coverageLimits: ghanaCoverageLimits,
-      };
+      });
     }
 
-    return {
+    return createInstitutionStatusResult(input, gtecSource, {
       status: "LISTED",
-      jurisdiction,
-      sourceName: gtecSourceName,
       sourceUrl: matchedRecord.sourceUrl,
       checkedAt: lookup.checkedAt,
       matchedName: matchedRecord.name,
@@ -538,8 +531,7 @@ export async function checkInstitutionStatus(
       summary: matchedRecord.registryStatus
         ? `A matching institution record appears in the GTEC directory. The source's status field reads “${matchedRecord.registryStatus}.”`
         : "A matching institution record appears in the GTEC directory; the source did not provide a status value for this row.",
-      coverageLimits: ghanaCoverageLimits,
-    };
+    });
   } catch {
     return unableResult(
       input,

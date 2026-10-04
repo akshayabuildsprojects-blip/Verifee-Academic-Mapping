@@ -659,7 +659,7 @@ export function downloadVerifeeReportPdf(
     addContextRow(
       'Source',
       institutionStatus.sourceName,
-      'Authoritative source',
+      'Source page',
       institutionStatus.sourceUrl,
     );
   }

@@ -206,7 +206,7 @@ test("does not call a Ghana-only registry for unsupported or missing jurisdictio
   }) as typeof fetch;
 
   const unsupported = await checkInstitutionStatus(
-    { institutionName: "Example University", jurisdiction: "United States" },
+    { institutionName: "Example University", jurisdiction: "Canada" },
     fetcher,
   );
   const missingJurisdiction = await checkInstitutionStatus(
