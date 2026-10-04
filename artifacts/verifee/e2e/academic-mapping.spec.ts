@@ -423,6 +423,34 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("resets scroll between wizard steps but not within a step", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  await openReview(page);
+
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await page.getByTestId("button-continue-target").click();
+  await expect(page).toHaveURL(/\/target$/);
+  await expect(page.getByRole("heading", { name: "Choose what you want to compare against" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+
+  await page.evaluate(() => window.scrollTo(0, 240));
+  const targetScrollBeforeChange = await page.evaluate(() => window.scrollY);
+  expect(targetScrollBeforeChange).toBeGreaterThan(0);
+  const programSelect = page.getByTestId("select-program");
+  const initialProgram = await programSelect.inputValue();
+  await programSelect.selectOption({ index: 1 });
+  await expect(programSelect).not.toHaveValue(initialProgram);
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await page.getByRole("button", { name: "Back to review" }).click();
+  await expect(page).toHaveURL(/\/analysis$/);
+  await expect(page.getByRole("heading", { name: "Verify & review" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+});
+
 test("shows institution and jurisdiction provenance with the exact Scottish source", async ({ page }) => {
   const record = {
     ...academicRecord,

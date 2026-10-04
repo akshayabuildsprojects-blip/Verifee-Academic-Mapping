@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -41,6 +41,7 @@ type InstitutionStatusView = (typeof RunInstitutionStatusCheckResponse)['_output
 
 const queryClient = new QueryClient();
 const wizardSteps = ['Upload Credential', 'Verify & Review', 'Select Target', 'Academic Mapping', 'Verifee Report'];
+const wizardStepPaths = new Set(['/start', '/analysis', '/target', '/report', '/final-report']);
 const verifeeSessionKeys = [
   'verifee-file-name',
   'verifee-file-size',
@@ -378,6 +379,21 @@ function Stepper({ current }: { current: number }) {
       <span className="wizard-marker">{index + 1}</span><span className="wizard-step-label">{step}</span>
     </div>)}
   </nav>;
+}
+function WizardStepScrollReset() {
+  const [location] = useLocation();
+  const path = location.split(/[?#]/, 1)[0].replace(/\/+$/, '') || '/';
+  const previousPath = useRef(path);
+
+  useLayoutEffect(() => {
+    const previous = previousPath.current;
+    previousPath.current = path;
+    if (previous !== path && wizardStepPaths.has(path)) {
+      window.scrollTo(0, 0);
+    }
+  }, [path]);
+
+  return null;
 }
 
 function LanguageDetectionCard({
@@ -1617,19 +1633,22 @@ function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
 }
 function Router() {
-  return <RoutedErrorBoundary><Switch>
-    <Route path="/" component={Landing} />
-    <Route path="/login" component={DemoLoginRoute} />
-    <Route path="/dashboard" component={DemoDashboardRoute} />
-    <Route path="/my-reports" component={DemoReportsRoute} />
-    <Route path="/saved-report/:reportId" component={SavedReportRoute} />
-    <Route path="/start" component={ProtectedUploadStep} />
-    <Route path="/analysis" component={ProtectedReview} />
-    <Route path="/target" component={ProtectedTargetSelection} />
-    <Route path="/report" component={ProtectedReport} />
-    <Route path="/final-report" component={ProtectedFinalReport} />
-    <Route component={NotFound} />
-  </Switch></RoutedErrorBoundary>;
+  return <>
+    <WizardStepScrollReset />
+    <RoutedErrorBoundary><Switch>
+      <Route path="/" component={Landing} />
+      <Route path="/login" component={DemoLoginRoute} />
+      <Route path="/dashboard" component={DemoDashboardRoute} />
+      <Route path="/my-reports" component={DemoReportsRoute} />
+      <Route path="/saved-report/:reportId" component={SavedReportRoute} />
+      <Route path="/start" component={ProtectedUploadStep} />
+      <Route path="/analysis" component={ProtectedReview} />
+      <Route path="/target" component={ProtectedTargetSelection} />
+      <Route path="/report" component={ProtectedReport} />
+      <Route path="/final-report" component={ProtectedFinalReport} />
+      <Route component={NotFound} />
+    </Switch></RoutedErrorBoundary>
+  </>;
 }
 function App() {
   return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>;
