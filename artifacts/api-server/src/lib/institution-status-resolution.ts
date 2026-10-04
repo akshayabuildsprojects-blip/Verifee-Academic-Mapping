@@ -15,7 +15,8 @@ type KnownInstitutionIdentity = {
 };
 
 // These exact aliases are intentionally narrow. Their canonical identities and locations are
-// backed by official source pages: gov.scot/policies/universities,
+// backed by official source pages: strath.ac.uk/contactus/quickcontacts,
+// gov.scot/policies/universities,
 // moe.gov.sg/post-secondary/overview/autonomous-universities/ntu, and gatech.edu.
 const knownInstitutionIdentities: KnownInstitutionIdentity[] = [
   {
@@ -23,6 +24,7 @@ const knownInstitutionIdentities: KnownInstitutionIdentity[] = [
       "University of Strathclyde",
       "The University of Strathclyde",
       "Strathclyde University",
+      "University of Strathclyde, Glasgow",
     ],
     canonicalName: "University of Strathclyde",
     jurisdiction: "Scotland, United Kingdom",
@@ -31,6 +33,12 @@ const knownInstitutionIdentities: KnownInstitutionIdentity[] = [
       "Scotland",
       "Scotland, United Kingdom",
       "Scotland, UK",
+      "Glasgow",
+      "Glasgow, Scotland",
+      "Glasgow, Scotland, United Kingdom",
+      "Glasgow, Scotland, UK",
+      "Glasgow, United Kingdom",
+      "Glasgow, UK",
       "United Kingdom",
       "United Kingdom of Great Britain and Northern Ireland",
       "Great Britain",
@@ -41,6 +49,8 @@ const knownInstitutionIdentities: KnownInstitutionIdentity[] = [
       "Scotland",
       "Scotland, United Kingdom",
       "Scotland, UK",
+      "Glasgow, Scotland, United Kingdom",
+      "Glasgow, Scotland, UK",
     ],
   },
   {

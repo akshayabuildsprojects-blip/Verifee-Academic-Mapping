@@ -386,6 +386,83 @@ test("resolves the University of Strathclyde to Scotland and checks the Scottish
   assert.doesNotMatch(result.sourceName ?? "", /Office for Students|OfS/);
 });
 
+test("resolves the Glasgow-qualified Strathclyde name to the Scottish Government list", async () => {
+  const requested: MockRequest[] = [];
+  const result = await checkInstitutionStatus(
+    { institutionName: "University of Strathclyde, Glasgow", jurisdiction: null },
+    mockFetcher(
+      () => htmlResponse(scottishRecognisedBodiesHtml()),
+      requested,
+    ),
+  );
+
+  assert.equal(result.status, "LISTED");
+  assert.equal(result.statusLabel, "Recognised");
+  assert.equal(result.institutionName, "University of Strathclyde");
+  assert.equal(result.institutionNameSource, "RESOLVED_BY_VERIFEE");
+  assert.equal(result.jurisdiction, "Scotland, United Kingdom");
+  assert.equal(result.jurisdictionSource, "RESOLVED_BY_VERIFEE");
+  assert.equal(result.sourceName, "Scottish Government — Recognised bodies");
+  assert.deepEqual(requested.map(({ url }) => url), [scotlandUrl]);
+  assert.doesNotMatch(result.sourceName ?? "", /Office for Students|OfS/);
+});
+
+test("resolves Glasgow jurisdiction to Scotland for the exact Strathclyde name", async () => {
+  const requested: MockRequest[] = [];
+  const result = await checkInstitutionStatus(
+    { institutionName: "University of Strathclyde", jurisdiction: "Glasgow" },
+    mockFetcher(
+      () => htmlResponse(scottishRecognisedBodiesHtml()),
+      requested,
+    ),
+  );
+
+  assert.equal(result.status, "LISTED");
+  assert.equal(result.statusLabel, "Recognised");
+  assert.equal(result.institutionName, "University of Strathclyde");
+  assert.equal(result.institutionNameSource, "TRANSCRIPT");
+  assert.equal(result.jurisdiction, "Scotland, United Kingdom");
+  assert.equal(result.jurisdictionSource, "RESOLVED_BY_VERIFEE");
+  assert.equal(result.sourceName, "Scottish Government — Recognised bodies");
+  assert.deepEqual(requested.map(({ url }) => url), [scotlandUrl]);
+  assert.doesNotMatch(result.sourceName ?? "", /Office for Students|OfS/);
+});
+
+test("does not resolve a similar Glasgow institution name as Strathclyde", async () => {
+  let requestCount = 0;
+  const result = await checkInstitutionStatus(
+    {
+      institutionName: "University of Strathclyde College, Glasgow",
+      jurisdiction: "Glasgow",
+    },
+    mockFetcher(() => {
+      requestCount += 1;
+      return htmlResponse(scottishRecognisedBodiesHtml());
+    }),
+  );
+
+  assert.equal(result.status, "UNABLE_TO_CHECK");
+  assert.equal(result.institutionName, "University of Strathclyde College, Glasgow");
+  assert.equal(result.jurisdiction, "Glasgow");
+  assert.equal(result.sourceName, null);
+  assert.equal(requestCount, 0);
+});
+
+test("preserves transcript provenance for a fully specified Glasgow jurisdiction", async () => {
+  const result = await checkInstitutionStatus(
+    {
+      institutionName: "University of Strathclyde",
+      jurisdiction: "Glasgow, Scotland, United Kingdom",
+    },
+    mockFetcher(() => htmlResponse(scottishRecognisedBodiesHtml())),
+  );
+
+  assert.equal(result.status, "LISTED");
+  assert.equal(result.jurisdiction, "Scotland, United Kingdom");
+  assert.equal(result.jurisdictionSource, "TRANSCRIPT");
+  assert.equal(result.sourceName, "Scottish Government — Recognised bodies");
+});
+
 test("resolves a broad United Kingdom transcript jurisdiction to Scotland for Strathclyde", async () => {
   const requested: MockRequest[] = [];
   const result = await checkInstitutionStatus(

@@ -428,15 +428,15 @@ test("shows institution and jurisdiction provenance with the exact Scottish sour
     ...academicRecord,
     institution: {
       ...academicRecord.institution,
-      name: "University of Strathclyde",
-      country: "United Kingdom",
+      name: "University of Strathclyde, Glasgow",
+      country: "Glasgow",
     },
   };
   const status = {
     ...institutionStatus,
     statusLabel: "Recognised",
     institutionName: "University of Strathclyde",
-    institutionNameSource: "TRANSCRIPT",
+    institutionNameSource: "RESOLVED_BY_VERIFEE",
     jurisdiction: "Scotland, United Kingdom",
     jurisdictionSource: "RESOLVED_BY_VERIFEE",
     sourceName: "Scottish Government — Recognised bodies",
@@ -452,7 +452,7 @@ test("shows institution and jurisdiction provenance with the exact Scottish sour
   await expect(page.getByTestId("status-institution-registry")).toHaveText("Recognised");
   await expect(card).toContainText("University of Strathclyde");
   await expect(card).toContainText("Institution source");
-  await expect(card).toContainText("Transcript");
+  await expect(card).toContainText("Resolved by Verifee");
   await expect(card).toContainText("Scotland, United Kingdom");
   await expect(card).toContainText("Jurisdiction source");
   await expect(card).toContainText("Resolved by Verifee");
