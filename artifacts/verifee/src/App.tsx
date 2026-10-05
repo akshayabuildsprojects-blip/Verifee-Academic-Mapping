@@ -147,6 +147,10 @@ function isPdfFile(file: File) {
   return file.name.toLowerCase().endsWith('.pdf');
 }
 
+function isVerifeeReportError(message: string) {
+  return /this is a verifee report, not an academic transcript/i.test(message);
+}
+
 function readAcademicRecord(): AcademicRecord | null {
   const serialized = sessionStorage.getItem('verifee-extracted-record');
   if (!serialized) return null;
@@ -567,7 +571,7 @@ function UploadStep() {
        {error && <div className="error-message" role="alert" data-testid="status-upload-error">{error}</div>}
        {languageDetection && <LanguageDetectionCard detection={languageDetection} compact />}
        <button className="cta" type="button" onClick={() => void submit()} disabled={!file || busy || Boolean(duplicateReportId && !continueWithDuplicate)} data-testid="button-continue-upload"><span>{busy ? file && isPdfFile(file) ? 'Reading transcript…' : 'Preparing sample record…' : 'Continue to verify & review'}</span>{busy ? <LoaderCircle size={16} className="animate-spin" /> : <ArrowRight size={16} />}</button>
-      {file && isPdfFile(file) && error && <button className="secondary-btn" type="button" onClick={() => void continueWithDemo()} disabled={busy} data-testid="button-use-demo-fallback">Continue with demo sample instead</button>}
+      {file && isPdfFile(file) && error && !isVerifeeReportError(error) && <button className="secondary-btn" type="button" onClick={() => void continueWithDemo()} disabled={busy} data-testid="button-use-demo-fallback">Continue with demo sample instead</button>}
       {hasSavedAnalysis && !file && <button className="secondary-btn resume-analysis" type="button" onClick={() => setLocation('/analysis')} data-testid="button-resume-analysis"><ArrowRight size={14} /> Continue saved analysis · {savedFileName}</button>}
     </section>
     <Disclaimer />

@@ -80,6 +80,33 @@ test("transcript extraction gates on English and requests English-only fields", 
   const baseUrl = await listen(server);
 
   try {
+    const modelRequestsBeforeReportChecks = transcriptModelRequests.length;
+    const generatedReports = [
+      [
+        "VERIFEE / PRELIMINARY ACADEMIC MAPPING REPORT",
+        "Preliminary Academic Mapping Report",
+        "REPORT ID VF-ABCD1234",
+      ],
+      [
+        "VERIFEE",
+        "REPORT RECEIPT",
+        "Receipt for a Verifee preliminary academic mapping report.",
+        "Report ID VF-ABCD1234",
+      ],
+    ];
+    for (const reportLines of generatedReports) {
+      const reportResponse = await submitPdf(
+        baseUrl,
+        makeSyntheticPdf(reportLines),
+      );
+      assert.equal(reportResponse.status, 422);
+      assert.deepEqual(await reportResponse.json(), {
+        error:
+          "This is a Verifee report, not an academic transcript. Upload the original academic transcript PDF.",
+      });
+    }
+    assert.equal(transcriptModelRequests.length, modelRequestsBeforeReportChecks);
+
     const englishPdf = makeSyntheticPdf([
       "Academic transcript",
       "Institution: Northbridge University",

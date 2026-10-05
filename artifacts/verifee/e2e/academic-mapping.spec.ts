@@ -553,6 +553,33 @@ test("shows an uncertain language result when transcript extraction is blocked",
   ).toBeNull();
 });
 
+test("rejects a Verifee report uploaded as a transcript", async ({ page }) => {
+  await page.route("**/api/academic-transcripts/extract", async (route) => {
+    await route.fulfill({
+      status: 422,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error:
+          "This is a Verifee report, not an academic transcript. Upload the original academic transcript PDF.",
+      }),
+    });
+  });
+
+  await page.goto("/start");
+  await page.getByTestId("input-credential").setInputFiles({
+    name: "Verifee_Report.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.4\n"),
+  });
+  await page.getByTestId("button-continue-upload").click();
+
+  await expect(page.getByTestId("status-upload-error")).toContainText(
+    "This is a Verifee report, not an academic transcript.",
+  );
+  await expect(page.getByTestId("button-use-demo-fallback")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/start$/);
+});
+
 test("explains when no readable English is detected", async ({ page }) => {
   await page.route("**/api/academic-transcripts/extract", async (route) => {
     await route.fulfill({

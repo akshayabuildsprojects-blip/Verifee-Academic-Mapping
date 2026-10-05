@@ -65,6 +65,14 @@ router.post(
       res.json(ExtractAcademicTranscriptResponse.parse(extraction));
     } catch (error) {
       if (error instanceof TranscriptExtractionError) {
+        if (error.code === "verifee-report") {
+          res.status(422).json({
+            error:
+              "This is a Verifee report, not an academic transcript. Upload the original academic transcript PDF.",
+          });
+          return;
+        }
+
         if (
           error.code === "uncertain-language" ||
           error.code === "no-english" ||
