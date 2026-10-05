@@ -1,0 +1,72 @@
+Mission 6: Brand Identity & Product Experience
+Mission Objective: Make the Product Clear, Trustworthy, and Memorable
+Give the working product a recognizable identity inside the experience customers actually use, then begin the pitch deck that tells the same truthful story. Keep the original brand identity, visual direction, and short story work, but let customer friction determine which part of the product to improve first. The “cool factor” is a useful product moment that helps a person understand, act, or see a meaningful result—not decoration over a broken task.
+Due: October 5, 2026 by 11:59 p.m. Eastern Time.
+Mission points: 175. Points are added to the leaderboard after staff review and approval.
+Submit this mission: ATL Cup 2026 submission page. Upload one completed packet file with your team name and mission title.
+By rigorously testing and iterating on your high-fidelity prototype, you're ensuring that your product decisions are grounded in real user data and behavior.
+"The most dangerous phrase in the language is, 'We've always done it this way.'"
+— Grace Hopper
+Deliverable: Product Experience Revision & Deck Draft
+Develop Brand Style Guidelines
+Brand Identity Statement
+Brand personality (3–5 adjectives)
+Brand values
+Tone of voice
+Visual Style Snapshot
+Logo concept or wordmark
+Colors (primary + secondary palette)
+Brand Story Draft
+2–3 sentences that explain who you are, what you stand for, and why it matters
+Action Items:
+Part 1: Brand Identity Statement
+Brand Personality (3–5 adjectives): _______________________
+Core Values (what you stand for): _______________________
+Tone of Voice (how you sound): _______________________
+Part 2: Visual Style Snapshot
+Logo Concept / Wordmark (sketch or draft): _______________________
+Colors (Primary + Secondary Palette): _______________________
+Typography Choices: _______________________
+Moodboard (3–5 sample images that capture the vibe): _______________________
+Part 3: Brand Story Draft
+In 2–3 sentences: Who are you, what do you stand for, and why does it matter to your users?
+→ _________________________________________________________
+Part 4: Rapid Testing Checklist
+✅ Share your top 2–3 logo/color directions with 5–10 users.
+✅ Ask: “Which feels most trustworthy? Which feels most exciting?”
+✅ Capture their words — they’ll guide refinements.
+💡 AI Prompt Suggestions
+“Act as a brand strategist. Suggest 5 brand personality adjectives and a 3-sentence brand story for [venture idea] targeting [audience].”
+“Generate 3 color palettes that align with a brand personality that is [adjective 1], [adjective 2], and [adjective 3].”
+“Suggest font pairings that match a brand voice that is [tone descriptors].”
+“Create a logo concept that combines [keyword 1] and [keyword 2] in a modern, simple way.”
+⚡ AI Tools & Tactics for Acceleration
+🗣 Verbal Identity (Story + Tone)
+ChatGPT: Draft brand personality words, tone of voice, and your 2–3 sentence story.
+Prompt: “Act as a brand strategist. Suggest 5 brand personality adjectives and write a 3-sentence brand story for a [venture idea] targeting [audience].” - This is where you can enter your content & context about your company, i.e. Mission 2 & 3!
+🎨 Visual Identity (Colors, Fonts, Moodboard)
+Coolors.co / Khroma: Generate color palettes from keywords.
+Looka / Hatchful by Shopify: Fast AI logo drafts to spark direction.
+Canva AI / Adobe Firefly: Create moodboards or mock visuals from text prompts.
+Prompt: “Generate a moodboard that captures a brand identity that is [adjective 1], [adjective 2], and [adjective 3]. Include colors and design elements.”
+🧪 Rapid Testing
+UsabilityHub / Maze: Quick A/B testing of logos, colors, or taglines with real users.
+MidJourney / DALL·E: Create concept art or mock marketing visuals to see how your brand “shows up” in the world.
+Pro Tips:
+Anchor in Emotion: If your persona feels “stressed,” your brand should feel “relieving.”
+Design for Versatility: Pick colors and fonts that work on app screens, decks, and social media.
+One-Liner Test: If you had 5 seconds on stage, could your brand story line land clearly?
+Consistency is King: Every element (logo, copy, visuals) should feel like they belong in the same family.
+Example:
+Customers hesitate because they cannot tell whether the AI result is final. The team labels it “AI draft,” explains it plainly, and adds visible edit and approve controls using the chosen brand voice and visual system. A permitted customer or first-time tester attempts the revised task. The team reports what happened and uses that before/after interaction in its deck draft, without claiming a universal improvement from one attempt.
+Resources:
+Original packet resources (carried forward):
+Optimizely for A/B testing implementation.
+UserTesting for qualitative user feedback.
+Hotjar for heatmaps and session recordings.
+Figma for rapid design iteration.
+Google Analytics for user-behavior measurement.
+The A/B Testing Manual by Khalid Saleh and Ayat Shukairy.
+Mixpanel for product analytics.
+2026 addition: FACTS: A Critical Thinking Model for AI.
+These tools are optional references, not required accounts or permission to collect customer data. Use recording or analytics only when approved and with appropriate notice and consent.
