@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import verifeeLogo from '../assets/verifee-logo.png?inline';
 import type {
   GeneratedReportMetadata,
   VerifeeReportContextField,
@@ -128,7 +129,8 @@ export function downloadVerifeeReportPdf(
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     setColor(palette.green);
-    doc.text('VERIFEE  /  PRELIMINARY ACADEMIC MAPPING REPORT', margin, 39);
+    doc.addImage(verifeeLogo, 'PNG', margin, 26, 49, 14.24);
+    doc.text('PRELIMINARY ACADEMIC MAPPING REPORT', margin + 57, 39);
     doc.setDrawColor(...palette.line);
     doc.setLineWidth(0.7);
     doc.line(margin, 49, right, 49);
@@ -238,10 +240,7 @@ export function downloadVerifeeReportPdf(
     doc.setFillColor(...palette.green);
     doc.rect(0, 0, 17, pageHeight, 'F');
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    setColor(palette.green);
-    doc.text('VERIFEE', margin, 64);
+    doc.addImage(verifeeLogo, 'PNG', margin, 31, 116, 33.73);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
     setColor(palette.muted);
@@ -826,10 +825,7 @@ export function downloadVerifeeSubmissionReceiptPdf(
   doc.setFillColor(...palette.green);
   doc.rect(0, 0, 17, pageHeight, 'F');
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(...palette.green);
-  doc.text('VERIFEE', margin, 64);
+  doc.addImage(verifeeLogo, 'PNG', margin, 31, 116, 33.73);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...palette.muted);

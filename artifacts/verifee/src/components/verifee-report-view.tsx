@@ -2,13 +2,13 @@ import {
   ArrowDownToLine,
   ArrowLeft,
   ArrowRight,
-  BookOpen,
   Check,
   ExternalLink,
   FileText,
   Landmark,
   ShieldCheck,
 } from 'lucide-react';
+import verifeeLogo from '@/assets/verifee-logo.png?inline';
 import {
   VERIFEE_REPORT_DISCLAIMER,
   type GeneratedReportMetadata,
@@ -312,7 +312,7 @@ export function VerifeeReportView({
 
               <article className="v-report-cover" aria-label="Report cover page">
                 <div className="v-report-cover-top">
-                  <span className="v-report-wordmark"><span className="v-report-brand-mark"><BookOpen size={16} aria-hidden="true" /></span> verifee</span>
+                  <img className="v-report-logo" src={verifeeLogo} alt="Verifee" />
                   <span>ACADEMIC INTERPRETATION</span>
                 </div>
                 <div className="v-report-cover-content">

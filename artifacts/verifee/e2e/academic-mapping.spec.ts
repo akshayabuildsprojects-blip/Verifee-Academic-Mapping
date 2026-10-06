@@ -889,6 +889,11 @@ test("shows the report preview immediately and keeps its downloads, save choices
   await page.getByTestId("button-open-verifee-report").click();
   await expect(page).toHaveURL(/\/final-report$/);
   await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
+  await expect(
+    page
+      .getByRole("article", { name: "Report cover page" })
+      .getByRole("img", { name: "Verifee" }),
+  ).toBeVisible();
   await expect(page.getByText("Your preliminary academic mapping report is ready to review or download.")).toBeVisible();
   await expect(page.getByTestId("button-generate-report")).toHaveCount(0);
   await expect(page.getByTestId("button-save-to-my-reports")).toBeVisible();
@@ -937,6 +942,7 @@ test("shows the report preview immediately and keeps its downloads, save choices
   const pdf = await readFile(downloadPath!);
   expect(pdf.subarray(0, 5).toString("ascii")).toBe("%PDF-");
   const pdfContents = pdf.toString("latin1");
+  expect(pdfContents).toMatch(/\/Subtype\s*\/Image/);
   expect(pdfContents).toContain("Preliminary Academic");
   expect(pdfContents).toContain("Final academic and admissions decisions");
   expect(pdfContents).toContain("https://catalog.example.edu/courses/math-101");
@@ -955,6 +961,7 @@ test("shows the report preview immediately and keeps its downloads, save choices
   const receiptPdf = await readFile(receiptPath!);
   expect(receiptPdf.subarray(0, 5).toString("ascii")).toBe("%PDF-");
   const receiptContents = receiptPdf.toString("latin1");
+  expect(receiptContents).toMatch(/\/Subtype\s*\/Image/);
   expect(receiptContents).toContain("Student report generated");
   expect(receiptContents).toContain("Ready for submission");
   expect(receiptContents).toContain("Not sent");
