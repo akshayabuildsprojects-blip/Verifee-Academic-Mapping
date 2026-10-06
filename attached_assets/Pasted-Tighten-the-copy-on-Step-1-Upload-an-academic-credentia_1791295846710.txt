@@ -1,0 +1,129 @@
+Tighten the copy on Step 1: Upload an academic credential.
+
+IMPORTANT:
+Do not redesign the page.
+Do not change layout, spacing, colors, cards, upload behavior, supported formats, file limits, extraction logic, demo behavior, or navigation.
+
+Only reduce and simplify the visible copy.
+
+GOAL
+
+Make the page feel fast, clear, and confident.
+
+The user’s job on this page is only:
+1. understand what they can upload;
+2. upload it;
+3. continue.
+
+Remove implementation-detail copy from the default view. Move failure-specific explanations into error states rather than showing them before upload.
+
+--------------------------------------------------
+REPLACE THE INTRO COPY
+--------------------------------------------------
+
+Current copy is too long.
+
+Replace it with:
+
+"Upload a transcript or supported digital credential to begin."
+
+--------------------------------------------------
+FORMAT CARDS
+--------------------------------------------------
+
+Use:
+
+PDF
+Academic transcript extraction
+
+OpenCerts .opencert
+Demo support
+
+European Digital Credential .jsonld
+Demo support
+
+Do not add long explanations under these cards.
+
+--------------------------------------------------
+UPLOAD AREA
+--------------------------------------------------
+
+Keep:
+
+"Drop your credential here or browse files"
+
+Supporting line:
+
+"PDF, .opencert, or .jsonld · Max 20 MB"
+
+--------------------------------------------------
+REMOVE FROM DEFAULT PAGE
+--------------------------------------------------
+
+Remove default-page explanations about:
+
+- checking languages first
+- extracting readable English text only
+- omitting non-English words
+- Latin-letter language caveats
+- short-word/name detection uncertainty
+- low-quality-scan language-detection caveats
+- sample-data demo-path explanations
+- detailed AI-service implementation wording
+- the separate long "Current scope" box
+
+These are not needed before the user uploads anything.
+
+--------------------------------------------------
+KEEP ONE SHORT PRIVACY / LIMITS NOTE
+--------------------------------------------------
+
+Replace the existing long explanatory text below the upload area with:
+
+"PDFs are used for academic extraction only and are not authenticated. Your extracted academic record is kept in the current browser session."
+
+Keep this visually secondary.
+
+--------------------------------------------------
+ERROR-STATE COPY
+--------------------------------------------------
+
+Do not delete the underlying language/error logic.
+
+Only show language/extraction details when they become relevant.
+
+If Verifee cannot extract enough readable English text, show:
+
+"We couldn’t extract enough readable English text from this document."
+
+Then offer:
+
+"Try another file"
+"Continue with demo sample"
+
+If detection is uncertain, show the caveat there rather than on the default upload screen.
+
+--------------------------------------------------
+CTA
+--------------------------------------------------
+
+Keep:
+
+"Continue to Verify & Review"
+
+Do not change the workflow.
+
+--------------------------------------------------
+FINAL CHECK
+--------------------------------------------------
+
+After the change, the initial upload page should contain only:
+
+- page title
+- one-sentence intro
+- three concise format cards
+- upload box
+- one short privacy/verification note
+- continue button
+
+Do not add new explanatory sections.

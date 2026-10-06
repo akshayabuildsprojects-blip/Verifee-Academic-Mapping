@@ -423,6 +423,7 @@ function LanguageDetectionCard({
     : detection.status === 'NO_ENGLISH'
       ? 'Academic extraction was not performed because readable English was not found.'
       : 'Academic extraction was not performed because the language check could not confidently identify readable English.';
+  const compactExplanation = compact && detection.status === 'NO_ENGLISH' ? '' : explanation;
 
   return <div
     className={`language-detection-card ${compact ? 'compact' : ''} ${detection.status.toLowerCase().replaceAll('_', '-')}`}
@@ -434,7 +435,7 @@ function LanguageDetectionCard({
       <strong>{statusLabel}</strong>
       <span className={`status-pill ${statusTone}`}>{confidenceLabel}</span>
     </div>
-    <p>{explanation}</p>
+    {compactExplanation && <p>{compactExplanation}</p>}
     {detection.languages.length > 0
       ? <ul className="language-detection-list" aria-label="Detected languages and writing systems">
           {detection.languages.map(({ language, script }, index) => <li key={`${language}-${script}-${index}`}>
@@ -549,29 +550,35 @@ function UploadStep() {
       setBusy(false);
     }
   };
+  const visibleError = languageDetection?.status === 'NO_ENGLISH'
+    ? 'We couldn’t extract enough readable English text from this document.'
+    : error;
+  const canTryAnotherFile = Boolean(
+    file && isPdfFile(file) && error && languageDetection && !isVerifeeReportError(error),
+  );
   return <div className="shell"><Header /><main className="page-wrap wizard-wrap">
     <Stepper current={1} />
     <section className="wizard-card">
       <div className="eyebrow">Step 1 of 5</div>
       <h1 className="wizard-title">Upload an academic credential</h1>
-      <p className="wizard-intro">Upload a transcript PDF. Verifee checks its languages first, then extracts readable English text only; non-English words are omitted, including those written in Latin letters. If no readable English is found, extraction will not run. Detection can be uncertain for short words, names, and low-quality scans. Other accepted formats continue through the sample-data demo path.</p>
+      <p className="wizard-intro">Upload a transcript or supported digital credential to begin.</p>
       <div className="format-grid" aria-label="Accepted credential formats">
-        <div className="format-option"><span className="format-name">PDF</span><span>AI academic extraction for Step 2</span></div>
-        <div className="format-option"><span className="format-name">OpenCerts <span className="format-ext">.opencert</span></span><span>Sample-data demo only; not verified</span></div>
-        <div className="format-option"><span className="format-name">European Digital Credential <span className="format-ext">.jsonld</span></span><span>Sample-data demo only; not verified</span></div>
+        <div className="format-option"><span className="format-name">PDF</span><span>Academic transcript extraction</span></div>
+        <div className="format-option"><span className="format-name">OpenCerts <span className="format-ext">.opencert</span></span><span>Demo support</span></div>
+        <div className="format-option"><span className="format-name">European Digital Credential <span className="format-ext">.jsonld</span></span><span>Demo support</span></div>
       </div>
       <div className={`dropzone wizard-dropzone ${drag ? 'drag' : ''}`} onDragOver={(event) => { event.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={(event) => { event.preventDefault(); setDrag(false); chooseFile(event.dataTransfer.files[0]); }} onClick={() => inputRef.current?.click()} role="button" tabIndex={0} aria-label="Choose a credential file" onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') inputRef.current?.click(); }} data-testid="dropzone-credential">
-        <div><span className="upload-icon"><Upload size={19} /></span><p className="drop-title">{file ? 'Credential selected' : 'Drop your credential here or'} {!file && <button className="browse" type="button" onClick={(event) => { event.stopPropagation(); inputRef.current?.click(); }}>browse files</button>}</p><p className="drop-hint">{file ? `${formatForFileName(file.name)} · ${(file.size / (1024 * 1024)).toFixed(2)} MB` : 'PDF, .opencert, or .jsonld · 20 MB maximum'}</p></div>
+        <div><span className="upload-icon"><Upload size={19} /></span><p className="drop-title">{file ? 'Credential selected' : 'Drop your credential here or'} {!file && <button className="browse" type="button" onClick={(event) => { event.stopPropagation(); inputRef.current?.click(); }}>browse files</button>}</p><p className="drop-hint">{file ? `${formatForFileName(file.name)} · ${(file.size / (1024 * 1024)).toFixed(2)} MB` : 'PDF, .opencert, or .jsonld · Max 20 MB'}</p></div>
       </div>
       <input ref={inputRef} className="file-control" type="file" accept=".pdf,.opencert,.jsonld,application/pdf,application/ld+json" aria-label="Choose a credential file" data-testid="input-credential" onChange={(event) => chooseFile(event.currentTarget.files?.[0])} />
        {file && <div className="file-chip" data-testid="text-selected-file"><div className="chip-file"><FileText size={17} color="#55766c" /><div><strong>{file.name}</strong><div className="file-meta">{(file.size / (1024 * 1024)).toFixed(2)} MB · {formatForFileName(file.name)}</div></div></div><button className="remove-file" aria-label="Remove selected file" data-testid="button-remove-file" onClick={() => { setFile(null); setError(''); setLanguageDetection(null); setDuplicateReportId(null); setContinueWithDuplicate(false); if (inputRef.current) inputRef.current.value = ''; }}><X size={16} /></button></div>}
        {duplicateReportId && <div className="demo-duplicate-upload" role="alert" data-testid="status-duplicate-upload"><div><strong>This file was used for a report saved in this demo session.</strong><p>Open that report, or continue with this file to create a new mapping.</p></div><div className="demo-duplicate-actions"><button className="secondary-btn" type="button" onClick={() => setLocation(`/saved-report/${encodeURIComponent(duplicateReportId)}`)} data-testid="button-view-duplicate-report">View Existing Report</button><button className="secondary-btn" type="button" onClick={() => setContinueWithDuplicate(true)} disabled={continueWithDuplicate} data-testid="button-continue-duplicate-upload">{continueWithDuplicate ? 'Continuing anyway' : 'Continue Anyway'}</button></div></div>}
-      <p className="upload-note">PDF contents are sent to the configured AI service for academic extraction. The extracted record is kept in this browser session; mapping sends only that academic JSON, not the PDF. Reading a PDF does not verify that it is authentic. OpenCerts and JSON-LD are not verified in this version.</p>
-      <div className="demo-disclosure"><strong>Current scope:</strong> PDF extraction and preliminary mapping use the academic details extracted from your transcript. If extraction fails, you can explicitly continue with the synthetic demo sample instead.</div>
-       {error && <div className="error-message" role="alert" data-testid="status-upload-error">{error}</div>}
+      <p className="upload-note">PDFs are used for academic extraction only and are not authenticated. Your extracted academic record is kept in the current browser session.</p>
+        {error && <div className="error-message" role="alert" data-testid="status-upload-error">{visibleError}</div>}
        {languageDetection && <LanguageDetectionCard detection={languageDetection} compact />}
-       <button className="cta" type="button" onClick={() => void submit()} disabled={!file || busy || Boolean(duplicateReportId && !continueWithDuplicate)} data-testid="button-continue-upload"><span>{busy ? file && isPdfFile(file) ? 'Reading transcript…' : 'Preparing sample record…' : 'Continue to verify & review'}</span>{busy ? <LoaderCircle size={16} className="animate-spin" /> : <ArrowRight size={16} />}</button>
-      {file && isPdfFile(file) && error && !isVerifeeReportError(error) && <button className="secondary-btn" type="button" onClick={() => void continueWithDemo()} disabled={busy} data-testid="button-use-demo-fallback">Continue with demo sample instead</button>}
+        <button className="cta" type="button" onClick={() => void submit()} disabled={!file || busy || Boolean(duplicateReportId && !continueWithDuplicate)} data-testid="button-continue-upload"><span>{busy ? file && isPdfFile(file) ? 'Reading transcript…' : 'Preparing sample record…' : 'Continue to Verify & Review'}</span>{busy ? <LoaderCircle size={16} className="animate-spin" /> : <ArrowRight size={16} />}</button>
+      {canTryAnotherFile && <button className="secondary-btn" type="button" onClick={() => inputRef.current?.click()} data-testid="button-try-another-file">Try another file</button>}
+      {file && isPdfFile(file) && error && !isVerifeeReportError(error) && <button className="secondary-btn" type="button" onClick={() => void continueWithDemo()} disabled={busy} data-testid="button-use-demo-fallback">Continue with demo sample</button>}
       {hasSavedAnalysis && !file && <button className="secondary-btn resume-analysis" type="button" onClick={() => setLocation('/analysis')} data-testid="button-resume-analysis"><ArrowRight size={14} /> Continue saved analysis · {savedFileName}</button>}
     </section>
     <Disclaimer />

@@ -423,6 +423,33 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
+test("keeps the Step 1 upload copy concise", async ({ page }) => {
+  await page.goto("/start");
+
+  await expect(page.getByRole("heading", { name: "Upload an academic credential" })).toBeVisible();
+  await expect(
+    page.getByText("Upload a transcript or supported digital credential to begin.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Drop your credential here or browse files", { exact: true })).toBeVisible();
+  await expect(page.getByText("PDF, .opencert, or .jsonld · Max 20 MB", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(
+      "PDFs are used for academic extraction only and are not authenticated. Your extracted academic record is kept in the current browser session.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(page.locator(".format-option")).toHaveCount(3);
+  await expect(page.locator(".format-option").nth(0)).toContainText("PDF");
+  await expect(page.locator(".format-option").nth(0)).toContainText("Academic transcript extraction");
+  await expect(page.locator(".format-option").nth(1)).toContainText("OpenCerts .opencert");
+  await expect(page.locator(".format-option").nth(1)).toContainText("Demo support");
+  await expect(page.locator(".format-option").nth(2)).toContainText("European Digital Credential .jsonld");
+  await expect(page.locator(".format-option").nth(2)).toContainText("Demo support");
+  await expect(page.getByRole("button", { name: "Continue to Verify & Review" })).toBeVisible();
+  await expect(page.locator(".demo-disclosure")).toHaveCount(0);
+  await expect(page.getByTestId("language-detection-upload")).toHaveCount(0);
+});
+
 test("resets scroll between wizard steps but not within a step", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 600 });
   await openReview(page);
@@ -613,9 +640,12 @@ test("explains when no readable English is detected", async ({ page }) => {
   await expect(summary).toContainText("High confidence");
   await expect(summary).toContainText("Spanish");
   await expect(summary).toContainText("Script: Latin");
-  await expect(summary).toContainText(
-    "Academic extraction was not performed because readable English was not found.",
+  await expect(summary).not.toContainText("Academic extraction was not performed");
+  await expect(page.getByTestId("status-upload-error")).toHaveText(
+    "We couldn’t extract enough readable English text from this document.",
   );
+  await expect(page.getByTestId("button-try-another-file")).toHaveText("Try another file");
+  await expect(page.getByTestId("button-use-demo-fallback")).toHaveText("Continue with demo sample");
   expect(
     await page.evaluate(() => sessionStorage.getItem("verifee-language-detection")),
   ).toBeNull();
