@@ -94,12 +94,17 @@ function scottishRecognisedBodiesHtml(): string {
     </body></html>`;
 }
 
-function dapipRecord(name: string, unitId: number) {
+function dapipRecord(
+  name: string,
+  unitId: number,
+  options: { opeID?: string; additionalLocations?: unknown[] } = {},
+) {
   return {
     unitid: unitId,
     institutionName: name,
     activeStatus: "Active",
-    additionalLocations: [],
+    opeID: options.opeID ?? null,
+    additionalLocations: options.additionalLocations ?? [],
   };
 }
 
@@ -123,6 +128,82 @@ test("checks exact U.S. DAPIP matches and preserves the source active status", a
   assert.match(result.sourceUrl ?? "", /#\/institution-profile\/12345$/);
   assert.match(result.coverageLimits, /inaccurate, outdated, or incomplete/);
   assert.equal(requested.length, 1);
+});
+
+test("selects the unique exact-name DAPIP record with an OPE ID", async () => {
+  const result = await checkInstitutionStatus(
+    { institutionName: "Wayne State University", jurisdiction: "United States" },
+    mockFetcher(() =>
+      jsonResponse(
+        dapipPage(
+          1,
+          [
+            dapipRecord("Wayne State University", 123323, {
+              opeID: "00232900",
+            }),
+            dapipRecord("Wayne State University", 257499),
+          ],
+          [123323, 257499],
+          "Wayne State University",
+        ),
+      ),
+    ),
+  );
+
+  assert.equal(result.status, "LISTED");
+  assert.equal(result.matchedName, "Wayne State University");
+  assert.match(result.registryStatus ?? "", /OPE ID: 00232900/);
+  assert.match(result.summary, /multiple exact-name records/);
+  assert.match(result.summary, /only exact-name record with an OPE ID/);
+  assert.match(result.sourceUrl ?? "", /#\/institution-profile\/123323$/);
+});
+
+test("keeps DAPIP matches ambiguous when multiple exact-name records have OPE IDs", async () => {
+  const result = await checkInstitutionStatus(
+    { institutionName: "Example University", jurisdiction: "United States" },
+    mockFetcher(() =>
+      jsonResponse(
+        dapipPage(1, [
+          dapipRecord("Example University", 12345, { opeID: "00123400" }),
+          dapipRecord("Example University", 67890, { opeID: "00567800" }),
+        ]),
+      ),
+    ),
+  );
+
+  assert.equal(result.status, "UNABLE_TO_CHECK");
+  assert.equal(result.matchedName, null);
+  assert.match(result.summary, /2 exact-name records/);
+  assert.match(result.summary, /no source-supported/);
+});
+
+test("selects a DAPIP institution when other exact-name matches are explicitly its locations", async () => {
+  const result = await checkInstitutionStatus(
+    { institutionName: "Example University", jurisdiction: "United States" },
+    mockFetcher(() =>
+      jsonResponse(
+        dapipPage(
+          1,
+          [
+            dapipRecord("Example University", 12345, {
+              additionalLocations: [
+                {
+                  unitid: 12345001,
+                  institutionName: "Example University",
+                  activeStatus: "Active",
+                },
+              ],
+            }),
+          ],
+          [12345, 12345001],
+        ),
+      ),
+    ),
+  );
+
+  assert.equal(result.status, "LISTED");
+  assert.match(result.summary, /explicitly affiliated additional location/);
+  assert.match(result.sourceUrl ?? "", /#\/institution-profile\/12345$/);
 });
 
 test("reports a U.S. miss only after the complete DAPIP result page is read", async () => {
@@ -211,6 +292,31 @@ test("keeps an incomplete UGC directory response as unable to check", async () =
   assert.equal(result.sourceName?.includes("University Grants Commission"), true);
 });
 
+test("keeps distinct exact-name UGC records ambiguous", async () => {
+  const result = await checkInstitutionStatus(
+    { institutionName: "Example University", jurisdiction: "India" },
+    mockFetcher(() =>
+      jsonResponse({
+        m: "Data filled.",
+        c: "success",
+        List: [
+          ...completeUgcList,
+          {
+            ID: "5",
+            uni_name: "Example University",
+            uni_type: "Private",
+            status: "2(f)",
+          },
+        ],
+      }),
+    ),
+  );
+
+  assert.equal(result.status, "UNABLE_TO_CHECK");
+  assert.equal(result.matchedName, null);
+  assert.match(result.summary, /multiple exact-name records/);
+});
+
 function singaporeRecord(name: string) {
   return {
     pei_id: "6",
@@ -245,6 +351,31 @@ test("checks Singapore's registered PEI listing and published record fields", as
   assert.match(result.registryStatus ?? "", /200606974C/);
   assert.match(result.registryStatus ?? "", /validity end date/);
   assert.match(result.coverageLimits, /autonomous universities/);
+});
+
+test("keeps distinct exact-name Singapore PEI records ambiguous", async () => {
+  const first = singaporeRecord("Example PEI");
+  const result = await checkInstitutionStatus(
+    { institutionName: "Example PEI", jurisdiction: "Singapore" },
+    mockFetcher(() =>
+      jsonResponse({
+        pages: "1",
+        totalItemsCount: "2",
+        list: [
+          first,
+          {
+            ...first,
+            pei_id: "7",
+            reg_no: "201234567A",
+          },
+        ],
+      }),
+    ),
+  );
+
+  assert.equal(result.status, "UNABLE_TO_CHECK");
+  assert.equal(result.matchedName, null);
+  assert.match(result.summary, /multiple exact-name PEI records/);
 });
 
 test("reports a Singapore PEI miss only after a valid empty search response", async () => {
@@ -384,6 +515,35 @@ test("resolves the University of Strathclyde to Scotland and checks the Scottish
   assert.match(result.coverageLimits, /Scottish Government/);
   assert.deepEqual(requested.map((request) => request.url), [scotlandUrl]);
   assert.doesNotMatch(result.sourceName ?? "", /Office for Students|OfS/);
+});
+
+test("keeps a duplicated exact-name Scottish listing ambiguous", async () => {
+  const duplicateNameHtml = scottishRecognisedBodiesHtml().replace(
+    "</ul>",
+    `<li><a href="https://example.gov.scot/duplicate">University of Strathclyde</a></li></ul>`,
+  );
+  const result = await checkInstitutionStatus(
+    { institutionName: "University of Strathclyde", jurisdiction: "Scotland" },
+    mockFetcher(() => htmlResponse(duplicateNameHtml)),
+  );
+
+  assert.equal(result.status, "UNABLE_TO_CHECK");
+  assert.equal(result.matchedName, null);
+  assert.match(result.summary, /multiple exact-name records/);
+});
+
+test("an unrelated repeated Scottish listing does not block a unique exact match", async () => {
+  const duplicateOtherNameHtml = scottishRecognisedBodiesHtml().replace(
+    "</ul>",
+    `<li><a href="https://example.gov.scot/duplicate">University of Aberdeen</a></li></ul>`,
+  );
+  const result = await checkInstitutionStatus(
+    { institutionName: "University of Strathclyde", jurisdiction: "Scotland" },
+    mockFetcher(() => htmlResponse(duplicateOtherNameHtml)),
+  );
+
+  assert.equal(result.status, "LISTED");
+  assert.equal(result.matchedName, "University of Strathclyde");
 });
 
 test("resolves the Glasgow-qualified Strathclyde name to the Scottish Government list", async () => {

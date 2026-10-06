@@ -153,6 +153,7 @@ type DapipLocation = {
   name: string;
   activeStatus: string | null;
   parentUnitId: string | null;
+  opeId: string | null;
 };
 
 type DapipResponse = {
@@ -199,6 +200,7 @@ function parseDapipResponse(
       name,
       activeStatus: stringValue(value.activeStatus),
       parentUnitId: null,
+      opeId: stringValue(value.opeID),
     }];
 
     if (value.additionalLocations !== undefined && value.additionalLocations !== null) {
@@ -219,6 +221,7 @@ function parseDapipResponse(
           name: additionalName,
           activeStatus: stringValue(additional.activeStatus),
           parentUnitId: unitId,
+          opeId: stringValue(additional.opeID),
         });
       }
     }
@@ -229,6 +232,44 @@ function parseDapipResponse(
 }
 
 type DapipMatch = DapipLocation;
+
+function resolveMultipleDapipMatches(
+  matches: DapipMatch[],
+): { match: DapipMatch; reason: string } | null {
+  const institutionRecords = matches.filter((match) => match.parentUnitId === null);
+
+  if (institutionRecords.length === 1) {
+    const parent = institutionRecords[0]!;
+    if (
+      matches.every(
+        (match) =>
+          match.unitId === parent.unitId ||
+          match.parentUnitId === parent.unitId,
+      )
+    ) {
+      return {
+        match: parent,
+        reason:
+          "DAPIP returned the exact-name institution and its explicitly affiliated additional location(s); the institution record was selected.",
+      };
+    }
+  }
+
+  // OPE IDs are assigned by the Office of Postsecondary Education and used by
+  // Federal Student Aid. Only use one when it uniquely identifies an exact-name
+  // top-level record; otherwise retain the ambiguity.
+  const opeIdMatches = matches.filter((match) => match.opeId);
+  if (opeIdMatches.length === 1 && opeIdMatches[0]!.parentUnitId === null) {
+    const match = opeIdMatches[0]!;
+    return {
+      match,
+      reason:
+        `DAPIP returned multiple exact-name records; this is the only exact-name record with an OPE ID (${match.opeId}).`,
+    };
+  }
+
+  return null;
+}
 
 async function checkUnitedStates(
   input: InstitutionStatusCheckInput,
@@ -278,19 +319,27 @@ async function checkUnitedStates(
     });
   }
 
-  if (matches.length > 1) {
+  const resolution = matches.length > 1
+    ? resolveMultipleDapipMatches(matches)
+    : null;
+  const match = matches.length === 1 ? matches[0]! : resolution?.match;
+
+  if (!match) {
     return createUnableInstitutionStatusResult(
       input,
-      "Institution identity requires review. DAPIP returned multiple exact-name records, so no institution or campus record was selected.",
+      `Institution identity requires review. DAPIP returned ${matches.length} exact-name records, and no source-supported institution or campus record could be selected.`,
       dapipSource,
       checkedAt,
     );
   }
 
-  const match = matches[0]!;
-  const registryStatus = match.activeStatus
+  const activeStatus = match.activeStatus
     ? `Source active-status field: ${match.activeStatus}`
     : "The source did not provide an active-status value for this record";
+  const registryStatus = match.opeId
+    ? `${activeStatus}; OPE ID: ${match.opeId}`
+    : activeStatus;
+  const resolutionNote = resolution ? ` ${resolution.reason}` : "";
   return createInstitutionStatusResult(input, dapipSource, {
     status: "LISTED",
     matchedName: match.name,
@@ -298,7 +347,7 @@ async function checkUnitedStates(
     sourceUrl: dapipProfileUrl(match.unitId, match.parentUnitId ?? undefined),
     checkedAt,
     summary:
-      `An exact name appears in the U.S. Department of Education's DAPIP database. ${registryStatus}. DAPIP cautions that its agency-reported data may be inaccurate, outdated, or incomplete; this is not an independent accreditation or recognition judgment.`,
+      `An exact name appears in the U.S. Department of Education's DAPIP database. ${registryStatus}.${resolutionNote} DAPIP cautions that its agency-reported data may be inaccurate, outdated, or incomplete; this is not an independent accreditation or recognition judgment.`,
   });
 }
 
@@ -713,16 +762,9 @@ function parseScottishRecognisedBodies(html: string): string[] {
   const names = [...list.matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)]
     .map((match) => plainHtmlText(match[1] ?? ""))
     .filter(Boolean);
-  const seenNames = new Set<string>();
-  for (const name of names) {
-    const normalized = normalizeText(name);
-    if (!normalized || seenNames.has(normalized)) {
-      throw new Error("The Scottish Government list contains a duplicate or unnamed record.");
-    }
-    seenNames.add(normalized);
-  }
+  const distinctNameCount = new Set(names.map(normalizeText)).size;
   if (
-    names.length < minimumScottishRecognisedBodies ||
+    distinctNameCount < minimumScottishRecognisedBodies ||
     names.length > 1000
   ) {
     throw new Error("The Scottish Government list was incomplete or outside supported limits.");

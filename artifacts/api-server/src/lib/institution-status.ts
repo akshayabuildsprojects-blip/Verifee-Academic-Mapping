@@ -31,7 +31,7 @@ type RegistrySnapshot = {
 };
 
 type RegistryLookup = {
-  matchedRecord: RegistryRecord | null;
+  matchingRecords: RegistryRecord[];
   snapshot: RegistrySnapshot | null;
   checkedAt: Date;
 };
@@ -57,7 +57,10 @@ const maxRegistryRecords = 5000;
 const registryPageConcurrency = 8;
 
 let registryCache: RegistrySnapshot | null = null;
-const positiveRecordCache = new Map<string, { record: RegistryRecord; checkedAt: Date }>();
+const positiveRecordCache = new Map<
+  string,
+  { records: RegistryRecord[]; checkedAt: Date }
+>();
 const pendingRegistryLookups = new Map<string, Promise<RegistryLookup>>();
 
 function decodeHtmlEntities(value: string): string {
@@ -288,17 +291,6 @@ async function scanRegistryForName(
     },
   );
 
-  for (const result of firstPageResults) {
-    if ("records" in result) {
-      const matchedRecord = result.records.find(
-        (record) => normalizeText(record.name) === normalizedName,
-      );
-      if (matchedRecord) {
-        return { matchedRecord, snapshot: null, checkedAt: new Date() };
-      }
-    }
-  }
-
   const firstPageError = firstPageResults.find(
     (result): result is Extract<FirstPageResult, { error: unknown }> =>
       "error" in result,
@@ -317,35 +309,20 @@ async function scanRegistryForName(
     })),
   );
 
-  let matchedRecord: RegistryRecord | null = null;
   let pageError: unknown = null;
   let nextPageJob = 0;
-  const pageAbortController = new AbortController();
   const pageWorker = async () => {
-    while (matchedRecord === null && nextPageJob < pageJobs.length) {
+    while (nextPageJob < pageJobs.length) {
       const job = pageJobs[nextPageJob]!;
       nextPageJob += 1;
 
       const pageUrl = new URL(job.category.url);
       pageUrl.searchParams.set("pg", String(job.page));
       try {
-        const html = await fetchGtecHtml(
-          pageUrl.href,
-          fetcher,
-          pageAbortController.signal,
-        );
+        const html = await fetchGtecHtml(pageUrl.href, fetcher);
         const pageRecords = parseInstitutionRows(html, pageUrl.href);
-        const pageMatch = pageRecords.find(
-          (record) => normalizeText(record.name) === normalizedName,
-        );
-        if (pageMatch) {
-          matchedRecord = pageMatch;
-          pageAbortController.abort();
-          return;
-        }
         recordsByCategory.get(job.category.url)?.push(...pageRecords);
       } catch (error) {
-        if (matchedRecord !== null || pageAbortController.signal.aborted) return;
         pageError ??= error;
       }
     }
@@ -358,9 +335,6 @@ async function scanRegistryForName(
     ),
   );
 
-  if (matchedRecord) {
-    return { matchedRecord, snapshot: null, checkedAt: new Date() };
-  }
   if (firstPageError) throw firstPageError;
   if (pageError) throw pageError;
 
@@ -385,7 +359,31 @@ async function scanRegistryForName(
     throw new Error("The GTEC directory could not be checked completely.");
   }
   const snapshot = { records, fetchedAt: new Date() };
-  return { matchedRecord: null, snapshot, checkedAt: snapshot.fetchedAt };
+  return {
+    matchingRecords: exactRegistryMatches(records, normalizedName),
+    snapshot,
+    checkedAt: snapshot.fetchedAt,
+  };
+}
+
+function exactRegistryMatches(
+  records: RegistryRecord[],
+  normalizedName: string,
+): RegistryRecord[] {
+  const seen = new Set<string>();
+  const matches: RegistryRecord[] = [];
+  for (const record of records) {
+    if (normalizeText(record.name) !== normalizedName) continue;
+    const identity = JSON.stringify([
+      record.sourceUrl,
+      normalizeText(record.name),
+      record.registryStatus,
+    ]);
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    matches.push(record);
+  }
+  return matches;
 }
 
 async function getRegistryLookup(
@@ -400,7 +398,7 @@ async function getRegistryLookup(
     Date.now() - positiveRecord.checkedAt.getTime() < cacheDurationMs
   ) {
     return {
-      matchedRecord: positiveRecord.record,
+      matchingRecords: positiveRecord.records,
       snapshot: null,
       checkedAt: positiveRecord.checkedAt,
     };
@@ -412,10 +410,10 @@ async function getRegistryLookup(
     Date.now() - registryCache.fetchedAt.getTime() < cacheDurationMs
   ) {
     return {
-      matchedRecord:
-        registryCache.records.find(
-          (record) => normalizeText(record.name) === normalizedName,
-        ) ?? null,
+      matchingRecords: exactRegistryMatches(
+        registryCache.records,
+        normalizedName,
+      ),
       snapshot: registryCache,
       checkedAt: registryCache.fetchedAt,
     };
@@ -430,9 +428,9 @@ async function getRegistryLookup(
 
   try {
     const lookup = await lookupPromise;
-    if (lookup.matchedRecord) {
+    if (lookup.matchingRecords.length > 0) {
       positiveRecordCache.set(normalizedName, {
-        record: lookup.matchedRecord,
+        records: lookup.matchingRecords,
         checkedAt: lookup.checkedAt,
       });
       if (positiveRecordCache.size > 500) {
@@ -442,9 +440,8 @@ async function getRegistryLookup(
           }
         }
       }
-    } else if (lookup.snapshot) {
-      registryCache = lookup.snapshot;
     }
+    if (lookup.snapshot) registryCache = lookup.snapshot;
     return lookup;
   } finally {
     pendingRegistryLookups.delete(normalizedName);
@@ -537,8 +534,18 @@ export async function checkInstitutionStatus(
 
   try {
     const lookup = await getRegistryLookup(normalizedInput, fetcher);
-    const matchedRecord = lookup.matchedRecord;
+    const matchingRecords = lookup.matchingRecords;
 
+    if (matchingRecords.length > 1) {
+      return createUnableInstitutionStatusResult(
+        resolvedInput,
+        `Institution identity requires review. The GTEC directory returned ${matchingRecords.length} distinct exact-name records, so no record was selected.`,
+        gtecSource,
+        lookup.checkedAt,
+      );
+    }
+
+    const matchedRecord = matchingRecords[0] ?? null;
     if (!matchedRecord) {
       if (!lookup.snapshot) {
         throw new Error("The GTEC directory check did not produce a complete result.");

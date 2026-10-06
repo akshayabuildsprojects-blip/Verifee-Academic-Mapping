@@ -27,9 +27,13 @@ function institutionTable(rows: string, pagination = ""): string {
   </table>${pagination}`;
 }
 
-function institutionRow(name: string, status = "Current"): string {
+function institutionRow(
+  name: string,
+  status = "Current",
+  institutionId = 878,
+): string {
   return `<tr>
-    <td><a href="https://gtec.edu.gh/programmes/?institutionId=878">${name}</a></td>
+    <td><a href="https://gtec.edu.gh/programmes/?institutionId=${institutionId}">${name}</a></td>
     <td>Cape Coast</td><td>Traditional University</td><td>${status}</td>
     <td>—</td><td>—</td><td>View Programmes</td>
   </tr>`;
@@ -160,6 +164,45 @@ test("returns a listed match found on a later directory page", async () => {
   assert.equal(result.matchedName, "University of Cape Coast");
   assert.equal(result.registryStatus, "Active");
   assert.equal(result.sourceUrl, pageTwoUrl.href);
+  assert.ok(requestedUrls.includes(pageTwoUrl.href));
+});
+
+test("does not select the first exact GTEC match before the full directory scan", async () => {
+  const requestedUrls: string[] = [];
+  const pageTwoUrl = new URL(categoryUrl);
+  pageTwoUrl.searchParams.set("pg", "2");
+  const result = await checkInstitutionStatus(
+    institutionInput,
+    mockFetcher(
+      new Map([
+        [
+          categoryUrl,
+          {
+            status: 200,
+            body: institutionTable(
+              institutionRow("University of Cape Coast", "Current", 878),
+              `<a href="${pageTwoUrl.href.replace("&pg=2", "&#038;pg=2")}">2</a>`,
+            ),
+          },
+        ],
+        [
+          pageTwoUrl.href,
+          {
+            status: 200,
+            body: institutionTable(
+              institutionRow("University of Cape Coast", "Active", 879),
+            ),
+          },
+        ],
+      ]),
+      requestedUrls,
+      2,
+    ),
+  );
+
+  assert.equal(result.status, "UNABLE_TO_CHECK");
+  assert.equal(result.matchedName, null);
+  assert.match(result.summary, /2 distinct exact-name records/);
   assert.ok(requestedUrls.includes(pageTwoUrl.href));
 });
 
