@@ -633,17 +633,14 @@ test("explains when no readable English is detected", async ({ page }) => {
   await page.getByTestId("button-continue-upload").click();
 
   const summary = page.getByTestId("language-detection-upload");
-  await expect(page.getByTestId("status-upload-error")).toContainText(
-    "No readable English text was found",
+  await expect(page.getByTestId("status-upload-error")).toHaveText(
+    "We couldn’t extract enough readable English text from this document.",
   );
   await expect(summary).toContainText("No readable English detected");
   await expect(summary).toContainText("High confidence");
   await expect(summary).toContainText("Spanish");
   await expect(summary).toContainText("Script: Latin");
   await expect(summary).not.toContainText("Academic extraction was not performed");
-  await expect(page.getByTestId("status-upload-error")).toHaveText(
-    "We couldn’t extract enough readable English text from this document.",
-  );
   await expect(page.getByTestId("button-try-another-file")).toHaveText("Try another file");
   await expect(page.getByTestId("button-use-demo-fallback")).toHaveText("Continue with demo sample");
   expect(
