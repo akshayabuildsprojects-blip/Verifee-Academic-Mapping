@@ -38,7 +38,9 @@ test('enters the demo account and opens the seeded NTU report', async ({ page })
   await expect(page).toHaveURL(/\/saved-report\/VF-DEMO-001$/);
   await expect(page.getByRole('heading', { name: 'Report preview' })).toBeVisible();
   await expect(page.getByText('Nanyang Technological University').first()).toBeVisible();
-  await expect(page.getByText('This report uses fictional coursework for demonstration')).toBeVisible();
+  await expect(page.getByTestId('report-review-notes')).toContainText(
+    'This report uses fictional coursework for demonstration',
+  );
 });
 
 test('protects mapping routes until the demo session starts and clears it on exit', async ({

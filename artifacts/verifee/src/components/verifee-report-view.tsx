@@ -306,6 +306,18 @@ export function VerifeeReportView({
                 </div>
               </article>
 
+              {Array.isArray(data.itemsRequiringReview) && data.itemsRequiringReview.length > 0 && <section
+                className="v-report-review-section"
+                aria-labelledby="v-report-review-heading"
+                data-testid="report-review-notes"
+              >
+                <span className="v-report-review-kicker">REVIEW NOTES</span>
+                <h2 id="v-report-review-heading">Items to review</h2>
+                <ul>
+                  {data.itemsRequiringReview.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}
+                </ul>
+              </section>}
+
               <section className="v-report-document-section" aria-labelledby="v-report-context-heading">
                 <div className="v-report-section-heading">
                   <span>01 / CONTEXT</span>
