@@ -444,9 +444,12 @@ test("landing page previews the wizard record, principles, and fictional sample 
   await expect(page.getByTestId("link-view-sample-report")).toBeVisible();
   await expect(page.getByTestId("landing-record-overview")).toContainText("Academic record summary");
   await expect(page.getByTestId("landing-record-overview")).toContainText("Verifee Demo University");
+  await expect(page.getByTestId("landing-record-overview").locator(".review-credential-tile:nth-child(3) .review-credential-value")).toHaveCSS("font-size", "11px");
   await expect(page.locator(".landing-principles-grid article")).toHaveCount(3);
   await expect(page.getByRole("heading", { name: "How Verifee reconciles ambiguity." })).toBeVisible();
   await expect(page.locator(".capability-cards .capability-item")).toHaveCount(3);
+  await expect(page.locator(".capability-copy h3").first()).toHaveCSS("font-size", "20px");
+  await expect(page.locator(".capability-copy p").first()).toHaveCSS("font-size", "13px");
   await expect(page.getByText("Verifee does not replace university admissions decisions.", { exact: true })).toBeVisible();
 
   await page.getByTestId("link-view-sample-report").click();
@@ -456,6 +459,11 @@ test("landing page previews the wizard record, principles, and fictional sample 
   await expect(page.getByTestId("report-preview")).toBeVisible();
   await expect(page.getByTestId("report-proof-panel")).toHaveCount(0);
   await expect(page.getByTestId("button-back-to-mapping")).toContainText("Back to Verifee");
+
+  await page.goto("/");
+  await page.setViewportSize({ width: 402, height: 874 });
+  await expect(page.locator(".capability-copy h3").first()).toHaveCSS("font-size", "18px");
+  await expect(page.locator(".capability-copy p").first()).toHaveCSS("font-size", "13px");
 });
 
 test("keeps the Step 1 upload copy concise", async ({ page }) => {
