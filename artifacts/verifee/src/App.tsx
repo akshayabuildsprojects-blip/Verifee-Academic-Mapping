@@ -914,7 +914,6 @@ function RequirementCard({
 function Report() {
   const [, setLocation] = useLocation();
   const [filter, setFilter] = useState('ALL');
-  const [expanded, setExpanded] = useState(true);
   const fileName = sessionStorage.getItem('verifee-file-name') || 'Selected credential';
   const isExtracted = sessionStorage.getItem('verifee-analysis-mode') === 'extracted';
   const started = sessionStorage.getItem('verifee-started') === 'yes';
@@ -922,8 +921,6 @@ function Report() {
     () => readAcademicRecord() ?? (isExtracted ? null : createSampleAcademicRecord()),
     [isExtracted],
   );
-  const verificationStatus = (sessionStorage.getItem('verifee-verification-status') || 'Verification unavailable') as CredentialVerification['status'];
-  const verificationExplanation = sessionStorage.getItem('verifee-verification-explanation') || 'No independent verification source is connected in this demonstration.';
   const savedProgramId = sessionStorage.getItem('verifee-program');
   const program = georgiaTechDataset.programs.find((item) => item.id === savedProgramId) || georgiaTechDataset.programs[0];
   const [mapping, setMapping] = useState<AcademicMappingResult | null>(() => readStoredMapping(program.id));
@@ -1157,76 +1154,82 @@ function Report() {
         <button className="secondary-btn" type="button" onClick={reset} data-testid="button-new-analysis"><RotateCcw size={14} /> New analysis</button>
       </div>
     </div>
-    <section className="report-verification" data-testid="card-verification">
-      <div className="report-verification-top"><p className="verify-heading"><ShieldAlert size={16} color="#8a764d" /> Overall credential verification</p><span className="status-pill" data-testid="status-verification">{verificationStatus}</span></div>
-      <p className="verify-copy">{verificationExplanation} Verification is separate from academic interpretation and course mapping.</p>
-    </section>
     <section
-      className="report-verification institution-status-card"
+      className="panel section-card section-disclosure institution-status-card"
       aria-live="polite"
       aria-busy={institutionStatusLoading}
       data-testid="card-institution-status"
     >
-      <div className="report-verification-top">
-        <p className="verify-heading"><Landmark size={16} color="#55766c" /> Institution status check</p>
-        <span className="status-pill review" data-testid="status-institution-registry">
-          {institutionStatusLoading ? 'Checking registry…' : institutionStatus ? institutionStatusLabel(institutionStatus.status, institutionStatus.statusLabel) : 'Unable to check'}
-        </span>
-      </div>
-      {institutionStatus ? <>
-        <p className="verify-copy">{institutionStatus.summary}</p>
-        <dl className="institution-status-details">
-          <div>
-            <dt>Institution</dt>
-            <dd>{institutionStatus.institutionName || 'Institution identity requires review'}</dd>
-          </div>
-          <div>
-            <dt>Institution source</dt>
-            <dd>{institutionStatusResolutionSourceLabel(institutionStatus.institutionNameSource)}</dd>
-          </div>
-          <div>
-            <dt>Jurisdiction</dt>
-            <dd>{institutionStatus.jurisdiction || 'Jurisdiction unresolved'}</dd>
-          </div>
-          <div>
-            <dt>Jurisdiction source</dt>
-            <dd>{institutionStatusResolutionSourceLabel(institutionStatus.jurisdictionSource)}</dd>
-          </div>
-          <div>
-            <dt>Registry source</dt>
-            <dd>
-              {institutionStatus.sourceName
-                ? institutionStatus.sourceUrl
-                  ? <a href={institutionStatus.sourceUrl} target="_blank" rel="noreferrer noopener" data-testid="institution-status-source-link">{institutionStatus.sourceName} <ExternalLink size={12} /></a>
-                  : institutionStatus.sourceName
-                : 'No supported registry source was checked for this jurisdiction.'}
-            </dd>
-          </div>
-          {institutionStatus.matchedName && <div>
-            <dt>Registry entry</dt>
-            <dd>{institutionStatus.matchedName}</dd>
+      <details data-testid="disclosure-institution-status">
+        <summary className="section-disclosure-summary">
+          <span className="section-disclosure-heading"><Landmark size={19} /><span role="heading" aria-level={2}>Institution status check</span></span>
+          <span className="status-pill review section-status" data-testid="status-institution-registry">
+            {institutionStatusLoading ? 'Checking registry…' : institutionStatus ? institutionStatusLabel(institutionStatus.status, institutionStatus.statusLabel) : 'Unable to check'}
+          </span>
+          <span className="section-disclosure-brief">
+            {institutionStatusLoading
+              ? 'Checking the supported institution registry.'
+              : institutionStatus?.summary ?? 'No institution status result is available.'}
+          </span>
+          <ChevronRight className="section-disclosure-chevron" size={18} aria-hidden="true" />
+        </summary>
+        <div className="section-disclosure-content">
+          {institutionStatus ? <>
+            <p className="verify-copy">{institutionStatus.summary}</p>
+            <dl className="institution-status-details">
+              <div>
+                <dt>Institution</dt>
+                <dd>{institutionStatus.institutionName || 'Institution identity requires review'}</dd>
+              </div>
+              <div>
+                <dt>Institution source</dt>
+                <dd>{institutionStatusResolutionSourceLabel(institutionStatus.institutionNameSource)}</dd>
+              </div>
+              <div>
+                <dt>Jurisdiction</dt>
+                <dd>{institutionStatus.jurisdiction || 'Jurisdiction unresolved'}</dd>
+              </div>
+              <div>
+                <dt>Jurisdiction source</dt>
+                <dd>{institutionStatusResolutionSourceLabel(institutionStatus.jurisdictionSource)}</dd>
+              </div>
+              <div>
+                <dt>Registry source</dt>
+                <dd>
+                  {institutionStatus.sourceName
+                    ? institutionStatus.sourceUrl
+                      ? <a href={institutionStatus.sourceUrl} target="_blank" rel="noreferrer noopener" data-testid="institution-status-source-link">{institutionStatus.sourceName} <ExternalLink size={12} /></a>
+                      : institutionStatus.sourceName
+                    : 'No supported registry source was checked for this jurisdiction.'}
+                </dd>
+              </div>
+              {institutionStatus.matchedName && <div>
+                <dt>Registry entry</dt>
+                <dd>{institutionStatus.matchedName}</dd>
+              </div>}
+              {institutionStatus.registryStatus && <div>
+                <dt>Registry status</dt>
+                <dd>{institutionStatus.registryStatus}</dd>
+              </div>}
+              <div>
+                <dt>Checked</dt>
+                <dd>{formatInstitutionStatusTime(institutionStatus.checkedAt)}</dd>
+              </div>
+            </dl>
+            <p className="institution-status-coverage"><strong>Coverage limits:</strong> {institutionStatus.coverageLimits}</p>
+            <p className="academic-context-disclaimer">This source-scoped listing check is separate from credential authenticity, academic mapping, and admissions decisions.</p>
+            {institutionStatus.status === 'UNABLE_TO_CHECK' && <button
+              className="institution-status-retry"
+              type="button"
+              onClick={() => void requestInstitutionStatus()}
+              disabled={institutionStatusLoading}
+              data-testid="button-retry-institution-status"
+            >Retry status check</button>}
+          </> : <div className="academic-context-loading" role="status" data-testid="status-institution-check-loading">
+            <LoaderCircle size={15} className="animate-spin" /> Checking the supported institution registry…
           </div>}
-          {institutionStatus.registryStatus && <div>
-            <dt>Registry status</dt>
-            <dd>{institutionStatus.registryStatus}</dd>
-          </div>}
-          <div>
-            <dt>Checked</dt>
-            <dd>{formatInstitutionStatusTime(institutionStatus.checkedAt)}</dd>
-          </div>
-        </dl>
-        <p className="institution-status-coverage"><strong>Coverage limits:</strong> {institutionStatus.coverageLimits}</p>
-        <p className="academic-context-disclaimer">This source-scoped listing check is separate from credential authenticity, academic mapping, and admissions decisions.</p>
-        {institutionStatus.status === 'UNABLE_TO_CHECK' && <button
-          className="institution-status-retry"
-          type="button"
-          onClick={() => void requestInstitutionStatus()}
-          disabled={institutionStatusLoading}
-          data-testid="button-retry-institution-status"
-        >Retry status check</button>}
-      </> : <div className="academic-context-loading" role="status" data-testid="status-institution-check-loading">
-        <LoaderCircle size={15} className="animate-spin" /> Checking the supported institution registry…
-      </div>}
+        </div>
+      </details>
     </section>
     <div className="preliminary" data-testid="notice-preliminary"><AlertCircle size={16} /><span>
       <strong>{isExtracted ? 'Preliminary mapping of extracted academic details.' : 'Preliminary mapping of the synthetic demo record.'}</strong>{' '}
@@ -1234,50 +1237,83 @@ function Report() {
         ? `“${fileName}” was used only for extraction. This mapping request contains the extracted academic JSON, not the PDF.`
         : `“${fileName}” was not parsed; this mapping uses only the separately labeled synthetic sample record.`}
     </span></div>
-    <div className="report-grid">
-      <div className="report-main">
-        <section className="panel section-card academic-context-card" aria-live="polite" aria-busy={contextLoading} data-testid="card-academic-context">
-          <div className="section-title">
-            <div>
-              <h2>Mapped Academic Context</h2>
-              <p className="form-note mapping-section-note">Transcript facts and contextual mappings are labeled separately.</p>
-            </div>
-            <span className="small-label">{contextLoading ? 'Contextualizing' : contextFailure ? 'Context unavailable' : 'Preliminary context'}</span>
+    <div className="report-sections">
+      <section className="panel section-card section-disclosure academic-context-card" aria-live="polite" aria-busy={contextLoading} data-testid="card-academic-context">
+        <details data-testid="disclosure-academic-context">
+          <summary className="section-disclosure-summary">
+            <span className="section-disclosure-heading"><BookOpen size={19} /><span role="heading" aria-level={2}>Mapped academic context</span></span>
+            <span className="small-label section-status-label">{contextLoading ? 'Contextualizing' : contextFailure ? 'Context unavailable' : 'Preliminary context'}</span>
+            <span className="section-disclosure-brief">
+              {contextLoading
+                ? 'Contextualizing the extracted academic record.'
+                : `${academicContext?.institution.value ?? 'Institution context unavailable'} · ${requirements.length}/${program.requirements.length} requirements mapped.`}
+            </span>
+            <ChevronRight className="section-disclosure-chevron" size={18} aria-hidden="true" />
+          </summary>
+          <div className="section-disclosure-content">
+            <p className="form-note mapping-section-note">Transcript facts and contextual mappings are labeled separately.</p>
+            {academicContext ? <div className="academic-context-grid">
+              {[
+                { label: 'Institution', field: academicContext.institution },
+                { label: 'Country / education system', field: academicContext.country },
+                { label: 'Broad field', field: academicContext.broadField },
+                { label: 'Specific discipline', field: academicContext.specificDiscipline },
+                { label: 'Program', field: academicContext.program },
+              ].map(({ label, field }) => <div className="academic-context-item" key={label}>
+                <span className="data-label">{label}</span>
+                <span className="data-value">{field.value}</span>
+                <span className="academic-context-source">
+                  {academicContextSourceLabel(field.source)}
+                  {field.sourceUrl && <a href={field.sourceUrl} target="_blank" rel="noreferrer noopener" className="academic-context-link">View institution source <ExternalLink size={11} /></a>}
+                </span>
+              </div>)}
+              <div className="academic-context-item">
+                <span className="data-label">Target program</span>
+                <span className="data-value">{program.name}</span>
+                <span className="academic-context-source">{program.school} · {formatRequirementType(program.requirementType)}</span>
+              </div>
+            </div> : <div className="academic-context-loading" role="status" data-testid="status-academic-context-loading">
+              <LoaderCircle size={15} className="animate-spin" /> Contextualizing academic record…
+            </div>}
+            {contextFailure && <p className="academic-context-note" role="status">Contextualization was unavailable. Requirement mapping still uses the original extracted academic JSON.</p>}
+            {!contextFailure && academicContext && academicContext.status !== 'MAPPED' && <p className="academic-context-note">Some fields could not be confidently mapped from the available transcript or official institution source.</p>}
+            <p className="academic-context-disclaimer">This context is informational only and does not verify credential authenticity.</p>
+            <section className="context-mapping-overview" data-testid="card-mapping-overview">
+              <div className="context-mapping-overview-heading">
+                <h3>Mapping overview</h3>
+                <span>Mapped {requirements.length} / {program.requirements.length}</span>
+              </div>
+              <div className="summary-number">{requirements.length}</div>
+              <div className="summary-caption">{showPartialMapping ? `of ${program.requirements.length} requirements mapped` : `Stored ${program.shortName} criteria reviewed`}</div>
+              {currentMapping && !showPartialMapping && <div className="result-counts">
+                <div><strong>{counts.covered}</strong><span>Covered</span></div>
+                <div><strong>{counts.partial}</strong><span>Partially covered</span></div>
+                <div><strong>{counts.potentialGap}</strong><span>Potential gaps</span></div>
+                <div><strong>{counts.insufficient}</strong><span>Insufficient evidence</span></div>
+              </div>}
+            </section>
           </div>
-          {academicContext ? <div className="academic-context-grid">
-            {[
-              { label: 'Institution', field: academicContext.institution },
-              { label: 'Country / education system', field: academicContext.country },
-              { label: 'Broad field', field: academicContext.broadField },
-              { label: 'Specific discipline', field: academicContext.specificDiscipline },
-              { label: 'Program', field: academicContext.program },
-            ].map(({ label, field }) => <div className="academic-context-item" key={label}>
-              <span className="data-label">{label}</span>
-              <span className="data-value">{field.value}</span>
-              <span className="academic-context-source">
-                {academicContextSourceLabel(field.source)}
-                {field.sourceUrl && <a href={field.sourceUrl} target="_blank" rel="noreferrer noopener" className="academic-context-link">View institution source <ExternalLink size={11} /></a>}
-              </span>
-            </div>)}
-            <div className="academic-context-item">
-              <span className="data-label">Target</span>
-              <span className="data-value">{program.school} — {program.shortName}</span>
-              <span className="academic-context-source">Selected in Step 3</span>
-            </div>
-          </div> : <div className="academic-context-loading" role="status" data-testid="status-academic-context-loading">
-            <LoaderCircle size={15} className="animate-spin" /> Contextualizing academic record…
-          </div>}
-          {contextFailure && <p className="academic-context-note" role="status">Contextualization was unavailable. Requirement mapping still uses the original extracted academic JSON.</p>}
-          {!contextFailure && academicContext && academicContext.status !== 'MAPPED' && <p className="academic-context-note">Some fields could not be confidently mapped from the available transcript or official institution source.</p>}
-          <p className="academic-context-disclaimer">This context is informational only and does not verify credential authenticity.</p>
-        </section>
+        </details>
+      </section>
 
-        <section className="panel section-card" aria-live="polite">
-          <div className="section-title">
-            <div><h2>Program requirement mapping</h2><p className="form-note mapping-section-note">The selected program’s stored requirements are compared with extracted courses and available evidence.</p></div>
-            <button className="remove-file" type="button" onClick={() => setExpanded((value) => !value)} aria-label={expanded ? 'Collapse program mappings' : 'Expand program mappings'} data-testid="button-toggle-mappings"><ChevronRight size={18} style={{ transform: expanded ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }} /></button>
-          </div>
-          {expanded && <>
+      <section className="panel section-card section-disclosure" aria-live="polite" data-testid="card-program-mapping">
+        <details data-testid="disclosure-program-mapping">
+          <summary className="section-disclosure-summary">
+            <span className="section-disclosure-heading"><GraduationCap size={19} /><span role="heading" aria-level={2}>Program requirement mapping</span></span>
+            <span className={`status-pill section-status ${mappingError ? 'gap' : allRequirementsCompleted ? 'good' : 'review'}`}>
+              {mappingError ? 'Retry needed' : loading ? 'Mapping' : allRequirementsCompleted ? 'Complete' : 'In progress'}
+            </span>
+            <span className="section-disclosure-brief">
+              {mappingError
+                ? `Progress: ${requirements.length}/${program.requirements.length} requirements. Retry using the saved record.`
+                : allRequirementsCompleted
+                  ? `${counts.covered} covered · ${counts.partial} partial · ${counts.potentialGap} potential gaps · ${counts.insufficient} insufficient evidence.`
+                  : `Progress: ${requirements.length}/${program.requirements.length} requirements mapped.`}
+            </span>
+            <ChevronRight className="section-disclosure-chevron" size={18} aria-hidden="true" />
+          </summary>
+          <div className="section-disclosure-content">
+            <p className="form-note mapping-section-note">The selected program’s stored requirements are compared with extracted courses and available evidence.</p>
             <details className="source-details"><summary>Stored program source</summary><p>{program.source.title}</p><span>Last checked: {program.source.lastChecked}</span></details>
             {showMappingProgress && <div
               className="mapping-loading"
@@ -1343,24 +1379,9 @@ function Report() {
                 onToggle={() => setExpandedRequirementId((current) => current === match.requirementId ? null : match.requirementId)}
               />)}{visibleRequirements.length === 0 && <p className="form-note">No requirements have this result.</p>}</div>
             </>}
-          </>}
-        </section>
-      </div>
-      <aside className="report-side">
-        <section className="panel section-card">
-          <p className="report-aside-title">Mapping overview</p>
-          <div className="summary-number">{requirements.length}</div>
-          <div className="summary-caption">{showPartialMapping ? `of ${program.requirements.length} requirements mapped` : `Stored ${program.shortName} criteria reviewed`}</div>
-          {currentMapping && !showPartialMapping && <div className="result-counts">
-            <div><strong>{counts.covered}</strong><span>Covered</span></div>
-             <div><strong>{counts.partial}</strong><span>Partially Covered</span></div>
-             <div><strong>{counts.potentialGap}</strong><span>Potential Gaps</span></div>
-             <div><strong>{counts.insufficient}</strong><span>Insufficient Evidence</span></div>
-          </div>}
-        </section>
-        <section className="panel section-card"><p className="report-aside-title">Selected target program</p><p className="mapping-course">{program.name}</p><span className="data-label">{program.school}</span><p className="form-note"><strong>Requirement type:</strong> {formatRequirementType(program.requirementType)}</p><p className="form-note">{program.description}</p></section>
-        <section className="panel section-card"><p className="report-aside-title">Items requiring review</p><ul className="review-list"><li><span className="review-dot" />Confirm detailed course coverage with official catalog pages, syllabi, or learning outcomes.</li><li><span className="review-dot" />Confirm grading scale, credit units, and instructional hours with the issuing institution.</li><li><span className="review-dot" />Verify the credential independently; no verification was performed here.</li><li><span className="review-dot" />These preliminary mappings are not admissions, approval, equivalency, or transfer-credit decisions.</li></ul></section>
-      </aside>
+          </div>
+        </details>
+      </section>
     </div>
     {currentMapping && !loading && !mappingError && allRequirementsCompleted && !currentMapping.retryable && !contextLoading && !institutionStatusLoading && <div className="report-finalize-cta" data-testid="card-generate-verifee-report">
       <div>

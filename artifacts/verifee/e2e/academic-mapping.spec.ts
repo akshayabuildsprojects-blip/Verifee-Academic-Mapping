@@ -292,6 +292,7 @@ async function openReport(
   options: {
     record?: typeof academicRecord;
     status?: Record<string, unknown>;
+    expandSections?: boolean;
   } = {},
 ) {
   const record = options.record ?? academicRecord;
@@ -375,6 +376,10 @@ async function openReport(
   await page.waitForFunction(
     () => window.__verifeeMappingTest?.streams.length === 1,
   );
+  if (options.expandSections !== false) {
+    await page.getByTestId("disclosure-academic-context").locator(":scope > summary").click();
+    await page.getByTestId("disclosure-program-mapping").locator(":scope > summary").click();
+  }
 }
 
 async function openReview(page: Page) {
@@ -504,6 +509,7 @@ test("shows institution and jurisdiction provenance with the exact Scottish sour
   await openReport(page, { record, status });
 
   const card = page.getByTestId("card-institution-status");
+  await page.getByTestId("disclosure-institution-status").locator(":scope > summary").click();
   await expect(page.getByTestId("status-institution-registry")).toHaveText("Recognised");
   await expect(card).toContainText("University of Strathclyde");
   await expect(card).toContainText("Institution source");
@@ -757,6 +763,7 @@ test("shows each completed requirement live, keeps evidence accessible, and pers
   expect(storedResult).toEqual(result);
 
   await page.reload();
+  await page.getByTestId("disclosure-program-mapping").locator(":scope > summary").click();
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
   await expect(page.getByTestId("status-mapping-loading")).toHaveCount(0);
   const persistedToggle = page.getByTestId(
@@ -886,12 +893,23 @@ test("shows the report preview immediately and keeps its downloads, save choices
     const response = await route.fetch({ url: forwarded.toString() });
     await route.fulfill({ response });
   });
-  await openReport(page);
+  await openReport(page, { expandSections: false });
   await sendStreamEvent(page, 0, "complete", result);
   await page.evaluate(() => {
     window.__verifeeMappingTest?.streams[0]?.close();
   });
 
+  await expect(page.locator(".section-disclosure details[open]")).toHaveCount(0);
+  await expect(page.getByTestId("disclosure-institution-status")).toContainText("Listed");
+  await expect(page.getByTestId("disclosure-academic-context").locator(".section-status-label")).toHaveText(/Preliminary context|Context unavailable/);
+  await expect(page.getByTestId("disclosure-program-mapping")).toContainText("Complete");
+  await page.getByTestId("disclosure-institution-status").locator(":scope > summary").click();
+  await page.getByTestId("disclosure-academic-context").locator(":scope > summary").click();
+  await page.getByTestId("disclosure-program-mapping").locator(":scope > summary").click();
+  await expect(page.getByTestId("institution-status-source-link")).toBeVisible();
+  await expect(page.getByTestId("card-mapping-overview")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Overall credential verification" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Items requiring review" })).toHaveCount(0);
   await expect(page.getByTestId("button-open-verifee-report")).toBeVisible();
   const storedMappingBefore = await page.evaluate(() =>
     JSON.parse(sessionStorage.getItem("verifee-mapping-result") ?? "null"),
