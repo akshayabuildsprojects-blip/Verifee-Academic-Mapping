@@ -443,13 +443,20 @@ test("keeps the Step 1 upload copy concise", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Upload an academic credential" })).toBeVisible();
   await expect(page.getByTestId("upload-watermark")).toBeVisible();
-  await expect(page.locator(".upload-submit-brand")).toBeVisible();
-  const logoBeforeContinue = await page.evaluate(() => {
-    const logo = document.querySelector(".upload-submit-brand");
+  await expect(page.locator(".upload-submit-brand")).toHaveCount(0);
+  const watermarkOverContinue = await page.evaluate(() => {
+    const watermark = document.querySelector('[data-testid="upload-watermark"]');
     const button = document.querySelector('[data-testid="button-continue-upload"]');
-    return Boolean(logo && button && (logo.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING));
+    if (!watermark || !button) return false;
+    const watermarkBounds = watermark.getBoundingClientRect();
+    const buttonBounds = button.getBoundingClientRect();
+    return getComputedStyle(watermark).zIndex === "2" &&
+      watermarkBounds.left < buttonBounds.right &&
+      watermarkBounds.right > buttonBounds.left &&
+      watermarkBounds.top < buttonBounds.bottom &&
+      watermarkBounds.bottom > buttonBounds.top;
   });
-  expect(logoBeforeContinue).toBe(true);
+  expect(watermarkOverContinue).toBe(true);
   await expect(
     page.getByText("Upload a transcript or supported digital credential to begin.", { exact: true }),
   ).toBeVisible();
@@ -703,7 +710,15 @@ test("shows mapping progress before results, keeps evidence accessible, and pers
 }) => {
   await openReport(page);
 
-  await expect(page.getByText("0 of 4 requirements mapped")).toBeVisible();
+  const dashboard = page.getByTestId("mapping-dashboard");
+  await expect(dashboard).toBeVisible();
+  await expect(dashboard).toContainText("Mapping in progress");
+  await expect(dashboard).toContainText("Waiting for results");
+  await expect(dashboard).toContainText("—");
+  await expect(page.getByTestId("mapping-header-meta")).toContainText("Evaluation standard");
+  await expect(page.getByTestId("mapping-header-meta")).toContainText("Preliminary mapping.");
+  await expect(dashboard).toContainText("0 / 4");
+  await expect(page.getByTestId("card-mapping-progress")).toHaveCount(0);
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toHaveCount(0);
   await expect
     .poll(() =>
@@ -718,7 +733,7 @@ test("shows mapping progress before results, keeps evidence accessible, and pers
   };
   await sendStreamEvent(page, 0, "progress", firstSnapshot);
 
-  await expect(page.getByText("1 of 4 requirements mapped")).toBeVisible();
+  await expect(dashboard).toContainText("1 / 4");
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toHaveCount(0);
   await expect(page.getByTestId(`mapping-${requirementIds[1]}`)).toHaveCount(0);
 
@@ -730,8 +745,8 @@ test("shows mapping progress before results, keeps evidence accessible, and pers
   await sendStreamEvent(page, 0, "progress", secondSnapshot);
 
   await expect(page.getByTestId("card-institution-status")).toBeVisible();
-  await expect(page.getByTestId("card-mapping-progress")).toBeVisible();
-  await expect(page.getByText("2 of 4 requirements mapped")).toBeVisible();
+  await expect(page.getByTestId("card-mapping-progress")).toHaveCount(0);
+  await expect(dashboard).toContainText("2 / 4");
   await expect(page.getByTestId("mapping-progress-bar")).toBeVisible();
   await expect(page.getByTestId(`mapping-${requirementIds[1]}`)).toHaveCount(0);
   await sendStreamEvent(page, 0, "complete", result);
@@ -878,7 +893,7 @@ test("keeps completed requirement results visible after a stream failure and ret
   };
   await sendStreamEvent(page, 0, "progress", firstSnapshot);
 
-  await expect(page.getByText("1 of 4 requirements mapped")).toBeVisible();
+  await expect(page.getByTestId("mapping-dashboard")).toContainText("1 / 4");
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toHaveCount(0);
 
   await sendStreamEvent(page, 0, "error", {
@@ -891,7 +906,7 @@ test("keeps completed requirement results visible after a stream failure and ret
   await expect(page.getByTestId("status-mapping-error")).toBeVisible();
   await expect(page.getByTestId("button-retry-mapping")).toBeEnabled();
   await expect(page.getByTestId("card-mapping-progress")).toBeVisible();
-  await expect(page.getByText("1 of 4 requirements mapped")).toBeVisible();
+  await expect(page.getByTestId("mapping-dashboard")).toContainText("1 / 4");
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
   await expect(page.getByTestId(`mapping-${requirementIds[1]}`)).toHaveCount(0);
   expect(

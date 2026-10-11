@@ -581,7 +581,6 @@ function UploadStep() {
       <p className="upload-note">PDFs are used for academic extraction only and are not authenticated. Your extracted academic record is kept in the current browser session.</p>
         {error && <div className="error-message" role="alert" data-testid="status-upload-error">{visibleError}</div>}
        {languageDetection && <LanguageDetectionCard detection={languageDetection} compact />}
-        <div className="upload-submit-brand" aria-hidden="true"><VerifeeLogo className="upload-submit-logo" /></div>
         <button className="cta" type="button" onClick={() => void submit()} disabled={!file || busy || Boolean(duplicateReportId && !continueWithDuplicate)} data-testid="button-continue-upload"><span>{busy ? file && isPdfFile(file) ? 'Reading transcript…' : 'Preparing sample record…' : 'Continue to Verify & Review'}</span>{busy ? <LoaderCircle size={16} className="animate-spin" /> : <ArrowRight size={16} />}</button>
       {canTryAnotherFile && <button className="secondary-btn" type="button" onClick={() => inputRef.current?.click()} data-testid="button-try-another-file">Try another file</button>}
       {file && isPdfFile(file) && error && !isVerifeeReportError(error) && <button className="secondary-btn" type="button" onClick={() => void continueWithDemo()} disabled={busy} data-testid="button-use-demo-fallback">Continue with demo sample</button>}
@@ -1193,7 +1192,6 @@ function Report() {
     { value: 'INSUFFICIENT_EVIDENCE', label: 'Insufficient evidence' },
   ];
   const allRequirementsCompleted = program.requirements.length > 0 && requirements.length === program.requirements.length;
-  const showMappingProgress = loading || Boolean(mappingError);
   const mappingResultsReady = !loading && (
     Boolean(currentMapping) || (Boolean(mappingError) && progressRequirements.length > 0)
   );
@@ -1208,9 +1206,14 @@ function Report() {
         <div className="eyebrow">Step 4 of 5 · Academic mapping</div>
         <h1 className="report-title">Academic mapping</h1>
         <p className="report-lede">Course-by-course evidence compared with the stored {program.shortName} background requirements.</p>
-        <div className="evaluation-standard" data-testid="evaluation-standard">
-          <Landmark size={17} aria-hidden="true" />
-          <span><small>Evaluation standard</small><strong>{georgiaTechDataset.institution.name}</strong></span>
+        <div className="mapping-header-meta" data-testid="mapping-header-meta">
+          <div className="evaluation-standard" data-testid="evaluation-standard">
+            <Landmark size={20} aria-hidden="true" />
+            <span><small>Evaluation standard</small><strong>{georgiaTechDataset.institution.name}</strong></span>
+          </div>
+          <div className="preliminary mapping-scope-note" data-testid="notice-preliminary"><AlertCircle size={15} /><span>
+            <strong>Preliminary mapping.</strong> {isExtracted ? 'Compared using details extracted from the transcript.' : 'Demo sample only; the selected file was not parsed.'}
+          </span></div>
         </div>
       </div>
       <div className="report-actions">
@@ -1295,75 +1298,49 @@ function Report() {
         </div>
       </details>
     </section>
-    {showMappingProgress && <section
+    {mappingError && <section
       className="mapping-progress-card"
       aria-live="polite"
-      aria-busy={loading}
       data-testid="card-mapping-progress"
     >
-      <div className="mapping-loading" role="status" data-testid={loading ? 'status-mapping-loading' : 'status-mapping-progress'}>
-        {mappingError
-          ? <AlertCircle size={18} />
-          : <LoaderCircle size={18} className="animate-spin" />}
-        <div className="mapping-progress-content">
-          <strong>{mappingError ? 'Mapping did not finish' : mappingStage === 'context' ? 'Preparing academic context…' : 'Mapping academic requirements…'}</strong>
-          <div className="mapping-progress-count" data-testid="mapping-progress-count">
-            <strong>{requirements.length} of {program.requirements.length} requirements mapped</strong>
-            <span>{mappingError ? 'Mapping stopped' : mappingStage === 'context' ? 'Stage 1 of 2 · Contextualizing academic record' : 'Stage 2 of 2 · Evaluating target requirements'}</span>
-          </div>
-          <div className="mapping-progress-meter">
-            <div
-              className="mapping-progress-bar"
-              role="progressbar"
-              aria-label="Requirements mapped"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={progressPercent}
-              aria-valuetext={`${requirements.length} of ${program.requirements.length} requirements mapped, ${progressPercent}%`}
-              data-testid="mapping-progress-bar"
-            >
-              <span className="mapping-progress-fill" style={{ width: `${progressPercent}%` }} />
-            </div>
-            <span className="mapping-progress-percent">{progressPercent}%</span>
-          </div>
-          <p>{mappingError
-            ? 'Your academic record is saved. Retry without uploading the PDF again.'
-            : mappingStage === 'context'
-              ? 'Context is prepared before stored program requirements are evaluated.'
-              : 'Comparing each stored requirement with the extracted academic record.'}</p>
-        </div>
-      </div>
-      {mappingError && <div className="mapping-error" role="alert" data-testid="status-mapping-error">
+      <div className="mapping-error" role="alert" data-testid="status-mapping-error">
         <div><strong>Mapping did not finish</strong><p>{mappingError}</p></div>
         <button className="secondary-btn" type="button" onClick={retryMapping} disabled={loading} data-testid="button-retry-mapping"><RotateCcw size={14} /> Retry mapping</button>
-      </div>}
+      </div>
     </section>}
-    <div className="preliminary mapping-scope-note" data-testid="notice-preliminary"><AlertCircle size={15} /><span>
-      <strong>Preliminary mapping.</strong> {isExtracted ? 'Compared using details extracted from the transcript.' : 'Demo sample only; the selected file was not parsed.'}
-    </span></div>
-    {mappingResultsReady && <section className="mapping-dashboard" aria-label="Requirement mapping summary" data-testid="mapping-dashboard">
+    <section className={`mapping-dashboard${loading ? ' is-loading' : ''}`} aria-label="Requirement mapping summary" data-testid="mapping-dashboard">
       <div className="mapping-score-panel">
-        <span className="mapping-score-label">Requirements assessed</span>
+        <span className="mapping-score-label" role={loading ? 'status' : undefined} data-testid={loading ? 'status-mapping-loading' : 'status-mapping-progress'}>
+          {loading ? mappingStage === 'context' ? 'Preparing academic context' : 'Mapping in progress' : mappingError ? 'Mapping needs a retry' : 'Requirements assessed'}
+        </span>
         <div className="mapping-score-value">{requirements.length}<span> / {program.requirements.length}</span></div>
-        <p>{allRequirementsCompleted ? 'All stored criteria evaluated' : 'Stored criteria evaluated so far'}</p>
+        <p>{loading
+          ? mappingStage === 'context'
+            ? 'Preparing the extracted record before evaluating stored requirements.'
+            : 'Comparing extracted courses with stored program requirements.'
+          : allRequirementsCompleted
+            ? 'All stored criteria evaluated'
+            : mappingError
+              ? 'Your saved record is ready to retry'
+              : 'Stored criteria evaluated so far'}</p>
         <div className="mapping-progress-meter">
-          <div className="mapping-progress-bar" role="progressbar" aria-label="Requirements assessed" aria-valuemin={0} aria-valuemax={program.requirements.length} aria-valuenow={requirements.length}>
+          <div className="mapping-progress-bar" role="progressbar" aria-label="Requirements assessed" aria-valuemin={0} aria-valuemax={program.requirements.length} aria-valuenow={requirements.length} aria-valuetext={`${requirements.length} of ${program.requirements.length} requirements mapped, ${progressPercent}%`} data-testid="mapping-progress-bar">
             <span className="mapping-progress-fill" style={{ width: `${progressPercent}%` }} />
           </div>
           <span className="mapping-progress-percent">{progressPercent}%</span>
         </div>
       </div>
       <div className="mapping-breakdown-panel">
-        <div className="mapping-breakdown-heading"><h2>Requirement results</h2><span>{requirements.length} evaluated</span></div>
+        <div className="mapping-breakdown-heading"><h2>Requirement results</h2><span>{requirements.length > 0 ? `${requirements.length} evaluated` : loading ? 'Waiting for results' : 'No results yet'}</span></div>
         <div className="mapping-breakdown-grid">
-          <div className="mapping-breakdown-tile"><span>Covered</span><strong>{counts.covered}</strong></div>
-          <div className="mapping-breakdown-tile"><span>Partial</span><strong>{counts.partial}</strong></div>
-          <div className="mapping-breakdown-tile"><span>Insufficient</span><strong>{counts.insufficient}</strong></div>
-          <div className="mapping-breakdown-tile"><span>Potential gap</span><strong>{counts.potentialGap}</strong></div>
+          <div className="mapping-breakdown-tile"><span>Covered</span><strong>{requirements.length > 0 || mappingResultsReady ? counts.covered : '—'}</strong></div>
+          <div className="mapping-breakdown-tile"><span>Partial</span><strong>{requirements.length > 0 || mappingResultsReady ? counts.partial : '—'}</strong></div>
+          <div className="mapping-breakdown-tile"><span>Insufficient</span><strong>{requirements.length > 0 || mappingResultsReady ? counts.insufficient : '—'}</strong></div>
+          <div className="mapping-breakdown-tile"><span>Potential gap</span><strong>{requirements.length > 0 || mappingResultsReady ? counts.potentialGap : '—'}</strong></div>
         </div>
         <div className="mapping-dashboard-footer"><span>{academicRecord?.institution.name} · {program.shortName}</span><span>{program.requirements.length} stored criteria</span></div>
       </div>
-    </section>}
+    </section>
     <div className="report-sections">
       <section className="panel section-card section-disclosure academic-context-card" aria-live="polite" aria-busy={contextLoading} data-testid="card-academic-context">
         <details data-testid="disclosure-academic-context">
