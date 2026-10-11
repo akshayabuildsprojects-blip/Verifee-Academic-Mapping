@@ -193,6 +193,16 @@ button { cursor:pointer; }
 .review-section{padding:20px 0;border-top:1px solid #e8ece9}
 .review-section:first-of-type{border-top:0;padding-top:0}
 .review-section .section-title{margin-bottom:13px}
+.review-section.review-collapsible{padding:0;margin:0;border-top:1px solid #e8ece9}
+.review-summary{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:58px;cursor:pointer;list-style:none}
+.review-summary::-webkit-details-marker{display:none}
+.review-summary::after{content:"+";color:#477466;font-size:20px}
+.review-collapsible[open]>.review-summary::after{content:"−"}
+.review-summary-title{color:#34494b;font-size:15px;font-weight:700}
+.review-summary-value{margin-left:auto;color:#6c7979;font-size:12px}
+.review-collapsible-content{padding:0 0 20px}
+.v-report-post-actions-top{margin:0 0 22px}
+.v-report-post-actions-top .v-report-button{min-height:40px}
 .language-detection-card{padding:14px 15px;border:1px solid #dce6df;border-radius:8px;background:#f8faf8;color:#4b5c5c}
 .language-detection-card.no-english{border-color:#eadedb;background:#fbf7f6}
 .language-detection-card.uncertain{border-color:#e8dfcc;background:#fbf9f3}

@@ -9,4 +9,10 @@
 export interface ReportProofSendInput {
   /** @pattern ^[a-f0-9]{64}$ */
   reportHash: string;
+  /**
+     * @minLength 1
+     * @maxLength 10000000
+     * @pattern ^[A-Za-z0-9+/]+={0,2}$
+     */
+  pdfBase64: string;
 }

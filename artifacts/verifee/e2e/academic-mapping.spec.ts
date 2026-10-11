@@ -1,5 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).sort().map((key) => `${JSON.stringify(key)}:${stableJson(record[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
 
 const programId = "ms-analytics";
 const requirementIds = [
@@ -483,6 +493,18 @@ test("resets scroll between wizard steps but not within a step", async ({ page }
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
 });
 
+test("keeps Step 2 concise with collapsed details and removes only the Step 3 explanatory note", async ({ page }) => {
+  await openReview(page);
+  await expect(page.getByText("Review the extracted details before choosing a target.")).toBeVisible();
+  await expect(page.locator(".review-collapsible[open]")).toHaveCount(0);
+  await page.locator(".review-collapsible").filter({ hasText: "Credential details" }).locator("summary").click();
+  await expect(page.locator(".review-collapsible[open]")).toHaveCount(1);
+  await page.getByTestId("button-continue-target").click();
+  await expect(page).toHaveURL(/\/target$/);
+  await expect(page.getByText(/Program requirements, importance, and matching concepts/)).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Stored background requirements" })).toBeVisible();
+});
+
 test("shows institution and jurisdiction provenance with the exact Scottish source", async ({ page }) => {
   const record = {
     ...academicRecord,
@@ -884,14 +906,49 @@ test("shows the report preview immediately and keeps its downloads, save choices
   page,
 }) => {
   const proofRequests: string[] = [];
+  let syntheticProof: Record<string, unknown> | null = null;
+  let sentAt: string | null = null;
+  let emailedPdfBase64 = "";
   await page.route("**/api/report-proofs**", async (route) => {
     const request = route.request();
-    const forwarded = new URL(request.url());
-    forwarded.hostname = "localhost";
-    forwarded.port = "80";
-    proofRequests.push(`${request.method()} ${forwarded.pathname}`);
-    const response = await route.fetch({ url: forwarded.toString() });
-    await route.fulfill({ response });
+    const path = new URL(request.url()).pathname;
+    proofRequests.push(`${request.method()} ${path}`);
+    if (request.method() === "GET" && path.endsWith("/status")) {
+      await route.fulfill(syntheticProof
+        ? { status: 200, contentType: "application/json", body: JSON.stringify({ ...syntheticProof, sentAt }) }
+        : { status: 404, contentType: "application/json", body: JSON.stringify({ error: "not found" }) });
+      return;
+    }
+    if (request.method() === "POST" && path === "/api/report-proofs") {
+      const body = request.postDataJSON() as { reportId: string; payload: unknown };
+      const hash = createHash("sha256").update(stableJson(body.payload)).digest("hex");
+      syntheticProof = { reportId: body.reportId, reportHash: hash, status: "anchored", proofStatus: "anchored", signature: "synthetic-test-signature", proofTimestamp: new Date().toISOString(), issuedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 86_400_000).toISOString() };
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(syntheticProof) });
+      return;
+    }
+    if (request.method() === "POST" && path.endsWith("/send")) {
+      const body = request.postDataJSON() as { pdfBase64: string; reportHash: string };
+      emailedPdfBase64 = body.pdfBase64;
+      sentAt = new Date().toISOString();
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+        reportId: syntheticProof?.reportId, reportHash: body.reportHash, sentAt, sharingStatus: "sent",
+      }) });
+      return;
+    }
+    if (request.method() === "GET" && path.endsWith("/verify")) {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+        reportId: syntheticProof?.reportId,
+        reportHash: syntheticProof?.reportHash,
+        currentReportHash: syntheticProof?.reportHash,
+        signature: syntheticProof?.signature,
+        issuedAt: syntheticProof?.issuedAt,
+        expiresAt: syntheticProof?.expiresAt,
+        status: "valid",
+        checks: { hashMatches: true, reportIdMatches: true, appMatches: true, statusActive: true },
+      }) });
+      return;
+    }
+    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "unexpected proof request" }) });
   });
   await openReport(page, { expandSections: false });
   await sendStreamEvent(page, 0, "complete", result);
@@ -931,7 +988,7 @@ test("shows the report preview immediately and keeps its downloads, save choices
   await expect(page.getByText("Free in Demo Mode")).toBeVisible();
   await expect(page.getByText("Report pricing is disabled during the Verifee demo. No payment information is required.")).toBeVisible();
   await expect(page.getByText("Preliminary Academic Mapping Report").first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Example University", exact: true })).toBeVisible();
+  await expect(page.getByText("Example University", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Academic Interpretation · Completed")).toBeVisible();
   await expect(page.getByTestId(`report-requirement-${requirementIds[0]}`)).toContainText("Calculus");
   await expect(page.getByTestId(`report-requirement-${requirementIds[0]}`)).toContainText("Covered");
@@ -945,8 +1002,7 @@ test("shows the report preview immediately and keeps its downloads, save choices
   await expect(
     page.getByRole("link", { name: "Example University course catalog: Calculus I" }).first(),
   ).toHaveAttribute("href", "https://catalog.example.edu/courses/math-101");
-  await expect(page.getByRole("heading", { name: "Items requiring review" })).toBeVisible();
-  await expect(page.getByText(/Confirm the transcript grading scale/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Items requiring review" })).toHaveCount(0);
 
   const firstReportIdentity = await page.evaluate(() => {
     const value = JSON.parse(
@@ -1007,20 +1063,21 @@ test("shows the report preview immediately and keeps its downloads, save choices
   await page.getByTestId("button-send-to-institution").click();
   const confirmation = page.getByRole("dialog");
   await expect(confirmation.getByRole("heading", { name: "Send report to institution?" })).toBeVisible();
-  await expect(confirmation).toContainText("Verifee will create a cryptographic proof for this exact report before sending it. After proof creation, changes to this report will create a mismatch.");
+  await expect(confirmation).toContainText("Verifee will create a cryptographic proof for this exact report, then email the PDF to akumar3134@gatech.edu. After proof creation, changes to this report will create a mismatch.");
   await confirmation.getByRole("button", { name: "Cancel" }).click();
   expect(proofRequests.some((request) => request.startsWith("POST "))).toBe(false);
   await page.getByTestId("button-send-to-institution").click();
   await page.getByRole("dialog").getByRole("button", { name: "Create proof & send" }).click();
   await expect(page.getByTestId("report-proof-status")).toHaveText("Proof status: Anchored");
-  await expect(page.getByTestId("report-sent-status")).toHaveText("Ready for institution sharing");
+  await expect(page.getByTestId("report-sent-status")).toHaveText("Sent to akumar3134@gatech.edu");
+  expect(Buffer.from(emailedPdfBase64, "base64").subarray(0, 5).toString("ascii")).toBe("%PDF-");
   expect(proofRequests.some((request) => request === "POST /api/report-proofs")).toBe(true);
   expect(proofRequests.some((request) => request.endsWith("/send"))).toBe(true);
   await page.getByRole("link", { name: "Verify Report" }).click();
   await expect(page.getByTestId("report-proof-verification")).toContainText("Valid");
   await page.goBack();
   await expect(page.getByTestId("report-proof-status")).toHaveText("Proof status: Anchored");
-  await expect(page.getByTestId("report-sent-status")).toHaveText("Ready for institution sharing");
+  await expect(page.getByTestId("report-sent-status")).toHaveText("Sent to akumar3134@gatech.edu");
 
   await page.getByTestId("button-save-to-my-reports").click();
   await expect(page.getByTestId("status-save-to-reports")).toContainText(

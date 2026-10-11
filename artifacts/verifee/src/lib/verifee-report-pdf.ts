@@ -102,7 +102,8 @@ function safeSourceUrl(source: VerifeeReportSource) {
 export function downloadVerifeeReportPdf(
   data: VerifeeReportData,
   metadata: GeneratedReportMetadata,
-) {
+  output: 'download' | 'base64' = 'download',
+): string | void {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -688,89 +689,15 @@ export function downloadVerifeeReportPdf(
     gap: 8,
   });
 
-  addSectionHeading(
-    '03 / MAPPING SUMMARY',
-    'Academic Mapping Summary',
-    `${data.requirementsAnalyzed} requirements analyzed against ${data.targetProgram.name}.`,
-  );
-  const summaryRows = [
-    ['Covered', data.counts.covered, palette.green],
-    ['Partially Covered', data.counts.partiallyCovered, palette.amber],
-    ['Potential Gaps', data.counts.potentialGap, palette.clay],
-    ['Insufficient Evidence', data.counts.insufficientEvidence, palette.muted],
-  ] as const;
-  const summaryWidth = contentWidth / summaryRows.length;
-  summaryRows.forEach(([label, count, color], index) => {
-    ensureSpace(50);
-    const x = margin + summaryWidth * index;
-    doc.setFillColor(...palette.pale);
-    doc.setDrawColor(...palette.line);
-    doc.rect(x, y, summaryWidth - 4, 40, 'FD');
-    doc.setFont('times', 'normal');
-    doc.setFontSize(17);
-    setColor(color);
-    doc.text(String(count), x + 9, y + 19);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
-    setColor(palette.muted);
-    doc.text(label, x + 9, y + 32, {
-      maxWidth: summaryWidth - 18,
-    });
-  });
-  y += 54;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  setColor(palette.green);
-  doc.text('Credential Verification', margin, y);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  setColor(palette.ink);
-  doc.text(data.credentialVerification.status, margin + 130, y);
-  y += 14;
-  if (data.credentialVerification.method) {
-    addWrapped(`Verification method: ${data.credentialVerification.method}`, {
-      size: 8,
-      color: palette.muted,
-    });
-  }
-  addWrapped(data.credentialVerification.explanation, {
-    size: 8,
-    color: palette.muted,
-    gap: 7,
-  });
-
   nextPage();
   addSectionHeading(
-    '04 / REQUIREMENT RESULTS',
+    '03 / REQUIREMENT RESULTS',
     'Detailed Requirement Results',
-    'Results below use the completed Step 4 mapping exactly as stored. No additional analysis was run to prepare this report.',
+    `${data.requirementsAnalyzed} requirements assessed against ${data.targetProgram.name}.`,
   );
   data.requirements.forEach(drawRequirement);
 
-  addSectionHeading(
-    '05 / REVIEW',
-    'Items Requiring Review',
-    'These items are derived from the current academic context, verification state, and requirement results.',
-  );
-  if (data.itemsRequiringReview.length > 0) {
-    for (const item of data.itemsRequiringReview) {
-      addWrapped(`• ${item}`, {
-        size: 8.5,
-        color: palette.ink,
-        x: margin + 9,
-        width: contentWidth - 9,
-        gap: 5,
-      });
-    }
-  } else {
-    addWrapped('No specific review items were identified in this analysis.', {
-      size: 8.5,
-      color: palette.muted,
-    });
-  }
-
-  addSectionHeading('06 / IMPORTANT INFORMATION', 'Interpretation Disclaimer');
+  addSectionHeading('04 / IMPORTANT INFORMATION', 'Interpretation Disclaimer');
   addWrapped(VERIFEE_REPORT_DISCLAIMER, {
     size: 8.5,
     color: palette.ink,
@@ -801,6 +728,9 @@ export function downloadVerifeeReportPdf(
     safeFilePart(data.targetProgram.shortName || data.targetProgram.name),
     metadata.reportId.replace(/[^a-z0-9-]/gi, ''),
   ].join('_');
+  if (output === 'base64') {
+    return doc.output('datauristring').split(',')[1] ?? '';
+  }
   doc.save(`${fileName}.pdf`);
 }
 

@@ -6,10 +6,10 @@ import {
   ExternalLink,
   FileText,
   Landmark,
-  ShieldCheck,
 } from 'lucide-react';
 import verifeeLogo from '@/assets/verifee-logo.png?inline';
 import ReportProofPanel from '@/components/report-proof-panel';
+import { downloadVerifeeReportPdf } from '@/lib/verifee-report-pdf';
 import {
   VERIFEE_REPORT_DISCLAIMER,
   type GeneratedReportMetadata,
@@ -223,52 +223,14 @@ export function VerifeeReportView({
           <h1>Verifee Report</h1>
           <p>Your preliminary academic mapping report is ready to review or download.</p>
         </header>
-
-        <section className="v-report-summary" aria-labelledby="v-report-summary-title">
-          <div className="v-report-summary-heading">
-            <div>
-              <span className="v-report-label">Analysis overview</span>
-              <h2 id="v-report-summary-title">{data.issuingInstitution}</h2>
-            </div>
-            <div className="v-report-verification">
-              <ShieldCheck size={17} aria-hidden="true" />
-              <span><small>Credential verification</small><strong>{data.credentialVerification.status}</strong></span>
-            </div>
-          </div>
-
-          <div className="v-report-overview-grid">
-            <div className="v-report-overview-context">
-              <ContextValue label="Country / education system" field={data.countryEducationSystem} />
-              <ContextValue label="Broad academic field" field={data.broadAcademicField} />
-              <ContextValue label="Specific discipline" field={data.specificDiscipline} />
-              <ContextValue label="Source program" field={data.sourceProgram} />
-              <div className="v-report-context-item">
-                <span className="v-report-label">Target institution &amp; program</span>
-                <strong>{data.targetInstitution}</strong>
-                <span className="v-report-context-origin">{data.targetProgram.name} ({data.targetProgram.shortName}) · {data.targetProgram.school}</span>
-              </div>
-              <div className="v-report-context-item">
-                <span className="v-report-label">Academic interpretation</span>
-                <strong>{data.academicInterpretation}</strong>
-              </div>
-            </div>
-            <div className="v-report-count-panel">
-              <div className="v-report-count-total">
-                <span className="v-report-label">Requirements analyzed</span>
-                <strong>{data.requirementsAnalyzed}</strong>
-              </div>
-              <div className="v-report-counts" aria-label="Requirement status counts">
-                {counts.map(({ label, count, tone }) => (
-                  <div className="v-report-count-item" key={label}>
-                    <span className={`v-report-count-dot v-report-count-dot-${tone}`} aria-hidden="true" />
-                    <span>{label}</span>
-                    <strong>{count}</strong>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
+        <div className="v-report-post-actions v-report-post-actions-top">
+          <button className="v-report-button v-report-button-secondary" type="button" onClick={onBackToMapping} data-testid="button-back-to-mapping">
+            <ArrowLeft size={15} aria-hidden="true" /> Back to Academic Mapping
+          </button>
+          <button className="v-report-button v-report-button-text" type="button" onClick={onStartNewAnalysis} data-testid="button-start-new-analysis">
+            Start New Analysis <ArrowRight size={15} aria-hidden="true" />
+          </button>
+        </div>
 
         {showDemoPricingNotice && (
             <section className="v-report-fee" aria-labelledby="v-report-fee-title">
@@ -289,29 +251,21 @@ export function VerifeeReportView({
                   <span className="v-report-label">Generated academic report</span>
                   <h2 id="v-report-preview-title">Report preview</h2>
                 </div>
-                <div className="v-report-download-actions">
-                  {onSaveToMyReports && (
-                    <button
-                      className="v-report-button v-report-button-secondary"
-                      type="button"
-                      onClick={onSaveToMyReports}
-                      disabled={isSavedToMyReports}
-                      data-testid="button-save-to-my-reports"
-                    >
-                      {isSavedToMyReports ? <Check size={15} aria-hidden="true" /> : <FileText size={15} aria-hidden="true" />}
-                      {isSavedToMyReports ? 'Saved to My Reports' : 'Save to My Reports'}
-                    </button>
-                  )}
-                  <button className="v-report-button v-report-button-secondary" type="button" onClick={onDownloadReceipt} data-testid="button-download-submission-receipt">
-                    <FileText size={15} aria-hidden="true" /> Download Submission Receipt
-                  </button>
-                  <button className="v-report-button v-report-button-primary" type="button" onClick={onDownload} aria-label="Download report as PDF" data-testid="button-download-report">
-                    <ArrowDownToLine size={16} aria-hidden="true" /> Download PDF
-                  </button>
-                </div>
               </div>
 
-              <ReportProofPanel reportId={generatedReport.reportId} payload={data} />
+              <ReportProofPanel
+                reportId={generatedReport.reportId}
+                payload={data}
+                buildPdfBase64={() => downloadVerifeeReportPdf(data, generatedReport, 'base64') || ''}
+                extraActions={<>
+                  {onSaveToMyReports && <button className="v-report-button v-report-button-secondary" type="button" onClick={onSaveToMyReports} disabled={isSavedToMyReports} data-testid="button-save-to-my-reports">
+                  {isSavedToMyReports ? <Check size={15} aria-hidden="true" /> : <FileText size={15} aria-hidden="true" />}
+                    {isSavedToMyReports ? 'Saved' : 'Save'}
+                  </button>}
+                  <button className="v-report-button v-report-button-secondary" type="button" onClick={onDownloadReceipt} data-testid="button-download-submission-receipt"><FileText size={15} aria-hidden="true" /> Download Receipt</button>
+                  <button className="v-report-button v-report-button-secondary" type="button" onClick={onDownload} aria-label="Download report as PDF" data-testid="button-download-report"><ArrowDownToLine size={16} aria-hidden="true" /> Download PDF</button>
+                </>}
+              />
 
               <article className="v-report-cover" aria-label="Report cover page">
                 <div className="v-report-cover-top">
@@ -449,29 +403,11 @@ export function VerifeeReportView({
                 </div>
               </section>
 
-              {data.itemsRequiringReview.length > 0 && (
-                <section className="v-report-review-section" aria-labelledby="v-report-review-heading">
-                  <span className="v-report-review-kicker">05 / REVIEW NOTES</span>
-                  <h2 id="v-report-review-heading">Items requiring review</h2>
-                  <ul>
-                    {data.itemsRequiringReview.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}
-                  </ul>
-                </section>
-              )}
-
               <footer className="v-report-disclaimer">
                 <span>INTERPRETATION BOUNDARY</span>
                 <p>{VERIFEE_REPORT_DISCLAIMER}</p>
               </footer>
             </section>
-            <div className="v-report-post-actions">
-              <button className="v-report-button v-report-button-secondary" type="button" onClick={onBackToMapping} data-testid="button-back-to-mapping">
-                <ArrowLeft size={15} aria-hidden="true" /> Back to Academic Mapping
-              </button>
-              <button className="v-report-button v-report-button-text" type="button" onClick={onStartNewAnalysis} data-testid="button-start-new-analysis">
-                Start New Analysis <ArrowRight size={15} aria-hidden="true" />
-              </button>
-            </div>
       </div>
     </main>
   );

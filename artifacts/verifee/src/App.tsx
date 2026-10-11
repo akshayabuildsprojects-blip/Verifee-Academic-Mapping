@@ -700,36 +700,38 @@ function Review() {
     <section className="wizard-card">
       <div className="eyebrow">Step 2 of 5</div>
       <h1 className="wizard-title">Verify &amp; review</h1>
-      <p className="wizard-intro">Review the academic details before choosing a target. Reading a transcript does not establish that it is authentic.</p>
+      <p className="wizard-intro">Review the extracted details before choosing a target.</p>
       <div className="review-disclosure"><AlertCircle size={17} /><span>{isExtracted
         ? <><strong>Academic details extracted from the PDF.</strong> “{fileName || 'Selected credential'}” was processed for this review and was not stored by Verifee. No authenticity check was performed.</>
         : <><strong>Sample record shown for demonstration.</strong> “{fileName || 'Selected credential'}” was not parsed or saved. No authenticity check was performed.</>}</span></div>
-      <section className="review-section" aria-labelledby="format-heading">
-        <div className="section-title"><h2 id="format-heading">Credential format</h2><span className="small-label">Selected file</span></div>
-        <div className="format-summary"><span className="format-summary-type">{format}</span><span className="format-summary-name">{fileName || 'Selected credential'}</span></div>
-      </section>
-      <section className="review-section" aria-labelledby="verification-heading">
-        <div className="section-title"><h2 id="verification-heading">Verification status</h2></div>
-        <div className="verification-review"><ShieldAlert size={18} /><div><span className="status-pill" data-testid="status-verification">{verificationStatus}</span><p>{verificationExplanation}</p></div></div>
-      </section>
-      <section className="review-section" aria-labelledby="interpretation-status-heading">
-        <div className="section-title"><h2 id="interpretation-status-heading">Academic interpretation</h2></div>
-        <div className="verification-review"><Check size={18} /><div><span className="status-pill" data-testid="status-academic-interpretation">{isExtracted ? 'Available' : 'Sample only'}</span><p>{isExtracted ? 'The values below were extracted from the PDF. Missing or unreadable details are shown as not present in the transcript.' : 'The values below are sample data and were not extracted from the selected file.'}</p></div></div>
-      </section>
-      {isExtracted && languageDetection && <section className="review-section" aria-labelledby="language-detection-heading">
-        <div className="section-title"><h2 id="language-detection-heading">Language detection</h2></div>
-        <LanguageDetectionCard detection={languageDetection} />
-      </section>}
-      <section className="review-section" aria-labelledby="credential-heading">
-        <div className="section-title"><h2 id="credential-heading">Credential details</h2><span className="small-label">{isExtracted ? 'Extracted from PDF' : 'Sample record'}</span></div>
-        <div className="credential-grid">{credentialFields.map(([label, value]) => <div key={label}><span className="data-label">{label}</span><span className="data-value">{value}</span></div>)}</div>
-      </section>
-      <section className="review-section" aria-labelledby="courses-heading">
-        <div className="section-title"><h2 id="courses-heading">Courses detected</h2><span className="small-label">{courseCount} {isExtracted ? 'extracted' : 'in sample record'}</span></div>
+      <details className="review-section review-collapsible">
+        <summary className="review-summary"><span className="review-summary-title">Credential format</span><span className="review-summary-value">{format}</span></summary>
+        <div className="review-collapsible-content"><div className="format-summary"><span className="format-summary-type">{format}</span><span className="format-summary-name">{fileName || 'Selected credential'}</span></div></div>
+      </details>
+      <details className="review-section review-collapsible">
+        <summary className="review-summary"><span className="review-summary-title">Verification status</span><span className="review-summary-value">{verificationStatus}</span></summary>
+        <div className="review-collapsible-content"><div className="verification-review"><ShieldAlert size={18} /><div><span className="status-pill" data-testid="status-verification">{verificationStatus}</span><p>{verificationExplanation}</p></div></div></div>
+      </details>
+      <details className="review-section review-collapsible">
+        <summary className="review-summary"><span className="review-summary-title">Academic interpretation</span><span className="review-summary-value">{isExtracted ? 'Available' : 'Sample only'}</span></summary>
+        <div className="review-collapsible-content"><div className="verification-review"><Check size={18} /><div><span className="status-pill" data-testid="status-academic-interpretation">{isExtracted ? 'Available' : 'Sample only'}</span><p>{isExtracted ? 'Extracted from the PDF. Missing or unreadable values are marked as unavailable.' : 'Sample data; not extracted from the selected file.'}</p></div></div></div>
+      </details>
+      {isExtracted && languageDetection && <details className="review-section review-collapsible">
+        <summary className="review-summary"><span className="review-summary-title">Language detection</span><span className="review-summary-value">View result</span></summary>
+        <div className="review-collapsible-content"><LanguageDetectionCard detection={languageDetection} /></div>
+      </details>}
+      <details className="review-section review-collapsible">
+        <summary className="review-summary"><span className="review-summary-title">Credential details</span><span className="review-summary-value">{isExtracted ? 'Extracted' : 'Sample record'}</span></summary>
+        <div className="review-collapsible-content"><div className="credential-grid">{credentialFields.map(([label, value]) => <div key={label}><span className="data-label">{label}</span><span className="data-value">{value}</span></div>)}</div></div>
+      </details>
+      <details className="review-section review-collapsible">
+        <summary className="review-summary"><span className="review-summary-title">Courses detected</span><span className="review-summary-value">{courseCount} {isExtracted ? 'courses' : 'sample courses'}</span></summary>
+        <div className="review-collapsible-content">
         {courseRows.length > 0
           ? <><div style={{overflowX:'auto'}}><table className="course-table"><thead><tr><th>Code</th><th>Course title</th><th>Credits / units</th><th>Grade</th><th>Description / outcomes</th></tr></thead><tbody>{visibleCourseRows.map((course, index) => <tr key={`${course.code || 'course'}-${index}`}><td className="course-code">{course.code || '—'}</td><td>{course.title || (isExtracted ? 'Not shown in transcript' : '—')}</td><td>{course.credits || '—'}</td><td>{course.grade || '—'}</td><td>{course.description || '—'}</td></tr>)}</tbody></table></div><div className="course-pagination"><span>Showing {Math.min(visibleCourseCount, courseCount)} of {courseCount} courses</span>{visibleCourseCount < courseCount && <button className="secondary-btn" type="button" onClick={showMoreCourses} data-testid="button-show-more-courses">Show next 10 courses</button>}</div></>
           : <p className="form-note">No course rows were readable in this transcript. Review the other extracted fields before proceeding.</p>}
-      </section>
+        </div>
+      </details>
       <div className="wizard-actions"><button className="secondary-btn" type="button" onClick={() => setLocation('/start')}><ArrowLeft size={14} /> Back to upload</button><button className="cta wizard-next" type="button" onClick={() => setLocation('/target')} data-testid="button-continue-target"><span>Continue to target selection</span><ArrowRight size={16} /></button></div>
     </section>
     <Disclaimer />
@@ -783,7 +785,6 @@ function TargetSelection() {
           </article>;
         })}</div>
       </section>
-        <p className="form-note">Program requirements, importance, and matching concepts come only from the stored Georgia Tech definition; not every criterion is a mandatory admissions prerequisite. The mapping will use all course rows in the reviewed academic record.</p>
       <div className="wizard-actions"><button className="secondary-btn" type="button" onClick={() => setLocation('/analysis')}><ArrowLeft size={14} /> Back to review</button><button className="cta wizard-next" type="button" onClick={continueToMapping} data-testid="button-generate-mapping"><span>Generate preliminary mapping</span><ArrowRight size={16} /></button></div>
     </section>
     <Disclaimer />

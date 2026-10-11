@@ -390,13 +390,19 @@ export interface ReportProofStatus {
 export interface ReportProofSendInput {
   /** @pattern ^[a-f0-9]{64}$ */
   reportHash: string;
+  /**
+     * @minLength 1
+     * @maxLength 10000000
+     * @pattern ^[A-Za-z0-9+/]+={0,2}$
+     */
+  pdfBase64: string;
 }
 
 export type ReportProofSentResponseSharingStatus = typeof ReportProofSentResponseSharingStatus[keyof typeof ReportProofSentResponseSharingStatus];
 
 
 export const ReportProofSentResponseSharingStatus = {
-  ready_for_sharing: 'ready_for_sharing',
+  sent: 'sent',
 } as const;
 
 export interface ReportProofSentResponse {

@@ -348,17 +348,22 @@ export const MarkReportProofSentParams = zod.object({
 })
 
 export const markReportProofSentBodyReportHashRegExp = new RegExp('^[a-f0-9]{64}$');
+export const markReportProofSentBodyPdfBase64Max = 10000000;
+
+
+export const markReportProofSentBodyPdfBase64RegExp = new RegExp('^[A-Za-z0-9+/]+={0,2}$');
 
 
 export const MarkReportProofSentBody = zod.object({
-  "reportHash": zod.string().regex(markReportProofSentBodyReportHashRegExp)
+  "reportHash": zod.string().regex(markReportProofSentBodyReportHashRegExp),
+  "pdfBase64": zod.string().min(1).max(markReportProofSentBodyPdfBase64Max).regex(markReportProofSentBodyPdfBase64RegExp)
 })
 
 export const MarkReportProofSentResponse = zod.object({
   "reportId": zod.string(),
   "reportHash": zod.string(),
   "sentAt": zod.coerce.date(),
-  "sharingStatus": zod.enum(['ready_for_sharing'])
+  "sharingStatus": zod.enum(['sent'])
 })
 
 

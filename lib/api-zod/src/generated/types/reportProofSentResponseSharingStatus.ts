@@ -10,5 +10,5 @@ export type ReportProofSentResponseSharingStatus = typeof ReportProofSentRespons
 
 
 export const ReportProofSentResponseSharingStatus = {
-  ready_for_sharing: 'ready_for_sharing',
+  sent: 'sent',
 } as const;

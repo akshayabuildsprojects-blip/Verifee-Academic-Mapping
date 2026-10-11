@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import "./report-proof-panel.css";
 
@@ -27,7 +27,12 @@ async function sha256(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export default function ReportProofPanel({ reportId, payload }: { reportId: string; payload: object }) {
+export default function ReportProofPanel({ reportId, payload, buildPdfBase64, extraActions }: {
+  reportId: string;
+  payload: object;
+  buildPdfBase64(): string;
+  extraActions?: ReactNode;
+}) {
   const [proof, setProof] = useState<ProofStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -74,9 +79,12 @@ export default function ReportProofPanel({ reportId, payload }: { reportId: stri
       const sendResponse = await fetch(`/api/report-proofs/${encodeURIComponent(reportId)}/send`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ reportHash }),
+        body: JSON.stringify({ reportHash, pdfBase64: buildPdfBase64() }),
       });
-      if (!sendResponse.ok) throw new Error("Proof is anchored, but the report could not be marked ready for institution sharing. Please retry.");
+      if (!sendResponse.ok) {
+        const body = await sendResponse.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || "Proof is anchored, but the report email could not be sent. Please retry.");
+      }
       const sent = await sendResponse.json() as { sentAt: string };
       setProof({ ...anchoredProof, sentAt: sent.sentAt });
       setConfirmOpen(false);
@@ -100,13 +108,14 @@ export default function ReportProofPanel({ reportId, payload }: { reportId: stri
         <div><dt>Report hash</dt><dd className="report-proof-hash">{proof?.reportHash ?? "Created when you send the report"}</dd></div>
         <div><dt>Solana transaction signature</dt><dd className="report-proof-signature">{proof?.signature ?? "Not available yet"}</dd></div>
         <div><dt>Proof timestamp</dt><dd>{proof?.proofTimestamp ? new Date(proof.proofTimestamp).toLocaleString() : "Not created"}</dd></div>
-        <div><dt>Sent status</dt><dd data-testid="report-sent-status">{proof?.sentAt ? "Ready for institution sharing" : "Not sent"}</dd></div>
+        <div><dt>Sent status</dt><dd data-testid="report-sent-status">{proof?.sentAt ? "Sent to akumar3134@gatech.edu" : "Not sent"}</dd></div>
       </dl>
       {error && <p className="report-proof-error" role="alert">{error}</p>}
       <div className="report-proof-actions">
         {proof?.sentAt
-          ? <button type="button" className="v-report-button v-report-button-primary" disabled>Ready for institution sharing</button>
+          ? <button type="button" className="v-report-button v-report-button-primary" disabled>Sent</button>
           : <button data-testid="button-send-to-institution" type="button" className="v-report-button v-report-button-primary" onClick={() => setConfirmOpen(true)}>Send to Institution</button>}
+        {extraActions}
         {proof?.proofStatus === "anchored" && <Link className="v-report-button v-report-button-secondary" href={`/verify/${encodeURIComponent(reportId)}`}>Verify Report</Link>}
       </div>
       <p className="report-proof-retention">Report details are retained for 90 days to support verification.</p>
@@ -114,7 +123,7 @@ export default function ReportProofPanel({ reportId, payload }: { reportId: stri
         <div className="report-proof-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setConfirmOpen(false); }}>
           <section className="report-proof-modal" role="dialog" aria-modal="true" aria-labelledby="report-proof-confirm-title" aria-describedby="report-proof-confirm-text">
             <h2 id="report-proof-confirm-title">Send report to institution?</h2>
-            <p id="report-proof-confirm-text">Verifee will create a cryptographic proof for this exact report before sending it. After proof creation, changes to this report will create a mismatch.</p>
+             <p id="report-proof-confirm-text">Verifee will create a cryptographic proof for this exact report, then email the PDF to akumar3134@gatech.edu. After proof creation, changes to this report will create a mismatch.</p>
             <div className="report-proof-modal-actions">
               <button type="button" className="v-report-button v-report-button-secondary" disabled={busy} onClick={() => setConfirmOpen(false)}>Cancel</button>
               <button type="button" className="v-report-button v-report-button-primary" disabled={busy} onClick={() => void createProofAndSend()}>{busy ? "Creating proof…" : "Create proof & send"}</button>

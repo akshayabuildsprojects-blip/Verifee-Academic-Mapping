@@ -2,6 +2,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import bs58 from "bs58";
 import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction, sendAndConfirmTransaction } from "@solana/web3.js";
 import { and, eq, gt, lte, or } from "drizzle-orm";
+import { ReplitConnectors } from "@replit/connectors-sdk";
 import { db, reportProofsTable } from "@workspace/db";
 import { hashReportPayload as reportHash } from "../lib/report-proof-canonical";
 import {
@@ -225,11 +226,12 @@ router.get("/report-proofs/:reportId/status", async (req, res): Promise<void> =>
     proofStatus: row.proofStatus,
     signature: row.solanaSignature,
     proofTimestamp: row.issuedAt.toISOString(),
-    sentAt: row.sentAt?.toISOString() ?? null,
+    sentAt: row.emailSentAt?.toISOString() ?? null,
   }));
 });
 
 router.post("/report-proofs/:reportId/send", async (req, res): Promise<void> => {
+  if (!rateLimit(req, res)) return;
   const params = VerifyReportProofParams.safeParse(req.params);
   const body = MarkReportProofSentBody.safeParse(req.body);
   if (!params.success || !body.success) {
@@ -242,16 +244,20 @@ router.post("/report-proofs/:reportId/send", async (req, res): Promise<void> => 
     res.status(404).json({ error: "Report proof not found." });
     return;
   }
+  if (!row.reportPayload || reportHash(row.reportPayload) !== row.reportHash) {
+    res.status(409).json({ error: "The stored report no longer matches its anchored proof." });
+    return;
+  }
   if (row.reportHash !== body.data.reportHash) {
     res.status(409).json({ error: "The report hash does not match the anchored proof." });
     return;
   }
-  if (row.sentAt) {
+  if (row.emailSentAt) {
     res.json(MarkReportProofSentResponse.parse({
       reportId: row.reportId,
       reportHash: row.reportHash,
-      sentAt: row.sentAt.toISOString(),
-      sharingStatus: "ready_for_sharing",
+      sentAt: row.emailSentAt.toISOString(),
+      sharingStatus: "sent",
     }));
     return;
   }
@@ -259,22 +265,62 @@ router.post("/report-proofs/:reportId/send", async (req, res): Promise<void> => 
     res.status(409).json({ error: "A confirmed Solana proof is required before sharing." });
     return;
   }
+  const sender = process.env.VERIFEE_EMAIL_FROM;
+  if (!sender) {
+    res.status(503).json({ error: "Email delivery is not configured. Set a verified Resend sender address before retrying." });
+    return;
+  }
+  try {
+    const pdfBytes = Buffer.from(body.data.pdfBase64, "base64");
+    if (pdfBytes.length === 0 || pdfBytes.length > 7_500_000) {
+      res.status(413).json({ error: "The report PDF is too large to email. Download it and contact the institution directly." });
+      return;
+    }
+    const connectors = new ReplitConnectors();
+    const emailResponse = await connectors.proxy("resend", "/emails", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "Idempotency-Key": `verifee-report-${row.reportId}`,
+      },
+      body: JSON.stringify({
+        from: sender,
+        to: ["akumar3134@gatech.edu"],
+        subject: `Verifee report ${row.reportId}`,
+        text: `A preliminary Verifee academic mapping report is attached.\n\nReport ID: ${row.reportId}\nReport hash: ${row.reportHash}\nSolana transaction: ${row.solanaSignature}\n\nUse the Verify Report page in Verifee to check this report's proof.`,
+        attachments: [{
+          filename: `Verifee_Report_${row.reportId}.pdf`,
+          content: body.data.pdfBase64,
+          content_type: "application/pdf",
+        }],
+      }),
+    });
+    if (!emailResponse.ok) {
+      req.log.warn({ reportId: row.reportId, statusCode: emailResponse.status }, "Resend rejected the report email.");
+      res.status(503).json({ error: "The report email could not be sent. Please retry." });
+      return;
+    }
+  } catch (error) {
+    req.log.error({ reportId: row.reportId, message: error instanceof Error ? error.message : "unknown" }, "Report email delivery failed.");
+    res.status(503).json({ error: "The report email could not be sent. Please retry." });
+    return;
+  }
   const [updated] = await db.update(reportProofsTable)
-    .set({ sentAt: new Date(), updatedAt: new Date() })
+    .set({ emailSentAt: new Date(), updatedAt: new Date() })
     .where(and(
       eq(reportProofsTable.reportId, row.reportId),
       eq(reportProofsTable.proofStatus, "anchored"),
     ))
     .returning();
-  if (!updated?.sentAt) {
+  if (!updated?.emailSentAt) {
     res.status(409).json({ error: "The report could not be marked ready for sharing." });
     return;
   }
   res.json(MarkReportProofSentResponse.parse({
     reportId: updated.reportId,
     reportHash: updated.reportHash,
-    sentAt: updated.sentAt.toISOString(),
-    sharingStatus: "ready_for_sharing",
+    sentAt: updated.emailSentAt.toISOString(),
+    sharingStatus: "sent",
   }));
 });
 

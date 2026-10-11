@@ -922,7 +922,8 @@ components:
       additionalProperties: false
       properties:
         reportHash: { type: string, pattern: "^[a-f0-9]{64}$" }
-      required: [reportHash]
+        pdfBase64: { type: string, minLength: 1, maxLength: 10000000, pattern: "^[A-Za-z0-9+/]+={0,2}$" }
+      required: [reportHash, pdfBase64]
     ReportProofSentResponse:
       type: object
       additionalProperties: false
@@ -932,7 +933,7 @@ components:
         sentAt: { type: string, format: date-time }
         sharingStatus:
           type: string
-          enum: [ready_for_sharing]
+          enum: [sent]
       required: [reportId, reportHash, sentAt, sharingStatus]
     ReportProofVerification:
       type: object
