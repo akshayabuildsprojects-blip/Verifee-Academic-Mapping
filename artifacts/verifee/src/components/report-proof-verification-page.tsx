@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import VerifeeLogo from "./verifee-logo";
 import "./report-proof-verification-page.css";
 
 type Verification = {
@@ -54,7 +55,9 @@ export default function ReportProofVerificationPage({ reportId }: { reportId: st
   const state = result ? statusCopy[result.status] : null;
   return (
     <main className="page-wrap report-proof-verify" data-testid="report-proof-verification">
-      <a className="secondary-btn report-proof-back" href="/">Back to Verifee</a>
+      <a className="report-proof-back" href="/" aria-label="Back to Verifee">
+        <VerifeeLogo className="report-proof-verification-logo" />
+      </a>
       <span className="v-report-label">SOLANA DEVNET</span>
       <h1>Verify a Verifee report</h1>
       <p className="report-proof-verify-intro">This check compares the retained report data with the signed Memo Program transaction.</p>

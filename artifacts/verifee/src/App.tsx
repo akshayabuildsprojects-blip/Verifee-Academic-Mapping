@@ -11,7 +11,7 @@ import { extractAcademicTranscript, runAcademicContext, runInstitutionStatusChec
 import { ExtractAcademicTranscriptResponse, RunAcademicContextResponse, RunInstitutionStatusCheckResponse, RunAcademicMappingBody, RunAcademicMappingResponse, type TranscriptLanguageDetection } from '@workspace/api-zod';
 import { georgiaTechDataset } from '@workspace/georgia-tech-programs';
 import { checkVerification, extractMockRecord, sampleCourses, sampleCredential, uploadSchema, type CredentialVerification } from '@/lib/mock-analysis';
-import verifeeLogo from '@/assets/verifee-logo.png?inline';
+import VerifeeLogo from '@/components/verifee-logo';
 import { runAcademicMappingWithProgress } from '@/lib/academic-mapping-stream';
 import VerifeeReportView from '@/components/verifee-report-view';
 import ReportProofVerificationPage from '@/components/report-proof-verification-page';
@@ -367,7 +367,7 @@ function Header() {
   const [, setLocation] = useLocation();
   const demoSession = readDemoSession();
   return <header className="masthead">
-    <Link href={demoSession ? '/dashboard' : '/'} className="brand" data-testid="link-brand"><img className="brand-logo" src={verifeeLogo} alt="Verifee" /></Link>
+    <Link href={demoSession ? '/dashboard' : '/'} className="brand" data-testid="link-brand"><VerifeeLogo className="brand-logo" /></Link>
     {demoSession ? <nav className="app-demo-navigation" aria-label="Demo navigation">
       <button type="button" onClick={() => { clearVerifeeSession(); setLocation('/start'); }} data-testid="button-navigation-new-mapping">New Mapping</button>
       <Link href="/my-reports" data-testid="link-navigation-my-reports">My Reports</Link>
@@ -590,7 +590,7 @@ function Landing() {
   return <div className="landing-shell" id="top">
     <header className="landing-header">
       <div className="landing-nav-wrap">
-        <Link href="/" className="brand" data-testid="link-brand-home"><img className="brand-logo" src={verifeeLogo} alt="Verifee" /></Link>
+        <Link href="/" className="brand" data-testid="link-brand-home"><VerifeeLogo className="brand-logo" /></Link>
         <nav className="landing-nav" aria-label="Main navigation">
           <a href="#how-it-works" data-testid="link-how-it-works">How it works</a>
           <Link href="/login" className="nav-cta" data-testid="link-try-verifee-nav">Try Verifee <ArrowUpRight size={14} /></Link>
@@ -657,7 +657,7 @@ function Landing() {
         <div className="bottom-cta-action"><p>Start with an academic record and a program in mind.</p><Link href="/login" className="landing-primary" data-testid="link-try-verifee-bottom">Try Verifee <ArrowRight size={16} /></Link></div>
       </section>
     </main>
-    <footer className="landing-footer"><Link href="/" className="brand"><img className="brand-logo" src={verifeeLogo} alt="Verifee" /></Link><span>Preliminary academic interpretation, with care.</span><a href="#top" onClick={(event) => { event.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Back to top <ArrowUpRight size={13} /></a></footer>
+    <footer className="landing-footer"><Link href="/" className="brand"><VerifeeLogo className="brand-logo" /></Link><span>Preliminary academic interpretation, with care.</span><a href="#top" onClick={(event) => { event.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Back to top <ArrowUpRight size={13} /></a></footer>
   </div>;
 }
 function Review() {

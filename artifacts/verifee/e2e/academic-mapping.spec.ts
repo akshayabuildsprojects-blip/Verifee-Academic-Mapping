@@ -908,6 +908,7 @@ test("shows the report preview immediately and keeps its downloads, save choices
   const proofRequests: string[] = [];
   let syntheticProof: Record<string, unknown> | null = null;
   let sentAt: string | null = null;
+  let failFirstSend = true;
   let emailedPdfBase64 = "";
   await page.route("**/api/report-proofs**", async (route) => {
     const request = route.request();
@@ -928,6 +929,11 @@ test("shows the report preview immediately and keeps its downloads, save choices
     }
     if (request.method() === "POST" && path.endsWith("/send")) {
       const body = request.postDataJSON() as { pdfBase64: string; reportHash: string };
+      if (failFirstSend) {
+        failFirstSend = false;
+        await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "The report email could not be sent. Please retry." }) });
+        return;
+      }
       emailedPdfBase64 = body.pdfBase64;
       sentAt = new Date().toISOString();
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
@@ -1015,7 +1021,7 @@ test("shows the report preview immediately and keeps its downloads, save choices
   });
   expect(firstReportIdentity.reportId).toMatch(/^VF-/);
   expect(Date.parse(firstReportIdentity.generatedAt)).not.toBeNaN();
-  await expect(page.getByTestId("report-sent-status")).toHaveText("Not sent");
+  await expect(page.getByTestId("report-sent-status")).toHaveCount(0);
   expect(proofRequests.some((request) => request.startsWith("POST "))).toBe(false);
 
   const [download] = await Promise.all([
@@ -1060,16 +1066,19 @@ test("shows the report preview immediately and keeps its downloads, save choices
   expect(receiptContents).toContain("(institution.) Tj");
 
   expect(proofRequests.some((request) => request.startsWith("POST "))).toBe(false);
+  await expect(page.getByTestId("report-proof-panel")).toContainText("Report Integrity Proof");
+  await expect(page.getByTestId("report-proof-status")).toHaveText("Proof status: Not created yet");
+  await expect(page.getByTestId("report-proof-panel")).toContainText("Verifee will create a cryptographic proof for this exact report when you send it to the institution.");
+  await expect(page.getByTestId("report-proof-details")).toHaveCount(0);
   await page.getByTestId("button-send-to-institution").click();
-  const confirmation = page.getByRole("dialog");
-  await expect(confirmation.getByRole("heading", { name: "Send report to institution?" })).toBeVisible();
-  await expect(confirmation).toContainText("Verifee will create a cryptographic proof for this exact report, then email the PDF to akumar3134@gatech.edu. After proof creation, changes to this report will create a mismatch.");
-  await confirmation.getByRole("button", { name: "Cancel" }).click();
-  expect(proofRequests.some((request) => request.startsWith("POST "))).toBe(false);
-  await page.getByTestId("button-send-to-institution").click();
-  await page.getByRole("dialog").getByRole("button", { name: "Create proof & send" }).click();
+  await expect(page.getByTestId("report-proof-status")).toHaveText("Proof status: Proof created, send failed");
+  await expect(page.getByTestId("report-proof-details")).toHaveCount(0);
+  await expect(page.getByTestId("report-sent-status")).toHaveCount(0);
+  await page.getByTestId("button-retry-send").click();
   await expect(page.getByTestId("report-proof-status")).toHaveText("Proof status: Anchored");
-  await expect(page.getByTestId("report-sent-status")).toHaveText("Sent to akumar3134@gatech.edu");
+  await expect(page.getByTestId("report-sent-status")).toHaveText("Sent");
+  await expect(page.getByTestId("report-proof-details")).toContainText("Solana transaction signature");
+  await expect(page.getByTestId("report-proof-details")).toContainText("Report hash");
   expect(Buffer.from(emailedPdfBase64, "base64").subarray(0, 5).toString("ascii")).toBe("%PDF-");
   expect(proofRequests.some((request) => request === "POST /api/report-proofs")).toBe(true);
   expect(proofRequests.some((request) => request.endsWith("/send"))).toBe(true);
@@ -1077,7 +1086,7 @@ test("shows the report preview immediately and keeps its downloads, save choices
   await expect(page.getByTestId("report-proof-verification")).toContainText("Valid");
   await page.goBack();
   await expect(page.getByTestId("report-proof-status")).toHaveText("Proof status: Anchored");
-  await expect(page.getByTestId("report-sent-status")).toHaveText("Sent to akumar3134@gatech.edu");
+  await expect(page.getByTestId("report-sent-status")).toHaveText("Sent");
 
   await page.getByTestId("button-save-to-my-reports").click();
   await expect(page.getByTestId("status-save-to-reports")).toContainText(
@@ -1230,4 +1239,58 @@ test("shows the report preview immediately and keeps its downloads, save choices
   await page.getByTestId("button-view-duplicate-report").click();
   await expect(page).toHaveURL(new RegExp(`/saved-report/${firstSavedReportId}$`));
   await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
+});
+
+test("keeps proof details hidden after proof failure and retries proof creation", async ({ page }) => {
+  let proofAttempts = 0;
+  let sendAttempts = 0;
+  let syntheticProof: Record<string, unknown> | null = null;
+  await page.route("**/api/report-proofs**", async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (request.method() === "GET" && path.endsWith("/status")) {
+      await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "not found" }) });
+      return;
+    }
+    if (request.method() === "POST" && path === "/api/report-proofs") {
+      proofAttempts += 1;
+      if (proofAttempts === 1) {
+        await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Solana unavailable" }) });
+        return;
+      }
+      const body = request.postDataJSON() as { reportId: string; payload: unknown };
+      const hash = createHash("sha256").update(stableJson(body.payload)).digest("hex");
+      syntheticProof = { reportId: body.reportId, reportHash: hash, status: "anchored", proofStatus: "anchored", signature: "synthetic-test-signature", proofTimestamp: new Date().toISOString(), issuedAt: new Date().toISOString() };
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(syntheticProof) });
+      return;
+    }
+    if (request.method() === "POST" && path.endsWith("/send")) {
+      sendAttempts += 1;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+        reportId: syntheticProof?.reportId,
+        reportHash: syntheticProof?.reportHash,
+        sentAt: new Date().toISOString(),
+        sharingStatus: "sent",
+      }) });
+      return;
+    }
+    await route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "unexpected proof request" }) });
+  });
+  await openReport(page, { expandSections: false });
+  await sendStreamEvent(page, 0, "complete", result);
+  await page.evaluate(() => window.__verifeeMappingTest?.streams[0]?.close());
+  await expect(page.getByTestId("button-open-verifee-report")).toBeVisible();
+  await page.getByTestId("button-open-verifee-report").click();
+  await expect(page.getByTestId("button-send-to-institution")).toBeVisible();
+
+  await page.getByTestId("button-send-to-institution").click();
+  await expect(page.getByTestId("report-proof-status")).toHaveText("Proof status: Proof failed");
+  await expect(page.getByTestId("report-proof-details")).toHaveCount(0);
+  await expect(page.getByTestId("button-send-to-institution")).toHaveText("Retry Proof Creation");
+  expect(sendAttempts).toBe(0);
+
+  await page.getByTestId("button-send-to-institution").click();
+  await expect(page.getByTestId("report-sent-status")).toHaveText("Sent");
+  expect(proofAttempts).toBe(2);
+  expect(sendAttempts).toBe(1);
 });

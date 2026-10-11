@@ -7,8 +7,8 @@ import {
   FileText,
   Landmark,
 } from 'lucide-react';
-import verifeeLogo from '@/assets/verifee-logo.png?inline';
 import ReportProofPanel from '@/components/report-proof-panel';
+import VerifeeLogo from '@/components/verifee-logo';
 import { downloadVerifeeReportPdf } from '@/lib/verifee-report-pdf';
 import {
   VERIFEE_REPORT_DISCLAIMER,
@@ -269,7 +269,7 @@ export function VerifeeReportView({
 
               <article className="v-report-cover" aria-label="Report cover page">
                 <div className="v-report-cover-top">
-                  <img className="v-report-logo" src={verifeeLogo} alt="Verifee" />
+                  <VerifeeLogo className="v-report-logo" />
                   <span>ACADEMIC INTERPRETATION</span>
                 </div>
                 <div className="v-report-cover-content">

@@ -2,6 +2,7 @@
 .report-proof-verify h1 { margin: 10px 0; color: #243b36; font: 500 clamp(34px, 5vw, 54px)/1.08 Georgia, serif; }
 .report-proof-verify-intro { color: #69766f; line-height: 1.6; margin: 0 0 24px; }
 .report-proof-back { display: inline-flex; margin-bottom: 36px; }
+.report-proof-verification-logo { display: block; width: 138px; height: auto; object-fit: contain; }
 .report-proof-result { padding: 22px; border: 1px solid #dce5df; border-radius: 14px; background: #f5f8f4; margin: 20px 0; }
 .report-proof-result strong { color: #243b36; font-size: 18px; }
 .report-proof-result p { color: #68746e; line-height: 1.55; margin: 7px 0 0; }

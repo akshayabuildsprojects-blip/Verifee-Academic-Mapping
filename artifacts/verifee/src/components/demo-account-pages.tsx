@@ -11,6 +11,7 @@ import {
   Plus,
   ShieldCheck,
 } from 'lucide-react';
+import VerifeeLogo from './verifee-logo';
 import './demo-account-pages.css';
 
 export interface DemoSavedReportSummary {
@@ -51,14 +52,6 @@ export interface DemoReportsPageProps {
   onLogOut(): void;
 }
 
-function DemoMark() {
-  return (
-    <span className="demo-account__brand-mark" aria-hidden="true">
-      <BookOpen size={16} strokeWidth={2.1} />
-    </span>
-  );
-}
-
 function DemoHeader({
   onLogOut,
   onNewMapping,
@@ -75,8 +68,7 @@ function DemoHeader({
   return (
     <header className="demo-account__header">
       <a className="demo-account__brand" href={onLogOut ? '/dashboard' : '/'} aria-label="Verifee home" data-testid="link-verifee-home">
-        <DemoMark />
-        <span>verifee</span>
+        <VerifeeLogo className="demo-account__brand-logo" />
       </a>
       {onLogOut && <nav className="demo-account__navigation" aria-label="Demo navigation">
         {onNewMapping && <button type="button" onClick={onNewMapping} data-testid="nav-new-mapping">New Mapping</button>}

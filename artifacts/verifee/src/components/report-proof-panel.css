@@ -14,27 +14,20 @@
   justify-content: space-between;
   gap: 16px;
 }
-.report-proof-heading h2 { margin: 7px 0 0; color: #243b36; font: 500 24px/1.15 Georgia, serif; }
+.report-proof-heading h2 { margin: 0; color: #243b36; font: 500 24px/1.15 Georgia, serif; }
 .report-proof-status { color: #6c776f; font-size: 13px; font-weight: 600; }
 .report-proof-status.is-anchored { color: #216b52; }
 .report-proof-status.is-error, .report-proof-error { color: #9b3e36; }
+.report-proof-helper { max-width: 600px; margin: 0; color: #68746e; font-size: 14px; line-height: 1.55; }
 .report-proof-details { display: grid; gap: 12px; margin: 0; }
 .report-proof-details > div { display: grid; grid-template-columns: minmax(150px, 0.35fr) 1fr; gap: 14px; }
 .report-proof-details dt { color: #68746e; font-size: 12px; }
 .report-proof-details dd { min-width: 0; margin: 0; color: #253d37; font-size: 13px; overflow-wrap: anywhere; }
 .report-proof-details a { color: #236b54; }
-.report-proof-error, .report-proof-retention { margin: 0; font-size: 12px; line-height: 1.5; }
-.report-proof-retention { color: #77817b; }
+.report-proof-error { margin: 0; font-size: 12px; line-height: 1.5; }
 .report-proof-actions { justify-content: flex-start; flex-wrap: wrap; }
-.report-proof-modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 20px; background: rgb(17 31 28 / 55%); }
-.report-proof-modal { width: min(100%, 520px); padding: 28px; border: 1px solid #dce5df; border-radius: 18px; background: #fff; box-shadow: 0 24px 80px rgb(0 0 0 / 22%); }
-.report-proof-modal h2 { margin: 0 0 12px; color: #243b36; font: 500 28px/1.15 Georgia, serif; }
-.report-proof-modal p { margin: 0; color: #68746e; line-height: 1.6; }
-.report-proof-modal-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
-.report-proof-modal button:disabled { cursor: wait; opacity: .65; }
 @media (max-width: 600px) {
   .report-proof-panel { padding: 18px; }
   .report-proof-heading { align-items: flex-start; flex-direction: column; }
   .report-proof-details > div { grid-template-columns: 1fr; gap: 4px; }
-  .report-proof-modal { padding: 22px; }
 }

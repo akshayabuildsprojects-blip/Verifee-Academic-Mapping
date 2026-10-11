@@ -35,27 +35,69 @@ export default function ReportProofPanel({ reportId, payload, buildPdfBase64, ex
 }) {
   const [proof, setProof] = useState<ProofStatus | null>(null);
   const [busy, setBusy] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [busyPhase, setBusyPhase] = useState<"proof" | "send" | null>(null);
+  const [proofFailed, setProofFailed] = useState(false);
+  const [sendFailed, setSendFailed] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
+    setProof(null);
+    setProofFailed(false);
+    setSendFailed(false);
+    setError("");
     void fetch(`/api/report-proofs/${encodeURIComponent(reportId)}/status`)
       .then(async (response) => {
         if (response.status === 404) return null;
         if (!response.ok) throw new Error("Could not load report proof status.");
         return await response.json() as ProofStatus;
       })
-      .then((value) => { if (active && value) setProof(value); })
+      .then((value) => {
+        if (!active || !value) return;
+        setProof(value);
+        setProofFailed(value.proofStatus === "failed");
+        setSendFailed(value.proofStatus === "anchored" && !value.sentAt);
+      })
       .catch(() => { /* A report without a proof remains unsent; no proof is created on page load. */ });
     return () => { active = false; };
   }, [reportId]);
 
+  const sendAnchoredReport = async (
+    anchoredProof: ProofStatus,
+    frozenPayload: Record<string, unknown>,
+    frozenPdfBase64: string,
+  ) => {
+    const currentHash = await sha256(canonicalJson(frozenPayload));
+    if (currentHash !== anchoredProof.reportHash) {
+      throw new Error("This report has changed since its proof was created. Restore the anchored report before retrying.");
+    }
+    setBusyPhase("send");
+    const sendResponse = await fetch(`/api/report-proofs/${encodeURIComponent(reportId)}/send`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reportHash: anchoredProof.reportHash, pdfBase64: frozenPdfBase64 }),
+    });
+    if (!sendResponse.ok) {
+      const body = await sendResponse.json().catch(() => ({})) as { error?: string };
+      throw new Error(body.error || "Proof created, send failed. Please retry sending the report.");
+    }
+    const sent = await sendResponse.json() as { sentAt: string };
+    setProof({ ...anchoredProof, sentAt: sent.sentAt });
+    setProofFailed(false);
+    setSendFailed(false);
+    setError("");
+  };
+
   const createProofAndSend = async () => {
     setBusy(true);
     setError("");
+    setProofFailed(false);
+    setSendFailed(false);
+    setBusyPhase("proof");
+    let phase: "proof" | "send" = "proof";
     try {
       const frozenPayload = JSON.parse(canonicalJson(payload)) as Record<string, unknown>;
+      const frozenPdfBase64 = buildPdfBase64();
       const reportHash = await sha256(canonicalJson(frozenPayload));
       const anchorResponse = await fetch("/api/report-proofs", {
         method: "POST",
@@ -65,72 +107,99 @@ export default function ReportProofPanel({ reportId, payload, buildPdfBase64, ex
       if (!anchorResponse.ok) {
         const body = await anchorResponse.json().catch(() => ({})) as { error?: string; issuerPublicKey?: string };
         const funding = body.issuerPublicKey ? ` Issuer public key to fund: ${body.issuerPublicKey}` : "";
-        throw new Error(`Cryptographic proof could not be created. Please retry before sending.${funding}`);
+        throw new Error(`Proof failed. Cryptographic proof could not be created. Please retry.${funding}`);
       }
       const anchored = await anchorResponse.json() as { reportHash: string; status: string; signature: string | null; issuedAt: string };
       if (anchored.reportHash !== reportHash || anchored.status !== "anchored" || !anchored.signature) {
-        throw new Error("Cryptographic proof could not be created. Please retry before sending.");
+        throw new Error("Proof failed. Cryptographic proof could not be created. Please retry.");
       }
       const anchoredProof: ProofStatus = {
         reportId, reportHash, proofStatus: "anchored", signature: anchored.signature,
         proofTimestamp: anchored.issuedAt, sentAt: null,
       };
       setProof(anchoredProof);
-      const sendResponse = await fetch(`/api/report-proofs/${encodeURIComponent(reportId)}/send`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ reportHash, pdfBase64: buildPdfBase64() }),
-      });
-      if (!sendResponse.ok) {
-        const body = await sendResponse.json().catch(() => ({})) as { error?: string };
-        throw new Error(body.error || "Proof is anchored, but the report email could not be sent. Please retry.");
-      }
-      const sent = await sendResponse.json() as { sentAt: string };
-      setProof({ ...anchoredProof, sentAt: sent.sentAt });
-      setConfirmOpen(false);
+      phase = "send";
+      await sendAnchoredReport(anchoredProof, frozenPayload, frozenPdfBase64);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Cryptographic proof could not be created. Please retry before sending.");
+      const message = reason instanceof Error ? reason.message : "The report could not be sent. Please retry.";
+      setError(message);
+      if (phase === "proof") {
+        setProof(null);
+        setProofFailed(true);
+        setSendFailed(false);
+      } else {
+        setProofFailed(false);
+        setSendFailed(true);
+      }
     } finally {
       setBusy(false);
+      setBusyPhase(null);
     }
   };
+
+  const retrySend = async () => {
+    if (!proof || proof.proofStatus !== "anchored") return;
+    setBusy(true);
+    setError("");
+    setBusyPhase("send");
+    try {
+      const frozenPayload = JSON.parse(canonicalJson(payload)) as Record<string, unknown>;
+      const frozenPdfBase64 = buildPdfBase64();
+      await sendAnchoredReport(proof, frozenPayload, frozenPdfBase64);
+    } catch (reason) {
+      setSendFailed(true);
+      setError(reason instanceof Error ? reason.message : "Proof created, send failed. Please retry sending the report.");
+    } finally {
+      setBusy(false);
+      setBusyPhase(null);
+    }
+  };
+
+  const sent = Boolean(proof?.sentAt);
+  const anchored = proof?.proofStatus === "anchored";
+  const statusLabel = sent
+    ? "Anchored"
+    : anchored || sendFailed
+      ? "Proof created, send failed"
+      : proofFailed || proof?.proofStatus === "failed"
+        ? "Proof failed"
+        : "Not created yet";
 
   return (
     <section className="report-proof-panel" aria-labelledby="report-proof-title" data-testid="report-proof-panel">
       <div className="report-proof-heading">
-        <div><span className="v-report-label">Solana devnet</span><h2 id="report-proof-title">Report integrity proof</h2></div>
-        <span data-testid="report-proof-status" className={`report-proof-status ${proof?.proofStatus === "anchored" ? "is-anchored" : ""}`} role="status">
-          Proof status: {proof?.proofStatus === "anchored" ? "Anchored" : proof?.proofStatus === "failed" ? "Failed" : "Not created"}
+        <h2 id="report-proof-title">Report Integrity Proof</h2>
+        <span data-testid="report-proof-status" className={`report-proof-status ${sent ? "is-anchored" : proofFailed || sendFailed ? "is-error" : ""}`} role="status">
+          Proof status: {statusLabel}
         </span>
       </div>
-      <dl className="report-proof-details">
-        <div><dt>Report ID</dt><dd>{reportId}</dd></div>
-        <div><dt>Report hash</dt><dd className="report-proof-hash">{proof?.reportHash ?? "Created when you send the report"}</dd></div>
-        <div><dt>Solana transaction signature</dt><dd className="report-proof-signature">{proof?.signature ?? "Not available yet"}</dd></div>
-        <div><dt>Proof timestamp</dt><dd>{proof?.proofTimestamp ? new Date(proof.proofTimestamp).toLocaleString() : "Not created"}</dd></div>
-        <div><dt>Sent status</dt><dd data-testid="report-sent-status">{proof?.sentAt ? "Sent to akumar3134@gatech.edu" : "Not sent"}</dd></div>
-      </dl>
+      {!sent && !proofFailed && !anchored && (
+        <p className="report-proof-helper">Verifee will create a cryptographic proof for this exact report when you send it to the institution.</p>
+      )}
+      {sent && proof && (
+        <dl className="report-proof-details" data-testid="report-proof-details">
+          <div><dt>Sent status</dt><dd data-testid="report-sent-status">Sent</dd></div>
+          <div><dt>Report ID</dt><dd>{proof.reportId}</dd></div>
+          <div><dt>Report hash</dt><dd className="report-proof-hash">{proof.reportHash}</dd></div>
+          <div><dt>Solana transaction signature</dt><dd className="report-proof-signature">{proof.signature}</dd></div>
+          <div><dt>Proof timestamp</dt><dd>{new Date(proof.proofTimestamp).toLocaleString()}</dd></div>
+        </dl>
+      )}
       {error && <p className="report-proof-error" role="alert">{error}</p>}
       <div className="report-proof-actions">
-        {proof?.sentAt
-          ? <button type="button" className="v-report-button v-report-button-primary" disabled>Sent</button>
-          : <button data-testid="button-send-to-institution" type="button" className="v-report-button v-report-button-primary" onClick={() => setConfirmOpen(true)}>Send to Institution</button>}
+        {!sent && !anchored && (
+          <button data-testid="button-send-to-institution" type="button" className="v-report-button v-report-button-primary" disabled={busy} onClick={() => void createProofAndSend()}>
+            {busy ? busyPhase === "send" ? "Sending…" : "Creating proof…" : proofFailed ? "Retry Proof Creation" : "Create Proof & Send"}
+          </button>
+        )}
+        {!sent && anchored && (
+          <button data-testid="button-retry-send" type="button" className="v-report-button v-report-button-primary" disabled={busy} onClick={() => void retrySend()}>
+            {busy ? "Sending…" : "Retry Send"}
+          </button>
+        )}
         {extraActions}
-        {proof?.proofStatus === "anchored" && <Link className="v-report-button v-report-button-secondary" href={`/verify/${encodeURIComponent(reportId)}`}>Verify Report</Link>}
+        {sent && <Link className="v-report-button v-report-button-secondary" href={`/verify/${encodeURIComponent(reportId)}`}>Verify Report</Link>}
       </div>
-      <p className="report-proof-retention">Report details are retained for 90 days to support verification.</p>
-      {confirmOpen && (
-        <div className="report-proof-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setConfirmOpen(false); }}>
-          <section className="report-proof-modal" role="dialog" aria-modal="true" aria-labelledby="report-proof-confirm-title" aria-describedby="report-proof-confirm-text">
-            <h2 id="report-proof-confirm-title">Send report to institution?</h2>
-             <p id="report-proof-confirm-text">Verifee will create a cryptographic proof for this exact report, then email the PDF to akumar3134@gatech.edu. After proof creation, changes to this report will create a mismatch.</p>
-            <div className="report-proof-modal-actions">
-              <button type="button" className="v-report-button v-report-button-secondary" disabled={busy} onClick={() => setConfirmOpen(false)}>Cancel</button>
-              <button type="button" className="v-report-button v-report-button-primary" disabled={busy} onClick={() => void createProofAndSend()}>{busy ? "Creating proof…" : "Create proof & send"}</button>
-            </div>
-          </section>
-        </div>
-      )}
     </section>
   );
 }
