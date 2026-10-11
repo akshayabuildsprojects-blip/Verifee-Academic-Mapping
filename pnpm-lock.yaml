@@ -676,6 +676,10 @@ importers:
         version: 25.9.6
 
   scripts:
+    dependencies:
+      '@solana/web3.js':
+        specifier: ^1.99.0
+        version: 1.99.0(bufferutil@4.1.0)(typescript@5.9.3)
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
