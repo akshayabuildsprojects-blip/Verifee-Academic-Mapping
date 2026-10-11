@@ -336,6 +336,70 @@ export interface AcademicMappingResult {
   requirements: AcademicRequirementMapping[];
 }
 
+export type ReportProofInputPayload = { [key: string]: unknown };
+
+export interface ReportProofInput {
+  /** @pattern ^VF-[A-Z0-9-]{4,16}$ */
+  reportId: string;
+  payload: ReportProofInputPayload;
+}
+
+export type ReportProofResponseStatus = typeof ReportProofResponseStatus[keyof typeof ReportProofResponseStatus];
+
+
+export const ReportProofResponseStatus = {
+  pending: 'pending',
+  anchoring: 'anchoring',
+  anchored: 'anchored',
+  failed: 'failed',
+  expired: 'expired',
+} as const;
+
+export interface ReportProofResponse {
+  reportId: string;
+  reportHash: string;
+  status: ReportProofResponseStatus;
+  /** @nullable */
+  signature: string | null;
+  issuedAt: string;
+  expiresAt: string;
+}
+
+export type ReportProofVerificationStatus = typeof ReportProofVerificationStatus[keyof typeof ReportProofVerificationStatus];
+
+
+export const ReportProofVerificationStatus = {
+  valid: 'valid',
+  invalid: 'invalid',
+  proof_not_found: 'proof_not_found',
+  verification_unavailable: 'verification_unavailable',
+  payload_expired: 'payload_expired',
+} as const;
+
+export type ReportProofVerificationChecks = {
+  /** @nullable */
+  hashMatches: boolean | null;
+  /** @nullable */
+  reportIdMatches: boolean | null;
+  /** @nullable */
+  appMatches: boolean | null;
+  /** @nullable */
+  statusActive: boolean | null;
+};
+
+export interface ReportProofVerification {
+  reportId: string;
+  reportHash: string;
+  /** @nullable */
+  currentReportHash: string | null;
+  /** @nullable */
+  signature: string | null;
+  issuedAt: string;
+  expiresAt: string;
+  status: ReportProofVerificationStatus;
+  checks: ReportProofVerificationChecks;
+}
+
 export interface ErrorResponse {
   error: string;
 }

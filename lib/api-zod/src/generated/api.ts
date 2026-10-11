@@ -269,3 +269,51 @@ export const StreamAcademicMappingBody = zod.object({
 export const StreamAcademicMappingResponse = zod.unknown()
 
 
+/**
+ * @summary Anchor a Verifee report hash on Solana devnet
+ */
+export const createReportProofBodyReportIdRegExp = new RegExp('^VF-[A-Z0-9-]{4,16}$');
+
+
+export const CreateReportProofBody = zod.object({
+  "reportId": zod.string().regex(createReportProofBodyReportIdRegExp),
+  "payload": zod.record(zod.string(), zod.unknown())
+})
+
+export const CreateReportProofResponse = zod.object({
+  "reportId": zod.string(),
+  "reportHash": zod.string(),
+  "status": zod.enum(['pending', 'anchoring', 'anchored', 'failed', 'expired']),
+  "signature": zod.string().nullable(),
+  "issuedAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Verify a report payload against its Solana devnet memo
+ */
+export const verifyReportProofPathReportIdRegExp = new RegExp('^VF-[A-Z0-9-]{4,16}$');
+
+
+export const VerifyReportProofParams = zod.object({
+  "reportId": zod.coerce.string().regex(verifyReportProofPathReportIdRegExp)
+})
+
+export const VerifyReportProofResponse = zod.object({
+  "reportId": zod.string(),
+  "reportHash": zod.string(),
+  "currentReportHash": zod.string().nullable(),
+  "signature": zod.string().nullable(),
+  "issuedAt": zod.coerce.date(),
+  "expiresAt": zod.coerce.date(),
+  "status": zod.enum(['valid', 'invalid', 'proof_not_found', 'verification_unavailable', 'payload_expired']),
+  "checks": zod.object({
+  "hashMatches": zod.boolean().nullable(),
+  "reportIdMatches": zod.boolean().nullable(),
+  "appMatches": zod.boolean().nullable(),
+  "statusActive": zod.boolean().nullable()
+})
+})
+
+

@@ -18,6 +18,8 @@ tags:
     description: Source-scoped checks in supported official institution directories
   - name: academic-mapping
     description: Preliminary course-to-requirement mapping
+  - name: report-proof
+    description: Verifee report integrity proofs on Solana devnet
 paths:
   /healthz:
     get:
@@ -244,6 +246,85 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "503":
           description: The mapping service is temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /report-proofs:
+    post:
+      operationId: createReportProof
+      tags: [report-proof]
+      summary: Anchor a Verifee report hash on Solana devnet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportProofInput"
+      responses:
+        "200":
+          description: Anchored report proof
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportProofResponse"
+        "400":
+          description: Invalid report proof input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Report ID already belongs to a different report payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "410":
+          description: Report payload retention has expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Report anchoring request limit reached
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: The devnet proof could not be created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /report-proofs/{reportId}/verify:
+    get:
+      operationId: verifyReportProof
+      tags: [report-proof]
+      summary: Verify a report payload against its Solana devnet memo
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^VF-[A-Z0-9-]{4,16}$"
+      responses:
+        "200":
+          description: Report proof verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportProofVerification"
+        "400":
+          description: Invalid report ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Report ID not found
           content:
             application/json:
               schema:
@@ -718,6 +799,68 @@ components:
         - retryable
         - courseEvidence
         - requirements
+    ReportProofInput:
+      type: object
+      additionalProperties: false
+      properties:
+        reportId:
+          type: string
+          pattern: "^VF-[A-Z0-9-]{4,16}$"
+        payload:
+          type: object
+          additionalProperties: true
+      required: [reportId, payload]
+    ReportProofResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        reportId:
+          type: string
+        reportHash:
+          type: string
+        status:
+          type: string
+          enum: [pending, anchoring, anchored, failed, expired]
+        signature:
+          type: ["string", "null"]
+        issuedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+      required: [reportId, reportHash, status, signature, issuedAt, expiresAt]
+    ReportProofVerification:
+      type: object
+      additionalProperties: false
+      properties:
+        reportId:
+          type: string
+        reportHash:
+          type: string
+        currentReportHash:
+          type: ["string", "null"]
+        signature:
+          type: ["string", "null"]
+        issuedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [valid, invalid, proof_not_found, verification_unavailable, payload_expired]
+        checks:
+          type: object
+          additionalProperties: false
+          properties:
+            hashMatches: { type: ["boolean", "null"] }
+            reportIdMatches: { type: ["boolean", "null"] }
+            appMatches: { type: ["boolean", "null"] }
+            statusActive: { type: ["boolean", "null"] }
+          required: [hashMatches, reportIdMatches, appMatches, statusActive]
+      required: [reportId, reportHash, currentReportHash, signature, issuedAt, expiresAt, status, checks]
     ErrorResponse:
       type: object
       additionalProperties: false

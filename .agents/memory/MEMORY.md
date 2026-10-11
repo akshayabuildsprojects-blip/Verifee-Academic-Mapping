@@ -6,3 +6,4 @@
 - [Verifee report wallet boundary](verifee-report-wallet-scope.md) — reports stay free and unsent in the demo; account retrieval is future scope and transcripts must not be retained permanently.
 - [Synthetic PDF fixture layout](synthetic-pdf-fixture-layout.md) — simplified glyph widths can clip long lines and Poppler layout adds whitespace; normalize extraction checks and keep visible text within page bounds.
 - [UGC source data handling](ugc-source-data-handling.md) — the live UGC response includes a credential-like field; only extract fields needed for registry results and never log the raw payload.
+- [Report verification retention](report-verification-retention.md) — retain report payloads for 90 days, then remove payloads while keeping minimal on-chain proof metadata.

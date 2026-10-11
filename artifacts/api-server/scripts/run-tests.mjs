@@ -13,6 +13,7 @@ const testFiles = [
   "tests/academic-transcript-model-evaluation.spec.ts",
   "tests/institution-status.spec.ts",
   "tests/institution-status-additional.spec.ts",
+  "tests/report-proofs.spec.ts",
 ];
 
 await rm(testBundleDir, { recursive: true, force: true });

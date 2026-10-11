@@ -1,0 +1,25 @@
+.report-proof-verify { max-width: 900px; padding-top: 44px; padding-bottom: 70px; }
+.report-proof-verify h1 { margin: 10px 0; color: #243b36; font: 500 clamp(34px, 5vw, 54px)/1.08 Georgia, serif; }
+.report-proof-verify-intro { color: #69766f; line-height: 1.6; margin: 0 0 24px; }
+.report-proof-back { display: inline-flex; margin-bottom: 36px; }
+.report-proof-result { padding: 22px; border: 1px solid #dce5df; border-radius: 14px; background: #f5f8f4; margin: 20px 0; }
+.report-proof-result strong { color: #243b36; font-size: 18px; }
+.report-proof-result p { color: #68746e; line-height: 1.55; margin: 7px 0 0; }
+.report-proof-result.is-valid { background: #eef7f0; border-color: #bddbc8; }
+.report-proof-result.is-valid strong { color: #216b52; }
+.report-proof-result.is-error { background: #fbf3f0; border-color: #ead2cb; }
+.report-proof-result.is-error strong { color: #9b3e36; }
+.report-proof-verify-details { display: grid; gap: 0; border: 1px solid #e0e5e1; border-radius: 14px; overflow: hidden; }
+.report-proof-verify-details > div { display: grid; grid-template-columns: minmax(170px, .32fr) 1fr; gap: 18px; padding: 15px 18px; border-bottom: 1px solid #e8ece9; }
+.report-proof-verify-details > div:last-child { border-bottom: 0; }
+.report-proof-verify-details dt { color: #68746e; font-size: 13px; }
+.report-proof-verify-details dd { margin: 0; color: #243b36; font-size: 13px; overflow-wrap: anywhere; }
+.report-proof-checks { margin: 24px 0; padding: 20px; border: 1px solid #e0e5e1; border-radius: 14px; }
+.report-proof-checks h2 { margin: 0 0 12px; font-size: 16px; color: #243b36; }
+.report-proof-checks ul { list-style: none; margin: 0; padding: 0; }
+.report-proof-checks li { display: flex; justify-content: space-between; gap: 18px; padding: 10px 0; border-bottom: 1px solid #edf0ed; color: #68746e; font-size: 13px; }
+.report-proof-checks li:last-child { border-bottom: 0; }
+.report-proof-checks li strong { color: #243b36; }
+@media (max-width: 600px) {
+  .report-proof-verify-details > div { grid-template-columns: 1fr; gap: 5px; }
+}

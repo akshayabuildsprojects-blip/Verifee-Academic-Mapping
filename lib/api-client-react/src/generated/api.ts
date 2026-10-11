@@ -28,6 +28,9 @@ import type {
   HealthStatus,
   InstitutionStatusInput,
   InstitutionStatusResult,
+  ReportProofInput,
+  ReportProofResponse,
+  ReportProofVerification,
   TranscriptExtractionProblem,
   TranscriptExtractionResult
 } from './api.schemas';
@@ -581,4 +584,169 @@ export const useStreamAcademicMapping = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getStreamAcademicMappingMutationOptions(options));
     }
+
+export const getCreateReportProofUrl = () => {
+
+
+
+
+  return `/api/report-proofs`
+}
+
+/**
+ * @summary Anchor a Verifee report hash on Solana devnet
+ */
+export const createReportProof = async (reportProofInput: ReportProofInput, options?: Parameters<typeof customFetch>[1]): Promise<ReportProofResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ReportProofResponse>(getCreateReportProofUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reportProofInput)
+  }
+);}
+
+
+
+
+
+export const getCreateReportProofMutationKey = () => ['createReportProof'] as const;
+
+export const getCreateReportProofMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createReportProof>>, TError,CreateReportProofMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createReportProof>>, TError,CreateReportProofMutationVariables, TContext> => {
+
+const mutationKey = getCreateReportProofMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createReportProof>>, CreateReportProofMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createReportProof(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateReportProofMutationResult = NonNullable<Awaited<ReturnType<typeof createReportProof>>>
+    export type CreateReportProofMutationBody = BodyType<ReportProofInput>
+    export type CreateReportProofMutationError = ErrorType<ErrorResponse>
+    export type CreateReportProofMutationVariables = {data: BodyType<ReportProofInput>}
+
+    /**
+ * @summary Anchor a Verifee report hash on Solana devnet
+ */
+export const useCreateReportProof = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createReportProof>>, TError,CreateReportProofMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createReportProof>>,
+        TError,
+        CreateReportProofMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateReportProofMutationOptions(options));
+    }
+
+export const getVerifyReportProofUrl = (reportId: string,) => {
+
+
+
+
+  return `/api/report-proofs/${reportId}/verify`
+}
+
+/**
+ * @summary Verify a report payload against its Solana devnet memo
+ */
+export const verifyReportProof = async (reportId: string, options?: Parameters<typeof customFetch>[1]): Promise<ReportProofVerification> => {
+
+  return customFetch<ReportProofVerification>(getVerifyReportProofUrl(reportId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getVerifyReportProofQueryKey = (reportId: string,) => {
+    return [
+    `/api/report-proofs/${reportId}/verify`
+    ] as const;
+    }
+
+
+export const getVerifyReportProofQueryOptions = <TData = Awaited<ReturnType<typeof verifyReportProof>>, TError = ErrorType<ErrorResponse>>(reportId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyReportProof>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getVerifyReportProofQueryKey(reportId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof verifyReportProof>>> = ({ signal }) => verifyReportProof(reportId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: reportId !== null && reportId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof verifyReportProof>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type VerifyReportProofQueryResult = NonNullable<Awaited<ReturnType<typeof verifyReportProof>>>
+export type VerifyReportProofQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Verify a report payload against its Solana devnet memo
+ */
+
+export function useVerifyReportProof<TData = Awaited<ReturnType<typeof verifyReportProof>>, TError = ErrorType<ErrorResponse>>(
+ reportId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof verifyReportProof>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getVerifyReportProofQueryOptions(reportId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 

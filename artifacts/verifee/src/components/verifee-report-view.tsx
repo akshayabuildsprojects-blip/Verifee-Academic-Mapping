@@ -9,6 +9,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import verifeeLogo from '@/assets/verifee-logo.png?inline';
+import ReportProofPanel from '@/components/report-proof-panel';
 import {
   VERIFEE_REPORT_DISCLAIMER,
   type GeneratedReportMetadata,
@@ -309,6 +310,8 @@ export function VerifeeReportView({
                   </button>
                 </div>
               </div>
+
+              <ReportProofPanel reportId={generatedReport.reportId} payload={data} />
 
               <article className="v-report-cover" aria-label="Report cover page">
                 <div className="v-report-cover-top">

@@ -14,6 +14,7 @@ import { checkVerification, extractMockRecord, sampleCourses, sampleCredential, 
 import verifeeLogo from '@/assets/verifee-logo.png?inline';
 import { runAcademicMappingWithProgress } from '@/lib/academic-mapping-stream';
 import VerifeeReportView from '@/components/verifee-report-view';
+import ReportProofVerificationPage from '@/components/report-proof-verification-page';
 import {
   buildVerifeeReportData,
   createGeneratedReportMetadata,
@@ -1640,6 +1641,12 @@ function SavedReportRoute() {
   </RequireDemoSession>;
 }
 
+function VerifyReportProofRoute() {
+  const [, params] = useRoute<{ report_id: string }>('/verify/:report_id');
+  if (!params?.report_id) return null;
+  return <div className="shell"><Header /><ReportProofVerificationPage reportId={params.report_id} /></div>;
+}
+
 function RoutedErrorBoundary({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   return <ErrorBoundary resetKey={location}>{children}</ErrorBoundary>;
@@ -1653,6 +1660,7 @@ function Router() {
       <Route path="/dashboard" component={DemoDashboardRoute} />
       <Route path="/my-reports" component={DemoReportsRoute} />
       <Route path="/saved-report/:reportId" component={SavedReportRoute} />
+      <Route path="/verify/:report_id" component={VerifyReportProofRoute} />
       <Route path="/start" component={ProtectedUploadStep} />
       <Route path="/analysis" component={ProtectedReview} />
       <Route path="/target" component={ProtectedTargetSelection} />
