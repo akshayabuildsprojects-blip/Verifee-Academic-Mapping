@@ -443,6 +443,13 @@ test("keeps the Step 1 upload copy concise", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Upload an academic credential" })).toBeVisible();
   await expect(page.getByTestId("upload-watermark")).toBeVisible();
+  await expect(page.locator(".upload-submit-brand")).toBeVisible();
+  const logoBeforeContinue = await page.evaluate(() => {
+    const logo = document.querySelector(".upload-submit-brand");
+    const button = document.querySelector('[data-testid="button-continue-upload"]');
+    return Boolean(logo && button && (logo.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  expect(logoBeforeContinue).toBe(true);
   await expect(
     page.getByText("Upload a transcript or supported digital credential to begin.", { exact: true }),
   ).toBeVisible();
@@ -501,6 +508,7 @@ test("keeps Step 2 concise with inline details and removes only the Step 3 expla
   await expect(page.getByTestId("review-course-ledger")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Course ledger" })).toBeVisible();
   await expect(page.getByText("Cumulative GPA")).toBeVisible();
+  await expect(page.getByTestId("review-language-summary")).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Course code" })).toBeVisible();
   await expect(page.locator(".review-collapsible")).toHaveCount(0);
   await expect(page.getByTestId("review-supporting-details")).toBeVisible();
@@ -515,6 +523,7 @@ test("keeps Step 2 concise with inline details and removes only the Step 3 expla
   await expect(page).toHaveURL(/\/target$/);
   await expect(page.getByText(/Program requirements, importance, and matching concepts/)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Stored background requirements" })).toBeVisible();
+  await expect(page.getByText(/mapping request contains the extracted JSON/i)).toHaveCount(0);
 });
 
 test("shows institution and jurisdiction provenance with the exact Scottish source", async ({ page }) => {
@@ -562,7 +571,8 @@ test("shows detected languages and scripts in transcript review", async ({ page 
   await openReview(page);
 
   const summary = page.getByTestId("language-detection-review");
-  await expect(page.getByRole("heading", { name: "Language detection" })).toBeVisible();
+  await expect(page.getByTestId("review-language-summary")).toBeVisible();
+  await expect(page.getByText("Language detection", { exact: true })).toBeVisible();
   await expect(summary).toContainText("English detected");
   await expect(summary).toContainText("Medium confidence");
   await expect(summary).toContainText("English");
@@ -730,7 +740,8 @@ test("shows mapping progress before results, keeps evidence accessible, and pers
   });
   await expect(page.getByTestId("status-mapping-loading")).toHaveCount(0);
   await expect(page.getByTestId("card-mapping-progress")).toHaveCount(0);
-  await expect(page.locator(".summary-number")).toHaveText("4");
+  await expect(page.getByTestId("mapping-dashboard")).toContainText("4 / 4");
+  await expect(page.getByTestId("mapping-dashboard")).toContainText("Requirement results");
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
   await expect(page.getByTestId(`mapping-${requirementIds[1]}`)).toBeVisible();
   const firstCard = page.getByTestId(`mapping-${requirementIds[0]}`);
@@ -769,11 +780,21 @@ test("shows mapping progress before results, keeps evidence accessible, and pers
     "https://catalog.example.edu/courses/math-101",
   );
 
+  await page.getByTestId("button-expand-all-mappings").click();
+  for (const requirementId of requirementIds) {
+    await expect(page.getByTestId(`toggle-mapping-${requirementId}`)).toHaveAttribute("aria-expanded", "true");
+  }
+  await page.getByTestId("button-collapse-all-mappings").click();
+  for (const requirementId of requirementIds) {
+    await expect(page.getByTestId(`toggle-mapping-${requirementId}`)).toHaveAttribute("aria-expanded", "false");
+  }
+
   await firstToggle.focus();
-  await page.keyboard.press("Space");
   await expect(firstToggle).toHaveAttribute("aria-expanded", "false");
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("Space");
   await expect(firstToggle).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Enter");
+  await expect(firstToggle).toHaveAttribute("aria-expanded", "false");
 
   const storedResult = await page.evaluate(() =>
     JSON.parse(sessionStorage.getItem("verifee-mapping-result") ?? "null"),
@@ -958,15 +979,15 @@ test("shows the report preview immediately and keeps its downloads, save choices
     window.__verifeeMappingTest?.streams[0]?.close();
   });
 
-  await expect(page.locator(".section-disclosure details[open]")).toHaveCount(0);
+  await expect(page.getByTestId("disclosure-institution-status")).not.toHaveAttribute("open", "");
   await expect(page.getByTestId("disclosure-institution-status")).toContainText("Listed");
   await expect(page.getByTestId("disclosure-academic-context").locator(".section-status-label")).toHaveText(/Preliminary context|Context unavailable/);
   await expect(page.getByTestId("disclosure-program-mapping")).toContainText("Complete");
   await page.getByTestId("disclosure-institution-status").locator(":scope > summary").click();
   await page.getByTestId("disclosure-academic-context").locator(":scope > summary").click();
-  await page.getByTestId("disclosure-program-mapping").locator(":scope > summary").click();
   await expect(page.getByTestId("institution-status-source-link")).toBeVisible();
-  await expect(page.getByTestId("card-mapping-overview")).toBeVisible();
+  await expect(page.getByTestId("mapping-dashboard")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Requirement Verification Records" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Overall credential verification" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Items requiring review" })).toHaveCount(0);
   await expect(page.getByTestId("button-open-verifee-report")).toBeVisible();

@@ -405,9 +405,11 @@ function WizardStepScrollReset() {
 function LanguageDetectionCard({
   detection,
   compact = false,
+  testId,
 }: {
   detection: TranscriptLanguageDetection;
   compact?: boolean;
+  testId?: string;
 }) {
   const statusLabel = detection.status === 'ENGLISH_DETECTED'
     ? 'English detected'
@@ -429,7 +431,7 @@ function LanguageDetectionCard({
 
   return <div
     className={`language-detection-card ${compact ? 'compact' : ''} ${detection.status.toLowerCase().replaceAll('_', '-')}`}
-    data-testid={compact ? 'language-detection-upload' : 'language-detection-review'}
+    data-testid={testId ?? (compact ? 'language-detection-upload' : 'language-detection-review')}
     role={compact ? 'status' : undefined}
     aria-live={compact ? 'polite' : undefined}
   >
@@ -579,6 +581,7 @@ function UploadStep() {
       <p className="upload-note">PDFs are used for academic extraction only and are not authenticated. Your extracted academic record is kept in the current browser session.</p>
         {error && <div className="error-message" role="alert" data-testid="status-upload-error">{visibleError}</div>}
        {languageDetection && <LanguageDetectionCard detection={languageDetection} compact />}
+        <div className="upload-submit-brand" aria-hidden="true"><VerifeeLogo className="upload-submit-logo" /></div>
         <button className="cta" type="button" onClick={() => void submit()} disabled={!file || busy || Boolean(duplicateReportId && !continueWithDuplicate)} data-testid="button-continue-upload"><span>{busy ? file && isPdfFile(file) ? 'Reading transcript…' : 'Preparing sample record…' : 'Continue to Verify & Review'}</span>{busy ? <LoaderCircle size={16} className="animate-spin" /> : <ArrowRight size={16} />}</button>
       {canTryAnotherFile && <button className="secondary-btn" type="button" onClick={() => inputRef.current?.click()} data-testid="button-try-another-file">Try another file</button>}
       {file && isPdfFile(file) && error && !isVerifeeReportError(error) && <button className="secondary-btn" type="button" onClick={() => void continueWithDemo()} disabled={busy} data-testid="button-use-demo-fallback">Continue with demo sample</button>}
@@ -733,6 +736,12 @@ function Review() {
               <span className={label === 'Cumulative GPA' || label === 'Credit / unit system' ? 'review-credential-value review-mono' : 'review-credential-value'}>{value}</span>
             </div>
           ))}
+          <div className="review-credential-tile review-language-tile" data-testid="review-language-summary">
+            <span className="review-overline">Language detection</span>
+            {isExtracted && languageDetection
+              ? <LanguageDetectionCard detection={languageDetection} compact testId="language-detection-review" />
+              : <span className="review-credential-value">{isExtracted ? 'Unavailable' : 'Sample record'}</span>}
+          </div>
         </div>
       </section>
 
@@ -770,10 +779,6 @@ function Review() {
             <h2 id="review-interpretation-title">Academic interpretation</h2>
             <div className="verification-review"><Check size={18} /><div><span className="status-pill" data-testid="status-academic-interpretation">{isExtracted ? 'Available' : 'Sample only'}</span><p>{isExtracted ? 'Extracted from the PDF. Missing or unreadable values are marked as unavailable.' : 'Sample data; not extracted from the selected file.'}</p></div></div>
           </section>
-          {isExtracted && languageDetection && <section className="review-inline-card review-language-section" aria-labelledby="review-language-title">
-            <h2 id="review-language-title">Language detection</h2>
-            <LanguageDetectionCard detection={languageDetection} />
-          </section>}
         </div>
       </div>
       <div className="wizard-actions"><button className="secondary-btn" type="button" onClick={() => setLocation('/start')}><ArrowLeft size={14} /> Back to upload</button><button className="cta wizard-next" type="button" onClick={() => setLocation('/target')} data-testid="button-continue-target"><span>Continue to target selection</span><ArrowRight size={16} /></button></div>
@@ -808,7 +813,7 @@ function TargetSelection() {
     <section className="wizard-card target-card">
       <div className="eyebrow">Step 3 of 5</div>
       <h1 className="wizard-title">Choose what you want to compare against</h1>
-        <p className="wizard-intro">{isExtracted ? 'Choose the Georgia Tech program to compare with the complete extracted academic record. The mapping request uses the extracted JSON, not the PDF file.' : 'Choose the Georgia Tech program to compare with the synthetic sample academic record.'}</p>
+        <p className="wizard-intro">{isExtracted ? 'Choose a Georgia Tech program to compare with this academic record.' : 'Choose a Georgia Tech program to compare with the sample record.'}</p>
       <div className="target-form">
         <div className="target-field"><span className="field-label">Institution</span><div className="institution-value"><span className="institution-mark">GT</span><span>{georgiaTechDataset.institution.name}</span></div></div>
         <div className="target-field"><label className="field-label" htmlFor="target-program">Target program</label><select id="target-program" className="target-select" value={program.id} onChange={(event) => changeProgram(event.target.value)} data-testid="select-program">{georgiaTechDataset.programs.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></div>
@@ -979,7 +984,7 @@ function Report() {
   const [mappingError, setMappingError] = useState('');
   const [progressRequirements, setProgressRequirements] = useState<RequirementMapping[]>([]);
   const [progressCourseEvidence, setProgressCourseEvidence] = useState<CourseEvidence[]>([]);
-  const [expandedRequirementId, setExpandedRequirementId] = useState<string | null>(null);
+  const [expandedRequirementIds, setExpandedRequirementIds] = useState<Set<string>>(() => new Set());
   const [programMappingOpen, setProgramMappingOpen] = useState(false);
   const currentMapping = mapping?.programId === program.id ? mapping : null;
 
@@ -1079,7 +1084,7 @@ function Report() {
     setMappingError('');
     setProgressRequirements([]);
     setProgressCourseEvidence([]);
-    setExpandedRequirementId(null);
+    setExpandedRequirementIds(new Set());
     setMappingStage(academicContext ? 'requirements' : 'context');
     try {
       await ensureAcademicContext(cancelled);
@@ -1121,7 +1126,7 @@ function Report() {
       setMappingError('');
       setProgressRequirements([]);
       setProgressCourseEvidence([]);
-      setExpandedRequirementId(null);
+      setExpandedRequirementIds(new Set());
       setLoading(false);
       setMappingStage('complete');
       const cachedContext = readStoredAcademicContext();
@@ -1203,6 +1208,10 @@ function Report() {
         <div className="eyebrow">Step 4 of 5 · Academic mapping</div>
         <h1 className="report-title">Academic mapping</h1>
         <p className="report-lede">Course-by-course evidence compared with the stored {program.shortName} background requirements.</p>
+        <div className="evaluation-standard" data-testid="evaluation-standard">
+          <Landmark size={17} aria-hidden="true" />
+          <span><small>Evaluation standard</small><strong>{georgiaTechDataset.institution.name}</strong></span>
+        </div>
       </div>
       <div className="report-actions">
         <button className="secondary-btn" type="button" onClick={() => setLocation('/target')}><ArrowLeft size={14} /> Change target</button>
@@ -1329,12 +1338,32 @@ function Report() {
         <button className="secondary-btn" type="button" onClick={retryMapping} disabled={loading} data-testid="button-retry-mapping"><RotateCcw size={14} /> Retry mapping</button>
       </div>}
     </section>}
-    <div className="preliminary" data-testid="notice-preliminary"><AlertCircle size={16} /><span>
-      <strong>{isExtracted ? 'Preliminary mapping of extracted academic details.' : 'Preliminary mapping of the synthetic demo record.'}</strong>{' '}
-      {isExtracted
-        ? `“${fileName}” was used only for extraction. This mapping request contains the extracted academic JSON, not the PDF.`
-        : `“${fileName}” was not parsed; this mapping uses only the separately labeled synthetic sample record.`}
+    <div className="preliminary mapping-scope-note" data-testid="notice-preliminary"><AlertCircle size={15} /><span>
+      <strong>Preliminary mapping.</strong> {isExtracted ? 'Compared using details extracted from the transcript.' : 'Demo sample only; the selected file was not parsed.'}
     </span></div>
+    {mappingResultsReady && <section className="mapping-dashboard" aria-label="Requirement mapping summary" data-testid="mapping-dashboard">
+      <div className="mapping-score-panel">
+        <span className="mapping-score-label">Requirements assessed</span>
+        <div className="mapping-score-value">{requirements.length}<span> / {program.requirements.length}</span></div>
+        <p>{allRequirementsCompleted ? 'All stored criteria evaluated' : 'Stored criteria evaluated so far'}</p>
+        <div className="mapping-progress-meter">
+          <div className="mapping-progress-bar" role="progressbar" aria-label="Requirements assessed" aria-valuemin={0} aria-valuemax={program.requirements.length} aria-valuenow={requirements.length}>
+            <span className="mapping-progress-fill" style={{ width: `${progressPercent}%` }} />
+          </div>
+          <span className="mapping-progress-percent">{progressPercent}%</span>
+        </div>
+      </div>
+      <div className="mapping-breakdown-panel">
+        <div className="mapping-breakdown-heading"><h2>Requirement results</h2><span>{requirements.length} evaluated</span></div>
+        <div className="mapping-breakdown-grid">
+          <div className="mapping-breakdown-tile"><span>Covered</span><strong>{counts.covered}</strong></div>
+          <div className="mapping-breakdown-tile"><span>Partial</span><strong>{counts.partial}</strong></div>
+          <div className="mapping-breakdown-tile"><span>Insufficient</span><strong>{counts.insufficient}</strong></div>
+          <div className="mapping-breakdown-tile"><span>Potential gap</span><strong>{counts.potentialGap}</strong></div>
+        </div>
+        <div className="mapping-dashboard-footer"><span>{academicRecord?.institution.name} · {program.shortName}</span><span>{program.requirements.length} stored criteria</span></div>
+      </div>
+    </section>}
     <div className="report-sections">
       <section className="panel section-card section-disclosure academic-context-card" aria-live="polite" aria-busy={contextLoading} data-testid="card-academic-context">
         <details data-testid="disclosure-academic-context">
@@ -1376,20 +1405,6 @@ function Report() {
             {contextFailure && <p className="academic-context-note" role="status">Contextualization was unavailable. Requirement mapping still uses the original extracted academic JSON.</p>}
             {!contextFailure && academicContext && academicContext.status !== 'MAPPED' && <p className="academic-context-note">Some fields could not be confidently mapped from the available transcript or official institution source.</p>}
             <p className="academic-context-disclaimer">This context is informational only and does not verify credential authenticity.</p>
-            <section className="context-mapping-overview" data-testid="card-mapping-overview">
-              <div className="context-mapping-overview-heading">
-                <h3>Mapping overview</h3>
-                <span>Mapped {requirements.length} / {program.requirements.length}</span>
-              </div>
-              <div className="summary-number">{requirements.length}</div>
-              <div className="summary-caption">{showPartialMapping ? `of ${program.requirements.length} requirements mapped` : `Stored ${program.shortName} criteria reviewed`}</div>
-              {currentMapping && !showPartialMapping && <div className="result-counts">
-                <div><strong>{counts.covered}</strong><span>Covered</span></div>
-                <div><strong>{counts.partial}</strong><span>Partially covered</span></div>
-                <div><strong>{counts.potentialGap}</strong><span>Potential gaps</span></div>
-                <div><strong>{counts.insufficient}</strong><span>Insufficient evidence</span></div>
-              </div>}
-            </section>
           </div>
         </details>
       </section>
@@ -1397,7 +1412,7 @@ function Report() {
       <section className="panel section-card section-disclosure" aria-live="polite" data-testid="card-program-mapping">
         <details data-testid="disclosure-program-mapping" open={programMappingOpen} onToggle={(event) => setProgramMappingOpen(event.currentTarget.open)}>
           <summary className="section-disclosure-summary">
-            <span className="section-disclosure-heading"><GraduationCap size={19} /><span role="heading" aria-level={2}>Program requirement mapping</span></span>
+            <span className="section-disclosure-heading"><GraduationCap size={19} /><span role="heading" aria-level={2}>Requirement Verification Records</span>{mappingResultsReady && <span className="mapping-record-count">{requirements.length} evaluated pairs</span>}</span>
             <span className={`status-pill section-status ${mappingError ? 'gap' : allRequirementsCompleted ? 'good' : 'review'}`}>
               {mappingError ? 'Retry needed' : loading ? 'Mapping' : allRequirementsCompleted ? 'Complete' : 'In progress'}
             </span>
@@ -1413,6 +1428,10 @@ function Report() {
           <div className="section-disclosure-content">
             <p className="form-note mapping-section-note">The selected program’s stored requirements are compared with extracted courses and available evidence.</p>
             <details className="source-details"><summary>Stored program source</summary><p>{program.source.title}</p><span>Last checked: {program.source.lastChecked}</span></details>
+            <div className="mapping-record-controls">
+              <button className="text-action" type="button" onClick={() => setExpandedRequirementIds(new Set(visibleRequirements.map((item) => item.requirementId)))} data-testid="button-expand-all-mappings">Expand all</button>
+              <button className="text-action" type="button" onClick={() => setExpandedRequirementIds(new Set())} data-testid="button-collapse-all-mappings">Collapse all</button>
+            </div>
             {currentMapping && !showPartialMapping && <>
               <p className="source-claim">{sourceSummary}</p>
               {currentMapping.retryable && !mappingError && <div className="mapping-error mapping-partial-error" role="status" data-testid="status-partial-mapping">
@@ -1427,8 +1446,13 @@ function Report() {
                 key={match.requirementId}
                 match={match}
                 courseEvidenceByIndex={courseEvidenceByIndex}
-                expanded={expandedRequirementId === match.requirementId}
-                onToggle={() => setExpandedRequirementId((current) => current === match.requirementId ? null : match.requirementId)}
+                expanded={expandedRequirementIds.has(match.requirementId)}
+                onToggle={() => setExpandedRequirementIds((current) => {
+                  const next = new Set(current);
+                  if (next.has(match.requirementId)) next.delete(match.requirementId);
+                  else next.add(match.requirementId);
+                  return next;
+                })}
               />)}{visibleRequirements.length === 0 && <p className="form-note">No requirements have this result.</p>}</div>
             </>}
           </div>
