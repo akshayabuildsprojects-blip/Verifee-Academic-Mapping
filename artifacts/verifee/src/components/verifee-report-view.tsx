@@ -219,7 +219,7 @@ export function VerifeeReportView({
     <main className="v-report-page">
       <div className="v-report-wrap">
         <header className="v-report-intro">
-          <div className="v-report-overline"><span /> Preliminary academic interpretation</div>
+          <div className="v-report-overline"><span /> Step 5 of 5</div>
           <h1>Verifee Report</h1>
           <p>Your preliminary academic mapping report is ready to review or download.</p>
         </header>
@@ -245,27 +245,28 @@ export function VerifeeReportView({
               </div>
             </section>
         )}
-            <section className="v-report-preview" aria-labelledby="v-report-preview-title">
+        <ReportProofPanel
+          reportId={generatedReport.reportId}
+          targetInstitution={data.targetInstitution}
+          payload={data}
+          buildPdfBase64={() => downloadVerifeeReportPdf(data, generatedReport, 'base64') || ''}
+          extraActions={<>
+            {onSaveToMyReports && <button className="v-report-button v-report-button-secondary" type="button" onClick={onSaveToMyReports} disabled={isSavedToMyReports} data-testid="button-save-to-my-reports">
+            {isSavedToMyReports ? <Check size={15} aria-hidden="true" /> : <FileText size={15} aria-hidden="true" />}
+              {isSavedToMyReports ? 'Saved' : 'Save'}
+            </button>}
+            <button className="v-report-button v-report-button-secondary" type="button" onClick={onDownloadReceipt} data-testid="button-download-submission-receipt"><FileText size={15} aria-hidden="true" /> Download Receipt</button>
+            <button className="v-report-button v-report-button-secondary" type="button" onClick={onDownload} aria-label="Download report as PDF" data-testid="button-download-report"><ArrowDownToLine size={16} aria-hidden="true" /> Download PDF</button>
+          </>}
+        />
+
+        <section className="v-report-preview" aria-labelledby="v-report-preview-title" data-testid="report-preview">
               <div className="v-report-preview-toolbar">
                 <div>
                   <span className="v-report-label">Generated academic report</span>
                   <h2 id="v-report-preview-title">Report preview</h2>
                 </div>
               </div>
-
-              <ReportProofPanel
-                reportId={generatedReport.reportId}
-                payload={data}
-                buildPdfBase64={() => downloadVerifeeReportPdf(data, generatedReport, 'base64') || ''}
-                extraActions={<>
-                  {onSaveToMyReports && <button className="v-report-button v-report-button-secondary" type="button" onClick={onSaveToMyReports} disabled={isSavedToMyReports} data-testid="button-save-to-my-reports">
-                  {isSavedToMyReports ? <Check size={15} aria-hidden="true" /> : <FileText size={15} aria-hidden="true" />}
-                    {isSavedToMyReports ? 'Saved' : 'Save'}
-                  </button>}
-                  <button className="v-report-button v-report-button-secondary" type="button" onClick={onDownloadReceipt} data-testid="button-download-submission-receipt"><FileText size={15} aria-hidden="true" /> Download Receipt</button>
-                  <button className="v-report-button v-report-button-secondary" type="button" onClick={onDownload} aria-label="Download report as PDF" data-testid="button-download-report"><ArrowDownToLine size={16} aria-hidden="true" /> Download PDF</button>
-                </>}
-              />
 
               <article className="v-report-cover" aria-label="Report cover page">
                 <div className="v-report-cover-top">

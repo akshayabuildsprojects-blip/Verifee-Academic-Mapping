@@ -27,8 +27,9 @@ async function sha256(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export default function ReportProofPanel({ reportId, payload, buildPdfBase64, extraActions }: {
+export default function ReportProofPanel({ reportId, targetInstitution, payload, buildPdfBase64, extraActions }: {
   reportId: string;
+  targetInstitution: string;
   payload: object;
   buildPdfBase64(): string;
   extraActions?: ReactNode;
@@ -164,11 +165,18 @@ export default function ReportProofPanel({ reportId, payload, buildPdfBase64, ex
       : proofFailed || proof?.proofStatus === "failed"
         ? "Proof failed"
         : "Not created yet";
+  const verificationPath = `/verify/${encodeURIComponent(reportId)}`;
+  const explorerPath = proof?.signature
+    ? `https://explorer.solana.com/tx/${encodeURIComponent(proof.signature)}?cluster=devnet`
+    : null;
 
   return (
     <section className="report-proof-panel" aria-labelledby="report-proof-title" data-testid="report-proof-panel">
       <div className="report-proof-heading">
-        <h2 id="report-proof-title">Report Integrity Proof</h2>
+        <div>
+          {sent && <span className="report-proof-kicker">Verification dossier</span>}
+          <h2 id="report-proof-title">Report Integrity Proof</h2>
+        </div>
         <span data-testid="report-proof-status" className={`report-proof-status ${sent ? "is-anchored" : proofFailed || sendFailed ? "is-error" : ""}`} role="status">
           Proof status: {statusLabel}
         </span>
@@ -178,11 +186,25 @@ export default function ReportProofPanel({ reportId, payload, buildPdfBase64, ex
       )}
       {sent && proof && (
         <dl className="report-proof-details" data-testid="report-proof-details">
-          <div><dt>Sent status</dt><dd data-testid="report-sent-status">Sent</dd></div>
-          <div><dt>Report ID</dt><dd>{proof.reportId}</dd></div>
-          <div><dt>Report hash</dt><dd className="report-proof-hash">{proof.reportHash}</dd></div>
-          <div><dt>Solana transaction signature</dt><dd className="report-proof-signature">{proof.signature}</dd></div>
+          <div><dt>Target institution</dt><dd>{targetInstitution}</dd></div>
           <div><dt>Proof timestamp</dt><dd>{new Date(proof.proofTimestamp).toLocaleString()}</dd></div>
+          <div><dt>Sent status</dt><dd data-testid="report-sent-status"><span className="report-proof-immutable">Sent</span></dd></div>
+          <div><dt>Report ID</dt><dd className="report-proof-mono">{proof.reportId}</dd></div>
+          <div className="report-proof-detail-wide">
+            <dt>Report hash · SHA-256 checksum</dt>
+            <dd className="report-proof-mono report-proof-hash">{proof.reportHash}</dd>
+          </div>
+          <div className="report-proof-detail-wide">
+            <dt>Solana transaction signature</dt>
+            <dd className="report-proof-signature-row">
+              <span className="report-proof-mono report-proof-signature">{proof.signature}</span>
+              {explorerPath && <a href={explorerPath} target="_blank" rel="noreferrer noopener">View on Solana Explorer ↗</a>}
+            </dd>
+          </div>
+          <div className="report-proof-detail-wide">
+            <dt>Direct trust verification</dt>
+            <dd><Link href={verificationPath}>{window.location.origin}{verificationPath}</Link></dd>
+          </div>
         </dl>
       )}
       {error && <p className="report-proof-error" role="alert">{error}</p>}

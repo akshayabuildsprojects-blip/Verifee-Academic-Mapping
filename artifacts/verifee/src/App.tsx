@@ -1203,7 +1203,7 @@ function Report() {
     <Stepper current={4} />
     <div className="report-top">
       <div>
-        <div className="eyebrow">Step 4 of 5 · Academic mapping</div>
+        <div className="eyebrow">Step 4 of 5</div>
         <h1 className="report-title">Academic mapping</h1>
         <p className="report-lede">Course-by-course evidence compared with the stored {program.shortName} background requirements.</p>
         <div className="mapping-header-meta" data-testid="mapping-header-meta">

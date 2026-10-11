@@ -447,10 +447,16 @@ test("keeps the Step 1 upload copy concise", async ({ page }) => {
   const watermarkOverContinue = await page.evaluate(() => {
     const watermark = document.querySelector('[data-testid="upload-watermark"]');
     const button = document.querySelector('[data-testid="button-continue-upload"]');
-    if (!watermark || !button) return false;
+    const card = watermark?.closest(".upload-step-card");
+    if (!watermark || !button || !card) return false;
     const watermarkBounds = watermark.getBoundingClientRect();
     const buttonBounds = button.getBoundingClientRect();
-    return getComputedStyle(watermark).zIndex === "2" &&
+    const cardBounds = card.getBoundingClientRect();
+    const watermarkStyle = getComputedStyle(watermark);
+    const watermarkCenter = watermarkBounds.left + watermarkBounds.width / 2;
+    return watermarkStyle.zIndex === "2" &&
+      Number(watermarkStyle.opacity) <= 0.08 &&
+      watermarkCenter > cardBounds.left + cardBounds.width * 0.55 &&
       watermarkBounds.left < buttonBounds.right &&
       watermarkBounds.right > buttonBounds.left &&
       watermarkBounds.top < buttonBounds.bottom &&
@@ -717,6 +723,10 @@ test("shows mapping progress before results, keeps evidence accessible, and pers
   await expect(dashboard).toContainText("—");
   await expect(page.getByTestId("mapping-header-meta")).toContainText("Evaluation standard");
   await expect(page.getByTestId("mapping-header-meta")).toContainText("Preliminary mapping.");
+  const institutionCardGap = await page.getByTestId("card-institution-status").evaluate(
+    (card) => Number.parseFloat(getComputedStyle(card).marginBottom),
+  );
+  expect(institutionCardGap).toBeGreaterThanOrEqual(20);
   await expect(dashboard).toContainText("0 / 4");
   await expect(page.getByTestId("card-mapping-progress")).toHaveCount(0);
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toHaveCount(0);
@@ -1012,6 +1022,15 @@ test("shows the report preview immediately and keeps its downloads, save choices
   await page.getByTestId("button-open-verifee-report").click();
   await expect(page).toHaveURL(/\/final-report$/);
   await expect(page.getByRole("heading", { name: "Report preview" })).toBeVisible();
+  await expect(page.getByText("Step 5 of 5", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("report-proof-panel")).toBeVisible();
+  await expect(page.getByTestId("report-preview")).toBeVisible();
+  const proofBeforePreview = await page.evaluate(() => {
+    const proof = document.querySelector('[data-testid="report-proof-panel"]');
+    const preview = document.querySelector('[data-testid="report-preview"]');
+    return Boolean(proof && preview && (proof.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  expect(proofBeforePreview).toBe(true);
   await expect(
     page
       .getByRole("article", { name: "Report cover page" })
@@ -1111,6 +1130,10 @@ test("shows the report preview immediately and keeps its downloads, save choices
   await expect(page.getByTestId("report-sent-status")).toHaveText("Sent");
   await expect(page.getByTestId("report-proof-details")).toContainText("Solana transaction signature");
   await expect(page.getByTestId("report-proof-details")).toContainText("Report hash");
+  await expect(page.getByTestId("report-proof-details")).toContainText("Target institution");
+  await expect(page.getByTestId("report-proof-details")).toContainText("Proof timestamp");
+  await expect(page.getByTestId("report-proof-details").getByRole("link", { name: /Solana Explorer/ })).toHaveAttribute("href", /cluster=devnet/);
+  await expect(page.getByTestId("report-proof-details").getByRole("link", { name: /\/verify\// })).toBeVisible();
   expect(Buffer.from(emailedPdfBase64, "base64").subarray(0, 5).toString("ascii")).toBe("%PDF-");
   expect(proofRequests.some((request) => request === "POST /api/report-proofs")).toBe(true);
   expect(proofRequests.some((request) => request.endsWith("/send"))).toBe(true);
