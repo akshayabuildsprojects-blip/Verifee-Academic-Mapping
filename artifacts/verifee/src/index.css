@@ -190,6 +190,47 @@ button { cursor:pointer; }
 .demo-disclosure strong{color:#4d655d}
 .review-disclosure{display:flex;align-items:flex-start;gap:10px;margin:0 0 22px;padding:13px 15px;border:1px solid #e6e2d7;border-radius:8px;background:#f8f6ef;color:#6c6655;font-size:12px;line-height:1.55}
 .review-disclosure svg{flex:none;margin-top:1px;color:#8a764d}
+.review-page-wrap{max-width:1180px}
+.review-page{padding:clamp(20px,3.4vw,38px)}
+.review-page-heading{margin-bottom:22px}
+.review-stage-label{display:inline-flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid #d7e8dc;border-radius:999px;background:#eaf5ec;color:#416e5d;font-size:9px;font-weight:700;letter-spacing:.11em}
+.review-stage-dot{width:7px;height:7px;border-radius:50%;background:#63a288}
+.review-page .wizard-title{margin:16px 0 7px;color:#253d35;font-size:clamp(32px,4vw,44px)}
+.review-page .wizard-intro{margin-bottom:0}
+.review-page .review-disclosure{margin-bottom:20px}
+.review-dossier{padding:22px;border:1px solid #e0e9e1;border-radius:13px;background:#f2f7f2}
+.review-dossier-heading{display:flex;align-items:center;gap:12px;min-width:0}
+.review-dossier-icon{width:40px;height:40px;display:grid;place-items:center;flex:none;border-radius:10px;background:#e1ede4;color:#376959}
+.review-overline{display:block;color:#73817a;font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+.review-dossier-heading h2{margin:4px 0 0;color:#243d35;font:500 21px/1.2 var(--app-font-serif);overflow-wrap:anywhere}
+.review-record-badge{margin-left:auto;flex:none;padding:7px 10px;border:1px solid #d9e8dd;border-radius:999px;background:#fff;color:#527264;font-size:10px;font-weight:700}
+.review-record-badge.is-sample{border-color:#ece3d3;background:#faf7ef;color:#806f4c}
+.review-credential-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:18px}
+.review-credential-tile{min-height:82px;padding:14px;border:1px solid #e5ece5;border-radius:10px;background:#fff}
+.review-credential-value{display:block;margin-top:8px;color:#2d413a;font-size:14px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
+.review-credential-tile:nth-child(3) .review-credential-value{font:500 24px/1 var(--app-font-serif);color:#214f40}
+.review-mono{font-family:var(--app-font-mono)}
+.review-ledger{margin-top:23px;padding:20px 0 0;border-top:1px solid #e7ece8}
+.review-ledger-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:15px}
+.review-ledger-title-line{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.review-ledger-title-line h2{margin:0;color:#243d35;font:500 24px/1.15 var(--app-font-serif)}
+.review-entry-count{padding:4px 8px;border:1px solid #e3e8e3;border-radius:999px;background:#f4f6f3;color:#62746c;font-size:9px}
+.review-ledger-heading p{margin:5px 0 0;color:#687670;font-size:11px;line-height:1.5}
+.review-ledger-scope{flex:none;padding:7px 10px;border:1px solid #e0e8e2;border-radius:7px;background:#f7faf7;color:#63786e;font-size:10px;font-weight:600}
+.review-table-scroll{overflow-x:auto;border:1px solid #e8ede9;border-radius:10px}
+.review-course-table{min-width:780px;margin:0}
+.review-course-table th{padding:12px;border-bottom:1px solid #e6ebe7;background:#f2f7f2;color:#697a71;font-size:9px;letter-spacing:.045em;text-transform:uppercase}
+.review-course-table td{padding:15px 12px;vertical-align:middle;font-size:11px}
+.review-course-table .course-code{white-space:nowrap;color:#294b40;font-size:10px}
+.review-course-title{min-width:170px;color:#2f413b!important;font-weight:600}
+.review-course-description{min-width:210px;max-width:340px;color:#65736d!important;line-height:1.5}
+.review-grade{display:inline-flex;min-width:34px;justify-content:center;padding:5px 7px;border-radius:5px;background:#e8f3eb;color:#315e4c;font-family:var(--app-font-mono);font-size:10px;font-weight:700}
+.review-supporting-sections{margin-top:23px;border-top:1px solid #e7ece8}
+.review-supporting-sections .review-section.review-collapsible{border-color:#e7ece8}
+.review-supporting-sections .review-summary{min-height:54px}
+.review-supporting-sections .review-summary-title{font-size:13px}
+.review-supporting-sections .review-summary-value{font-size:10px}
+.review-supporting-sections .review-collapsible-content{padding:0 0 17px}
 .review-section{padding:20px 0;border-top:1px solid #e8ece9}
 .review-section:first-of-type{border-top:0;padding-top:0}
 .review-section .section-title{margin-bottom:13px}
@@ -534,4 +575,23 @@ button { cursor:pointer; }
   .app-demo-navigation{gap:7px;font-size:8px}
   .app-demo-navigation .demo-badge{padding:4px;font-size:7px}
   .app-demo-navigation a,.app-demo-navigation button{font-size:8px}
+}
+@media(max-width:760px){
+  .review-page-wrap{padding-top:20px}
+  .review-dossier{padding:16px}
+  .review-credential-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .review-ledger-heading{align-items:flex-start;flex-direction:column}
+  .review-ledger-scope{align-self:flex-start}
+  .review-course-table{min-width:720px}
+}
+@media(max-width:460px){
+  .review-page{padding:18px 14px}
+  .review-stage-label{font-size:8px}
+  .review-dossier-heading{align-items:flex-start}
+  .review-dossier-icon{width:34px;height:34px}
+  .review-dossier-heading h2{font-size:18px}
+  .review-record-badge{padding:5px 7px;font-size:9px}
+  .review-credential-grid{grid-template-columns:1fr}
+  .review-credential-tile{min-height:68px}
+  .review-ledger-title-line h2{font-size:21px}
 }

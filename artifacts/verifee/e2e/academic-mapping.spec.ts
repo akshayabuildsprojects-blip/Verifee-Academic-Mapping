@@ -410,7 +410,7 @@ async function openReview(page: Page) {
     sessionStorage.setItem("verifee-started", "yes");
   }, { record: academicRecord, languageDetection: detectedLanguages });
   await page.goto("/analysis");
-  await page.getByRole("heading", { name: "Verify & review" }).waitFor();
+  await page.getByRole("heading", { name: "Extracted Academic Record Review" }).waitFor();
 }
 
 async function sendStreamEvent(
@@ -489,14 +489,23 @@ test("resets scroll between wizard steps but not within a step", async ({ page }
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
   await page.getByRole("button", { name: "Back to review" }).click();
   await expect(page).toHaveURL(/\/analysis$/);
-  await expect(page.getByRole("heading", { name: "Verify & review" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Extracted Academic Record Review" })).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
 });
 
 test("keeps Step 2 concise with collapsed details and removes only the Step 3 explanatory note", async ({ page }) => {
   await openReview(page);
   await expect(page.getByText("Review the extracted details before choosing a target.")).toBeVisible();
+  await expect(page.getByTestId("review-dossier")).toBeVisible();
+  await expect(page.getByTestId("review-course-ledger")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Course ledger" })).toBeVisible();
+  await expect(page.getByText("Cumulative GPA")).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Course code" })).toBeVisible();
   await expect(page.locator(".review-collapsible[open]")).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByTestId("review-dossier")).toBeVisible();
+  const courseLedgerOverflows = await page.locator(".review-table-scroll").evaluate((element) => element.scrollWidth > element.clientWidth);
+  expect(courseLedgerOverflows).toBe(true);
   await page.locator(".review-collapsible").filter({ hasText: "Credential details" }).locator("summary").click();
   await expect(page.locator(".review-collapsible[open]")).toHaveCount(1);
   await page.getByTestId("button-continue-target").click();
