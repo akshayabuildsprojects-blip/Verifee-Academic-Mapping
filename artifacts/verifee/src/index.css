@@ -139,6 +139,12 @@ button { cursor:pointer; }
 .mapping-filter{display:flex;flex-wrap:wrap;gap:7px;margin:15px 0}
 .mapping-loading,.mapping-error{display:flex;align-items:flex-start;gap:12px;padding:15px;margin:16px 0;border-radius:8px;font-size:12px;line-height:1.5}
 .mapping-loading{background:#f3f6f3;border:1px solid #dce6df;color:#526a62}
+.mapping-progress-card{margin:0 0 16px}
+.mapping-progress-card .mapping-loading{width:100%;margin:0}
+.mapping-progress-content{flex:1;min-width:0}
+.mapping-progress-content>strong{display:block;color:#34494b;font-size:13px}
+.mapping-progress-content>p{margin:8px 0 0}
+.mapping-progress-card .mapping-error{margin:10px 0 0}
 .mapping-loading svg{flex:none;margin-top:2px}
 .mapping-loading p,.mapping-error p{margin:3px 0 0;color:#6b7979}
 .mapping-error{justify-content:space-between;background:#fbf1ef;border:1px solid #efd8d3;color:#80534c}
@@ -171,6 +177,10 @@ button { cursor:pointer; }
 .wizard-step.current .wizard-marker{border-color:hsl(var(--primary));background:#e9f1ed;color:hsl(var(--primary))}
 .wizard-step-label{overflow-wrap:anywhere}
 .wizard-card{padding:clamp(24px,4vw,42px);background:hsl(var(--card));border:1px solid hsl(var(--card-border));border-radius:13px;box-shadow:var(--shadow)}
+.upload-step-card{position:relative;isolation:isolate;overflow:hidden}
+.upload-step-card>:not(.upload-watermark){position:relative;z-index:1}
+.upload-watermark{position:absolute;right:-32px;bottom:-22px;z-index:0;width:min(38%,360px);opacity:.055;pointer-events:none}
+.upload-watermark-logo{display:block;width:100%;height:auto}
 .final-report-stepper{max-width:1060px;padding-top:22px;padding-bottom:0}
 .final-report-stepper .wizard-stepper{margin-bottom:0}
 .final-report-stepper + .v-report-page{padding-top:20px}
@@ -226,6 +236,15 @@ button { cursor:pointer; }
 .review-course-description{min-width:210px;max-width:340px;color:#65736d!important;line-height:1.5}
 .review-grade{display:inline-flex;min-width:34px;justify-content:center;padding:5px 7px;border-radius:5px;background:#e8f3eb;color:#315e4c;font-family:var(--app-font-mono);font-size:10px;font-weight:700}
 .review-supporting-sections{margin-top:23px;border-top:1px solid #e7ece8}
+.review-supporting-sections{display:grid;gap:12px;padding-top:20px}
+.review-inline-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.review-inline-card{min-width:0;padding:16px;border:1px solid #e3eae4;border-radius:10px;background:#fbfcfa}
+.review-inline-card h2{margin:0 0 11px;color:#344a40;font:500 16px/1.25 "Newsreader",Georgia,serif}
+.review-inline-card .credential-grid{margin-top:5px}
+.review-inline-card .data-value{overflow-wrap:anywhere}
+.review-credential-details .credential-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.review-language-section{grid-column:1/-1}
+.review-language-section .language-detection-card{margin:0}
 .review-supporting-sections .review-section.review-collapsible{border-color:#e7ece8}
 .review-supporting-sections .review-summary{min-height:54px}
 .review-supporting-sections .review-summary-title{font-size:13px}
@@ -374,10 +393,13 @@ button { cursor:pointer; }
 
 @media(max-width:760px){
   .wizard-wrap{padding-top:22px}
+  .upload-watermark{right:-25px;width:48%;opacity:.045}
   .wizard-stepper{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 6px;margin-bottom:20px;padding-bottom:14px}
   .wizard-step{flex-direction:column;align-items:flex-start;gap:5px;font-size:10px}
   .wizard-marker{width:24px;height:24px}
   .report-finalize-cta{align-items:stretch;flex-direction:column;gap:13px;padding:17px}
+  .review-inline-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .review-language-section{grid-column:1/-1}
   .report-finalize-cta .cta{width:100%}
   .format-grid{grid-template-columns:1fr}
   .format-option{min-height:unset;padding:11px 13px}
@@ -387,6 +409,12 @@ button { cursor:pointer; }
   .program-requirement-list{grid-template-columns:1fr}
   .mapping-card-trigger{align-items:flex-start}
   .mapping-card-badges{flex-wrap:wrap}
+}
+@media(max-width:460px){
+  .upload-watermark{right:-20px;bottom:-10px;width:65%}
+  .review-inline-grid,.review-credential-details .credential-grid{grid-template-columns:1fr}
+  .review-language-section{grid-column:auto}
+  .mapping-progress-card .mapping-loading{padding:12px}
 }
 @media(max-width:460px){
   .wizard-stepper{grid-template-columns:repeat(2,minmax(0,1fr))}

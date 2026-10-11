@@ -442,6 +442,7 @@ test("keeps the Step 1 upload copy concise", async ({ page }) => {
   await page.goto("/start");
 
   await expect(page.getByRole("heading", { name: "Upload an academic credential" })).toBeVisible();
+  await expect(page.getByTestId("upload-watermark")).toBeVisible();
   await expect(
     page.getByText("Upload a transcript or supported digital credential to begin.", { exact: true }),
   ).toBeVisible();
@@ -493,7 +494,7 @@ test("resets scroll between wizard steps but not within a step", async ({ page }
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
 });
 
-test("keeps Step 2 concise with collapsed details and removes only the Step 3 explanatory note", async ({ page }) => {
+test("keeps Step 2 concise with inline details and removes only the Step 3 explanatory note", async ({ page }) => {
   await openReview(page);
   await expect(page.getByText("Review the extracted details before choosing a target.")).toBeVisible();
   await expect(page.getByTestId("review-dossier")).toBeVisible();
@@ -501,13 +502,15 @@ test("keeps Step 2 concise with collapsed details and removes only the Step 3 ex
   await expect(page.getByRole("heading", { name: "Course ledger" })).toBeVisible();
   await expect(page.getByText("Cumulative GPA")).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Course code" })).toBeVisible();
-  await expect(page.locator(".review-collapsible[open]")).toHaveCount(0);
+  await expect(page.locator(".review-collapsible")).toHaveCount(0);
+  await expect(page.getByTestId("review-supporting-details")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Credential details" })).toBeVisible();
+  await expect(page.getByTestId("status-verification")).toBeVisible();
+  await expect(page.getByTestId("status-academic-interpretation")).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByTestId("review-dossier")).toBeVisible();
   const courseLedgerOverflows = await page.locator(".review-table-scroll").evaluate((element) => element.scrollWidth > element.clientWidth);
   expect(courseLedgerOverflows).toBe(true);
-  await page.locator(".review-collapsible").filter({ hasText: "Credential details" }).locator("summary").click();
-  await expect(page.locator(".review-collapsible[open]")).toHaveCount(1);
   await page.getByTestId("button-continue-target").click();
   await expect(page).toHaveURL(/\/target$/);
   await expect(page.getByText(/Program requirements, importance, and matching concepts/)).toHaveCount(0);
@@ -685,7 +688,7 @@ test("explains when no readable English is detected", async ({ page }) => {
   ).toBeNull();
 });
 
-test("shows each completed requirement live, keeps evidence accessible, and persists the final report", async ({
+test("shows mapping progress before results, keeps evidence accessible, and persists the final report", async ({
   page,
 }) => {
   await openReport(page);
@@ -706,14 +709,8 @@ test("shows each completed requirement live, keeps evidence accessible, and pers
   await sendStreamEvent(page, 0, "progress", firstSnapshot);
 
   await expect(page.getByText("1 of 4 requirements mapped")).toBeVisible();
-  await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
+  await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toHaveCount(0);
   await expect(page.getByTestId(`mapping-${requirementIds[1]}`)).toHaveCount(0);
-  const firstRequirementToggle = page.getByTestId(
-    `toggle-mapping-${requirementIds[0]}`,
-  );
-  await expect(firstRequirementToggle).toHaveAttribute("aria-expanded", "false");
-  await firstRequirementToggle.click();
-  await expect(firstRequirementToggle).toHaveAttribute("aria-expanded", "true");
 
   const secondSnapshot: MappingResult = {
     ...result,
@@ -722,36 +719,26 @@ test("shows each completed requirement live, keeps evidence accessible, and pers
   };
   await sendStreamEvent(page, 0, "progress", secondSnapshot);
 
+  await expect(page.getByTestId("card-institution-status")).toBeVisible();
+  await expect(page.getByTestId("card-mapping-progress")).toBeVisible();
   await expect(page.getByText("2 of 4 requirements mapped")).toBeVisible();
-  await expect(page.getByTestId(`mapping-${requirementIds[1]}`)).toBeVisible();
-  const secondRequirementToggle = page.getByTestId(
-    `toggle-mapping-${requirementIds[1]}`,
-  );
-  if (await firstRequirementToggle.getAttribute("aria-expanded") !== "true") {
-    await firstRequirementToggle.click();
-  }
-  await expect(firstRequirementToggle).toHaveAttribute("aria-expanded", "true");
-  if (await secondRequirementToggle.getAttribute("aria-expanded") !== "true") {
-    await secondRequirementToggle.click();
-  }
-  await expect(firstRequirementToggle).toHaveAttribute("aria-expanded", "false");
-  await expect(secondRequirementToggle).toHaveAttribute("aria-expanded", "true");
-
+  await expect(page.getByTestId("mapping-progress-bar")).toBeVisible();
+  await expect(page.getByTestId(`mapping-${requirementIds[1]}`)).toHaveCount(0);
   await sendStreamEvent(page, 0, "complete", result);
   await page.evaluate(() => {
     window.__verifeeMappingTest?.streams[0]?.close();
   });
   await expect(page.getByTestId("status-mapping-loading")).toHaveCount(0);
+  await expect(page.getByTestId("card-mapping-progress")).toHaveCount(0);
   await expect(page.locator(".summary-number")).toHaveText("4");
+  await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
+  await expect(page.getByTestId(`mapping-${requirementIds[1]}`)).toBeVisible();
   const firstCard = page.getByTestId(`mapping-${requirementIds[0]}`);
   const firstToggle = firstCard.getByRole("button");
   if (await firstToggle.getAttribute("aria-expanded") !== "true") {
     await firstToggle.click();
   }
   await expect(firstToggle).toHaveAttribute("aria-expanded", "true");
-  await expect(
-    secondRequirementToggle,
-  ).toHaveAttribute("aria-expanded", "false");
 
   const firstContent = firstCard.getByRole("region");
   await expect(firstContent).toContainText("Relevant prior coursework");
@@ -794,7 +781,6 @@ test("shows each completed requirement live, keeps evidence accessible, and pers
   expect(storedResult).toEqual(result);
 
   await page.reload();
-  await page.getByTestId("disclosure-program-mapping").locator(":scope > summary").click();
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
   await expect(page.getByTestId("status-mapping-loading")).toHaveCount(0);
   const persistedToggle = page.getByTestId(
@@ -872,7 +858,7 @@ test("keeps completed requirement results visible after a stream failure and ret
   await sendStreamEvent(page, 0, "progress", firstSnapshot);
 
   await expect(page.getByText("1 of 4 requirements mapped")).toBeVisible();
-  await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
+  await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toHaveCount(0);
 
   await sendStreamEvent(page, 0, "error", {
     error: "The mapping service is temporarily unavailable.",
@@ -883,6 +869,7 @@ test("keeps completed requirement results visible after a stream failure and ret
 
   await expect(page.getByTestId("status-mapping-error")).toBeVisible();
   await expect(page.getByTestId("button-retry-mapping")).toBeEnabled();
+  await expect(page.getByTestId("card-mapping-progress")).toBeVisible();
   await expect(page.getByText("1 of 4 requirements mapped")).toBeVisible();
   await expect(page.getByTestId(`mapping-${requirementIds[0]}`)).toBeVisible();
   await expect(page.getByTestId(`mapping-${requirementIds[1]}`)).toHaveCount(0);

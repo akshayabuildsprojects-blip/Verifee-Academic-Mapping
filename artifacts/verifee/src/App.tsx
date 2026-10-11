@@ -560,7 +560,8 @@ function UploadStep() {
   );
   return <div className="shell"><Header /><main className="page-wrap wizard-wrap">
     <Stepper current={1} />
-    <section className="wizard-card">
+     <section className="wizard-card upload-step-card">
+       <div className="upload-watermark" aria-hidden="true" data-testid="upload-watermark"><VerifeeLogo className="upload-watermark-logo" /></div>
       <div className="eyebrow">Step 1 of 5</div>
       <h1 className="wizard-title">Upload an academic credential</h1>
       <p className="wizard-intro">Upload a transcript or supported digital credential to begin.</p>
@@ -751,27 +752,29 @@ function Review() {
           : <p className="form-note">No course rows were readable in this transcript. Review the other extracted fields before proceeding.</p>}
       </section>
 
-      <div className="review-supporting-sections">
-        <details className="review-section review-collapsible">
-          <summary className="review-summary"><span className="review-summary-title">Credential details</span><span className="review-summary-value">2 additional fields</span></summary>
-          <div className="review-collapsible-content"><div className="credential-grid">{additionalCredentialFields.map(([label, value]) => <div key={label}><span className="data-label">{label}</span><span className="data-value">{value}</span></div>)}</div></div>
-        </details>
-        <details className="review-section review-collapsible">
-          <summary className="review-summary"><span className="review-summary-title">Credential format</span><span className="review-summary-value">{format}</span></summary>
-          <div className="review-collapsible-content"><div className="format-summary"><span className="format-summary-type">{format}</span><span className="format-summary-name">{fileName || 'Selected credential'}</span></div></div>
-        </details>
-        <details className="review-section review-collapsible">
-          <summary className="review-summary"><span className="review-summary-title">Verification status</span><span className="review-summary-value">{verificationStatus}</span></summary>
-          <div className="review-collapsible-content"><div className="verification-review"><ShieldAlert size={18} /><div><span className="status-pill" data-testid="status-verification">{verificationStatus}</span><p>{verificationExplanation}</p></div></div></div>
-        </details>
-        <details className="review-section review-collapsible">
-          <summary className="review-summary"><span className="review-summary-title">Academic interpretation</span><span className="review-summary-value">{isExtracted ? 'Available' : 'Sample only'}</span></summary>
-          <div className="review-collapsible-content"><div className="verification-review"><Check size={18} /><div><span className="status-pill" data-testid="status-academic-interpretation">{isExtracted ? 'Available' : 'Sample only'}</span><p>{isExtracted ? 'Extracted from the PDF. Missing or unreadable values are marked as unavailable.' : 'Sample data; not extracted from the selected file.'}</p></div></div></div>
-        </details>
-        {isExtracted && languageDetection && <details className="review-section review-collapsible">
-          <summary className="review-summary"><span className="review-summary-title">Language detection</span><span className="review-summary-value">View result</span></summary>
-          <div className="review-collapsible-content"><LanguageDetectionCard detection={languageDetection} /></div>
-        </details>}
+      <div className="review-supporting-sections" data-testid="review-supporting-details">
+        <section className="review-inline-card review-credential-details" aria-labelledby="review-credential-details-title">
+          <h2 id="review-credential-details-title">Credential details</h2>
+          <div className="credential-grid">{additionalCredentialFields.map(([label, value]) => <div key={label}><span className="data-label">{label}</span><span className="data-value">{value}</span></div>)}</div>
+        </section>
+        <div className="review-inline-grid">
+          <section className="review-inline-card" aria-labelledby="review-format-title">
+            <h2 id="review-format-title">Credential format</h2>
+            <div className="format-summary"><span className="format-summary-type">{format}</span><span className="format-summary-name">{fileName || 'Selected credential'}</span></div>
+          </section>
+          <section className="review-inline-card" aria-labelledby="review-verification-title">
+            <h2 id="review-verification-title">Verification status</h2>
+            <div className="verification-review"><ShieldAlert size={18} /><div><span className="status-pill" data-testid="status-verification">{verificationStatus}</span><p>{verificationExplanation}</p></div></div>
+          </section>
+          <section className="review-inline-card" aria-labelledby="review-interpretation-title">
+            <h2 id="review-interpretation-title">Academic interpretation</h2>
+            <div className="verification-review"><Check size={18} /><div><span className="status-pill" data-testid="status-academic-interpretation">{isExtracted ? 'Available' : 'Sample only'}</span><p>{isExtracted ? 'Extracted from the PDF. Missing or unreadable values are marked as unavailable.' : 'Sample data; not extracted from the selected file.'}</p></div></div>
+          </section>
+          {isExtracted && languageDetection && <section className="review-inline-card review-language-section" aria-labelledby="review-language-title">
+            <h2 id="review-language-title">Language detection</h2>
+            <LanguageDetectionCard detection={languageDetection} />
+          </section>}
+        </div>
       </div>
       <div className="wizard-actions"><button className="secondary-btn" type="button" onClick={() => setLocation('/start')}><ArrowLeft size={14} /> Back to upload</button><button className="cta wizard-next" type="button" onClick={() => setLocation('/target')} data-testid="button-continue-target"><span>Continue to target selection</span><ArrowRight size={16} /></button></div>
     </section>
@@ -977,6 +980,7 @@ function Report() {
   const [progressRequirements, setProgressRequirements] = useState<RequirementMapping[]>([]);
   const [progressCourseEvidence, setProgressCourseEvidence] = useState<CourseEvidence[]>([]);
   const [expandedRequirementId, setExpandedRequirementId] = useState<string | null>(null);
+  const [programMappingOpen, setProgramMappingOpen] = useState(false);
   const currentMapping = mapping?.programId === program.id ? mapping : null;
 
   const requestInstitutionStatus = async (cancelled: () => boolean = () => false) => {
@@ -1135,6 +1139,12 @@ function Report() {
     return () => { cancelled = true; };
   }, [academicRecord, program.id, started]);
 
+  useEffect(() => {
+    if (!loading && (currentMapping || (mappingError && progressRequirements.length > 0))) {
+      setProgramMappingOpen(true);
+    }
+  }, [currentMapping, loading, mappingError, progressRequirements.length]);
+
   const retryMapping = () => {
     sessionStorage.removeItem('verifee-mapping-result');
     sessionStorage.removeItem('verifee-generated-report');
@@ -1178,7 +1188,10 @@ function Report() {
     { value: 'INSUFFICIENT_EVIDENCE', label: 'Insufficient evidence' },
   ];
   const allRequirementsCompleted = program.requirements.length > 0 && requirements.length === program.requirements.length;
-  const showMappingProgress = loading || Boolean(currentMapping) || Boolean(mappingError);
+  const showMappingProgress = loading || Boolean(mappingError);
+  const mappingResultsReady = !loading && (
+    Boolean(currentMapping) || (Boolean(mappingError) && progressRequirements.length > 0)
+  );
   const progressPercent = program.requirements.length > 0
     ? Math.min(100, Math.round((requirements.length / program.requirements.length) * 100))
     : 0;
@@ -1273,6 +1286,49 @@ function Report() {
         </div>
       </details>
     </section>
+    {showMappingProgress && <section
+      className="mapping-progress-card"
+      aria-live="polite"
+      aria-busy={loading}
+      data-testid="card-mapping-progress"
+    >
+      <div className="mapping-loading" role="status" data-testid={loading ? 'status-mapping-loading' : 'status-mapping-progress'}>
+        {mappingError
+          ? <AlertCircle size={18} />
+          : <LoaderCircle size={18} className="animate-spin" />}
+        <div className="mapping-progress-content">
+          <strong>{mappingError ? 'Mapping did not finish' : mappingStage === 'context' ? 'Preparing academic context…' : 'Mapping academic requirements…'}</strong>
+          <div className="mapping-progress-count" data-testid="mapping-progress-count">
+            <strong>{requirements.length} of {program.requirements.length} requirements mapped</strong>
+            <span>{mappingError ? 'Mapping stopped' : mappingStage === 'context' ? 'Stage 1 of 2 · Contextualizing academic record' : 'Stage 2 of 2 · Evaluating target requirements'}</span>
+          </div>
+          <div className="mapping-progress-meter">
+            <div
+              className="mapping-progress-bar"
+              role="progressbar"
+              aria-label="Requirements mapped"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progressPercent}
+              aria-valuetext={`${requirements.length} of ${program.requirements.length} requirements mapped, ${progressPercent}%`}
+              data-testid="mapping-progress-bar"
+            >
+              <span className="mapping-progress-fill" style={{ width: `${progressPercent}%` }} />
+            </div>
+            <span className="mapping-progress-percent">{progressPercent}%</span>
+          </div>
+          <p>{mappingError
+            ? 'Your academic record is saved. Retry without uploading the PDF again.'
+            : mappingStage === 'context'
+              ? 'Context is prepared before stored program requirements are evaluated.'
+              : 'Comparing each stored requirement with the extracted academic record.'}</p>
+        </div>
+      </div>
+      {mappingError && <div className="mapping-error" role="alert" data-testid="status-mapping-error">
+        <div><strong>Mapping did not finish</strong><p>{mappingError}</p></div>
+        <button className="secondary-btn" type="button" onClick={retryMapping} disabled={loading} data-testid="button-retry-mapping"><RotateCcw size={14} /> Retry mapping</button>
+      </div>}
+    </section>}
     <div className="preliminary" data-testid="notice-preliminary"><AlertCircle size={16} /><span>
       <strong>{isExtracted ? 'Preliminary mapping of extracted academic details.' : 'Preliminary mapping of the synthetic demo record.'}</strong>{' '}
       {isExtracted
@@ -1339,7 +1395,7 @@ function Report() {
       </section>
 
       <section className="panel section-card section-disclosure" aria-live="polite" data-testid="card-program-mapping">
-        <details data-testid="disclosure-program-mapping">
+        <details data-testid="disclosure-program-mapping" open={programMappingOpen} onToggle={(event) => setProgramMappingOpen(event.currentTarget.open)}>
           <summary className="section-disclosure-summary">
             <span className="section-disclosure-heading"><GraduationCap size={19} /><span role="heading" aria-level={2}>Program requirement mapping</span></span>
             <span className={`status-pill section-status ${mappingError ? 'gap' : allRequirementsCompleted ? 'good' : 'review'}`}>
@@ -1357,52 +1413,6 @@ function Report() {
           <div className="section-disclosure-content">
             <p className="form-note mapping-section-note">The selected program’s stored requirements are compared with extracted courses and available evidence.</p>
             <details className="source-details"><summary>Stored program source</summary><p>{program.source.title}</p><span>Last checked: {program.source.lastChecked}</span></details>
-            {showMappingProgress && <div
-              className="mapping-loading"
-              role="status"
-              data-testid={loading ? 'status-mapping-loading' : allRequirementsCompleted && !mappingError ? 'status-mapping-complete' : 'status-mapping-progress'}
-            >
-              {mappingError
-                ? <AlertCircle size={18} />
-                : allRequirementsCompleted
-                  ? <Check size={18} />
-                  : <LoaderCircle size={18} className="animate-spin" />}
-              <div>
-                <strong>{mappingError ? 'Mapping did not finish' : allRequirementsCompleted ? 'Academic mapping complete' : mappingStage === 'context' ? 'Mapping academic record…' : 'Mapping academic requirements…'}</strong>
-                {loading && mappingStage === 'context' && !mappingError
-                  ? <div className="mapping-context-stage" data-testid="mapping-stage-context">
-                    <strong>Stage 1 of 2 · Contextualizing academic record</strong>
-                    <p>Requirement evaluation starts after academic context has been mapped.</p>
-                  </div>
-                  : <>
-                    <div className="mapping-progress-count" data-testid="mapping-progress-count">
-                      <strong>{requirements.length} of {program.requirements.length} requirements mapped</strong>
-                      <span>{mappingError ? 'Mapping stopped' : allRequirementsCompleted ? 'All requirements completed' : 'Stage 2 of 2 · Evaluating target requirements'}</span>
-                    </div>
-                    <div className="mapping-progress-meter">
-                      <div
-                        className="mapping-progress-bar"
-                        role="progressbar"
-                        aria-label="Requirements mapped"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={progressPercent}
-                        aria-valuetext={`${requirements.length} of ${program.requirements.length} requirements mapped, ${progressPercent}%`}
-                        data-testid="mapping-progress-bar"
-                      >
-                        <span className="mapping-progress-fill" style={{ width: `${progressPercent}%` }} />
-                      </div>
-                      <span className="mapping-progress-percent">{progressPercent}%</span>
-                    </div>
-                    <p>{mappingError
-                      ? 'Your academic record is saved. Retry without uploading the PDF again.'
-                      : allRequirementsCompleted
-                        ? 'All stored requirements have been compared. Review the result cards below.'
-                        : 'Shortlisting courses, checking official course sources where available, and comparing each stored requirement.'}</p>
-                  </>}
-              </div>
-            </div>}
-            {mappingError && <div className="mapping-error" role="alert" data-testid="status-mapping-error"><div><strong>Mapping did not finish</strong><p>{mappingError}</p></div><button className="secondary-btn" type="button" onClick={retryMapping} disabled={loading} data-testid="button-retry-mapping"><RotateCcw size={14} /> Retry mapping</button></div>}
             {currentMapping && !showPartialMapping && <>
               <p className="source-claim">{sourceSummary}</p>
               {currentMapping.retryable && !mappingError && <div className="mapping-error mapping-partial-error" role="status" data-testid="status-partial-mapping">
@@ -1410,7 +1420,7 @@ function Report() {
                 <button className="secondary-btn" type="button" onClick={retryMapping} disabled={loading} data-testid="button-retry-partial-mapping"><RotateCcw size={14} /> Retry mapping</button>
               </div>}
             </>}
-            {(requirements.length > 0 || (currentMapping && !loading && !showPartialMapping)) && <>
+            {mappingResultsReady && (requirements.length > 0 || (currentMapping && !showPartialMapping)) && <>
               {showPartialMapping && requirements.length > 0 && requirements.length < program.requirements.length && <p className="mapping-progress-note">Completed requirement results are shown below while the remaining requirements continue processing.</p>}
               <div className="mapping-filter" role="group" aria-label="Filter requirement results">{statusFilters.map((item) => <button key={item.value} type="button" onClick={() => setFilter(item.value)} className="secondary-btn" style={{ padding: '7px 10px', fontSize: 10, background: filter === item.value ? '#eaf1ed' : '#fff', borderColor: filter === item.value ? '#a9c1b6' : undefined }} data-testid={`filter-${item.label.toLowerCase().replaceAll(' ', '-')}`}>{item.label}</button>)}</div>
               <div className="mapping-card-list">{visibleRequirements.map((match) => <RequirementCard
