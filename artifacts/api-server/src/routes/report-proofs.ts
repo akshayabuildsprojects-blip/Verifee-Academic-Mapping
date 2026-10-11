@@ -53,6 +53,11 @@ function assertDevnet(): void {
   }
 }
 
+function isInsufficientDevnetSol(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /insufficient funds|insufficient lamports|attempt to debit an account but found no record of a prior credit/i.test(message);
+}
+
 function rateLimit(req: Request, res: Response): boolean {
   const now = Date.now();
   const key = req.ip || req.socket.remoteAddress || "unknown";
@@ -80,6 +85,7 @@ router.post("/report-proofs", async (req, res): Promise<void> => {
   const { reportId, payload } = parsed.data;
   const hash = reportHash(payload);
   const now = new Date();
+  let issuerPublicKey: string | null = null;
 
   try {
     let [row] = await db.select().from(reportProofsTable).where(eq(reportProofsTable.reportId, reportId)).limit(1);
@@ -142,6 +148,7 @@ router.post("/report-proofs", async (req, res): Promise<void> => {
 
     assertDevnet();
     const keypair = getIssuerKeypair();
+    issuerPublicKey = keypair.publicKey.toBase58();
     const memo = JSON.stringify({
       app: "verifee",
       type: "report_proof",
@@ -157,6 +164,22 @@ router.post("/report-proofs", async (req, res): Promise<void> => {
       data: Buffer.from(memo, "utf8"),
     }));
     const connection = new Connection(rpcUrl, "confirmed");
+    transaction.feePayer = keypair.publicKey;
+    const latestBlockhash = await connection.getLatestBlockhash("confirmed");
+    transaction.recentBlockhash = latestBlockhash.blockhash;
+    transaction.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
+    const feeQuote = await connection.getFeeForMessage(transaction.compileMessage(), "confirmed");
+    const balance = await connection.getBalance(keypair.publicKey, "confirmed");
+    if (feeQuote.value !== null && balance < feeQuote.value) {
+      await db.update(reportProofsTable)
+        .set({ proofStatus: "failed", updatedAt: new Date() })
+        .where(eq(reportProofsTable.reportId, reportId));
+      res.status(503).json({
+        error: "The Verifee issuer wallet needs devnet SOL to pay the transaction fee.",
+        issuerPublicKey,
+      });
+      return;
+    }
     const signature = await sendAndConfirmTransaction(connection, transaction, [keypair], { commitment: "confirmed" });
     [row] = await db.update(reportProofsTable)
       .set({ solanaSignature: signature, proofStatus: "anchored", updatedAt: new Date() })
@@ -169,6 +192,13 @@ router.post("/report-proofs", async (req, res): Promise<void> => {
       .where(and(eq(reportProofsTable.reportId, reportId), gt(reportProofsTable.expiresAt, now)))
       .catch(() => undefined);
     req.log.error({ reportId, message: error instanceof Error ? error.message : "unknown" }, "Could not anchor report proof on Solana devnet.");
+    if (issuerPublicKey && isInsufficientDevnetSol(error)) {
+      res.status(503).json({
+        error: "The Verifee issuer wallet needs devnet SOL to pay the transaction fee.",
+        issuerPublicKey,
+      });
+      return;
+    }
     res.status(503).json({ error: "Solana devnet anchoring is temporarily unavailable. Retry the proof shortly." });
   }
 });

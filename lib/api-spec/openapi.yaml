@@ -867,6 +867,9 @@ components:
       properties:
         error:
           type: string
+        issuerPublicKey:
+          type: string
+          description: Present when the Verifee devnet issuer wallet needs funding.
       required:
         - error
 

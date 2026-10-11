@@ -45,7 +45,13 @@ export default function ReportProofPanel({ reportId, payload }: { reportId: stri
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ reportId, payload }),
         });
-        if (!response.ok) throw new Error("The report proof could not be anchored yet.");
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({})) as { error?: string; issuerPublicKey?: string };
+          const message = body.issuerPublicKey
+            ? `${body.error ?? "The issuer wallet needs devnet SOL."} Fund this public key: ${body.issuerPublicKey}`
+            : body.error ?? "The report proof could not be anchored yet.";
+          throw new Error(message);
+        }
         const result = await response.json() as AnchorResult;
         if (active) {
           setProof(result);

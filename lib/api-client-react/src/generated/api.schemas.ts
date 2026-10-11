@@ -402,5 +402,7 @@ export interface ReportProofVerification {
 
 export interface ErrorResponse {
   error: string;
+  /** Present when the Verifee devnet issuer wallet needs funding. */
+  issuerPublicKey?: string;
 }
 
