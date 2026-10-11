@@ -365,6 +365,47 @@ export interface ReportProofResponse {
   expiresAt: string;
 }
 
+export type ReportProofStatusProofStatus = typeof ReportProofStatusProofStatus[keyof typeof ReportProofStatusProofStatus];
+
+
+export const ReportProofStatusProofStatus = {
+  pending: 'pending',
+  anchoring: 'anchoring',
+  anchored: 'anchored',
+  failed: 'failed',
+  expired: 'expired',
+} as const;
+
+export interface ReportProofStatus {
+  reportId: string;
+  reportHash: string;
+  proofStatus: ReportProofStatusProofStatus;
+  /** @nullable */
+  signature: string | null;
+  proofTimestamp: string;
+  /** @nullable */
+  sentAt: string | null;
+}
+
+export interface ReportProofSendInput {
+  /** @pattern ^[a-f0-9]{64}$ */
+  reportHash: string;
+}
+
+export type ReportProofSentResponseSharingStatus = typeof ReportProofSentResponseSharingStatus[keyof typeof ReportProofSentResponseSharingStatus];
+
+
+export const ReportProofSentResponseSharingStatus = {
+  ready_for_sharing: 'ready_for_sharing',
+} as const;
+
+export interface ReportProofSentResponse {
+  reportId: string;
+  reportHash: string;
+  sentAt: string;
+  sharingStatus: ReportProofSentResponseSharingStatus;
+}
+
 export type ReportProofVerificationStatus = typeof ReportProofVerificationStatus[keyof typeof ReportProofVerificationStatus];
 
 

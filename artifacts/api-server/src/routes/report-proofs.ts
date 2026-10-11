@@ -7,6 +7,10 @@ import { hashReportPayload as reportHash } from "../lib/report-proof-canonical";
 import {
   CreateReportProofBody,
   CreateReportProofResponse,
+  GetReportProofStatusParams,
+  GetReportProofStatusResponse,
+  MarkReportProofSentBody,
+  MarkReportProofSentResponse,
   VerifyReportProofParams,
   VerifyReportProofResponse,
 } from "@workspace/api-zod";
@@ -201,6 +205,77 @@ router.post("/report-proofs", async (req, res): Promise<void> => {
     }
     res.status(503).json({ error: "Solana devnet anchoring is temporarily unavailable. Retry the proof shortly." });
   }
+});
+
+router.get("/report-proofs/:reportId/status", async (req, res): Promise<void> => {
+  const params = GetReportProofStatusParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "A valid report ID is required." });
+    return;
+  }
+  const [row] = await db.select().from(reportProofsTable)
+    .where(eq(reportProofsTable.reportId, params.data.reportId)).limit(1);
+  if (!row) {
+    res.status(404).json({ error: "Report proof not found." });
+    return;
+  }
+  res.json(GetReportProofStatusResponse.parse({
+    reportId: row.reportId,
+    reportHash: row.reportHash,
+    proofStatus: row.proofStatus,
+    signature: row.solanaSignature,
+    proofTimestamp: row.issuedAt.toISOString(),
+    sentAt: row.sentAt?.toISOString() ?? null,
+  }));
+});
+
+router.post("/report-proofs/:reportId/send", async (req, res): Promise<void> => {
+  const params = VerifyReportProofParams.safeParse(req.params);
+  const body = MarkReportProofSentBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "A valid report ID and report hash are required." });
+    return;
+  }
+  const [row] = await db.select().from(reportProofsTable)
+    .where(eq(reportProofsTable.reportId, params.data.reportId)).limit(1);
+  if (!row) {
+    res.status(404).json({ error: "Report proof not found." });
+    return;
+  }
+  if (row.reportHash !== body.data.reportHash) {
+    res.status(409).json({ error: "The report hash does not match the anchored proof." });
+    return;
+  }
+  if (row.sentAt) {
+    res.json(MarkReportProofSentResponse.parse({
+      reportId: row.reportId,
+      reportHash: row.reportHash,
+      sentAt: row.sentAt.toISOString(),
+      sharingStatus: "ready_for_sharing",
+    }));
+    return;
+  }
+  if (row.proofStatus !== "anchored" || !row.solanaSignature) {
+    res.status(409).json({ error: "A confirmed Solana proof is required before sharing." });
+    return;
+  }
+  const [updated] = await db.update(reportProofsTable)
+    .set({ sentAt: new Date(), updatedAt: new Date() })
+    .where(and(
+      eq(reportProofsTable.reportId, row.reportId),
+      eq(reportProofsTable.proofStatus, "anchored"),
+    ))
+    .returning();
+  if (!updated?.sentAt) {
+    res.status(409).json({ error: "The report could not be marked ready for sharing." });
+    return;
+  }
+  res.json(MarkReportProofSentResponse.parse({
+    reportId: updated.reportId,
+    reportHash: updated.reportHash,
+    sentAt: updated.sentAt.toISOString(),
+    sharingStatus: "ready_for_sharing",
+  }));
 });
 
 router.get("/report-proofs/:reportId/verify", async (req, res): Promise<void> => {

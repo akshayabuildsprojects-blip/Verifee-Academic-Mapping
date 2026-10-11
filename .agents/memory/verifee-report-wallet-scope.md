@@ -6,12 +6,14 @@ description: Product rules for demo report generation, receipts, and future acco
 ## Scope
 
 - Demo report generation does not charge or claim payment; represent its payment state as `DEMO_FREE`.
-- A generated report is `NOT_SENT`. The receipt confirms report generation only, not institutional delivery or acceptance.
+- Opening or generating a final report does not create a Solana proof; only the user's explicit confirmation of “Create proof & send” may anchor it.
+- After anchoring succeeds, mark the report ready for institution sharing; this demo does not claim actual delivery or acceptance.
 - Do not retain original transcripts permanently.
-- The demo account and saved reports exist only in browser `sessionStorage`; logout clears them.
+- Retain the frozen report payload for verification for 90 days, then remove it while keeping minimal proof metadata.
+- Demo account and saved report content remain browser-session scoped; do not add real authentication or account-backed retrieval.
 - Do not add real authentication, registration, password management, OAuth, or a production database to this demo.
-- Student account retrieval and production persistence are future work.
+- Student account retrieval remains future work.
 
-**Why:** The product brief separates a free, browser-session demo from future account-backed retrieval and explicitly excludes real authentication and production persistence.
+**Why:** The demo is free and does not deliver reports externally. The user explicitly restricted proof creation to a confirmation click and selected 90-day payload retention for verification.
 
-**How to apply:** Preserve the free/unsent states and transcript-retention boundary. Keep account and report data session-only unless the user explicitly requests a separately scoped persistent account feature.
+**How to apply:** Keep proof creation behind the final-preview confirmation; downloads and earlier workflow steps must not anchor. Never describe “ready for sharing” as institution delivery, and retain only the report payload needed for the chosen verification window.

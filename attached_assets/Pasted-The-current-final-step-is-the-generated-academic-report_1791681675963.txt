@@ -1,0 +1,95 @@
+The current final step is the generated academic report preview page.
+
+Update the flow so Solana anchoring happens ONLY from this final report preview page when the user explicitly clicks “Send to Institution.”
+
+Do not anchor anything to Solana during:
+- upload
+- extraction
+- review
+- target selection
+- mapping
+- report generation
+- page load
+- download PDF
+- download submission receipt
+
+Add a new primary button near the existing “Download Submission Receipt” and “Download PDF” buttons:
+
+“Send to Institution”
+
+When clicked:
+
+1. Open a confirmation modal:
+   Title: “Send report to institution?”
+   Text: “Verifee will create a cryptographic proof for this exact report before sending it. After proof creation, changes to this report will create a mismatch.”
+   Show:
+   - target institution
+   - target program
+   - report ID
+   - student name if available
+   Buttons:
+   - Cancel
+   - Create proof & send
+
+2. When user clicks “Create proof & send”:
+   - freeze the current final report payload
+   - create or use stable report_id
+   - create canonical JSON from the frozen report payload
+   - compute SHA-256 report_hash
+   - create a Solana devnet transaction using the Memo Program
+   - sign server-side using VERIFEE_ISSUER_SECRET_KEY
+   - send to SOLANA_RPC_URL
+   - store:
+     report_id
+     report_hash
+     solanaProofTx
+     proof_status = "anchored"
+     proof_timestamp
+     send_status
+
+3. The Solana memo JSON should be:
+
+{
+  "app": "verifee",
+  "type": "report_proof",
+  "report_id": "<report_id>",
+  "report_hash": "<sha256_report_hash>",
+  "target_institution": "<institution>",
+  "target_program": "<program>",
+  "issued_at": "<timestamp>",
+  "status": "active",
+  "version": "v1"
+}
+
+4. Only after Solana proof succeeds, mark the report as ready to send / sent to institution.
+
+5. If Solana anchoring fails:
+   - do not mark report as sent
+   - do not show it as verified
+   - show: “Cryptographic proof could not be created. Please retry before sending.”
+
+6. After success, update the report page to show:
+   - Proof status: Anchored
+   - Report hash
+   - Solana transaction signature
+   - Verify Report link
+   - Sent status
+
+7. Create or update /verify/:report_id so an institution can verify:
+   - current report hash == Solana memo report_hash
+   - report_id == memo report_id
+   - app == "verifee"
+   - type == "report_proof"
+   - status == "active"
+
+Institution result language:
+- Valid: “This report matches the Verifee proof anchored on Solana and has not been changed.”
+- Invalid: “This report does not match the Solana proof and may have been changed.”
+- Proof not found: “No Solana proof was found for this report.”
+- Verification unavailable: “Verification is temporarily unavailable.”
+
+Important:
+- The actual report stays off-chain.
+- Only report_id, report_hash, institution/program metadata, and proof status go on Solana.
+- Students and institutions do not need wallets.
+- Do not expose VERIFEE_ISSUER_SECRET_KEY in frontend code.

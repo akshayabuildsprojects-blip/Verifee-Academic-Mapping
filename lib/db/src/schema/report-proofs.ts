@@ -7,6 +7,7 @@ export const reportProofsTable = pgTable("report_proofs", {
   solanaSignature: text("solana_signature"),
   proofStatus: text("proof_status").notNull().default("pending"),
   issuedAt: timestamp("issued_at", { withTimezone: true }).notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

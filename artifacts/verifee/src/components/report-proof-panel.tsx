@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import "./report-proof-panel.css";
 
-type AnchorResult = {
+type ProofStatus = {
   reportId: string;
   reportHash: string;
-  status: "pending" | "anchoring" | "anchored" | "failed" | "expired";
+  proofStatus: "pending" | "anchoring" | "anchored" | "failed" | "expired";
   signature: string | null;
-  issuedAt: string;
-  expiresAt: string;
+  proofTimestamp: string;
+  sentAt: string | null;
 };
 
 function canonicalJson(value: unknown): string {
@@ -28,79 +28,100 @@ async function sha256(value: string): Promise<string> {
 }
 
 export default function ReportProofPanel({ reportId, payload }: { reportId: string; payload: object }) {
-  const [proof, setProof] = useState<AnchorResult | null>(null);
-  const [hash, setHash] = useState("");
+  const [proof, setProof] = useState<ProofStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState("");
-  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     let active = true;
-    void (async () => {
-      try {
-        const json = canonicalJson(payload);
-        const localHash = await sha256(json);
-        if (active) setHash(localHash);
-        const response = await fetch("/api/report-proofs", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ reportId, payload }),
-        });
-        if (!response.ok) {
-          const body = await response.json().catch(() => ({})) as { error?: string; issuerPublicKey?: string };
-          const message = body.issuerPublicKey
-            ? `${body.error ?? "The issuer wallet needs devnet SOL."} Fund this public key: ${body.issuerPublicKey}`
-            : body.error ?? "The report proof could not be anchored yet.";
-          throw new Error(message);
-        }
-        const result = await response.json() as AnchorResult;
-        if (active) {
-          setProof(result);
-          setError("");
-        }
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "The report proof is unavailable.");
-      }
-    })();
+    void fetch(`/api/report-proofs/${encodeURIComponent(reportId)}/status`)
+      .then(async (response) => {
+        if (response.status === 404) return null;
+        if (!response.ok) throw new Error("Could not load report proof status.");
+        return await response.json() as ProofStatus;
+      })
+      .then((value) => { if (active && value) setProof(value); })
+      .catch(() => { /* A report without a proof remains unsent; no proof is created on page load. */ });
     return () => { active = false; };
-  }, [reportId, payload, retry]);
+  }, [reportId]);
 
-  const status = proof?.status === "anchored"
-    ? "Anchored on Solana devnet"
-    : proof?.status === "expired"
-      ? "Verification data expired"
-      : error
-        ? "Anchoring unavailable"
-        : "Anchoring on Solana devnet…";
+  const createProofAndSend = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const frozenPayload = JSON.parse(canonicalJson(payload)) as Record<string, unknown>;
+      const reportHash = await sha256(canonicalJson(frozenPayload));
+      const anchorResponse = await fetch("/api/report-proofs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ reportId, payload: frozenPayload }),
+      });
+      if (!anchorResponse.ok) {
+        const body = await anchorResponse.json().catch(() => ({})) as { error?: string; issuerPublicKey?: string };
+        const funding = body.issuerPublicKey ? ` Issuer public key to fund: ${body.issuerPublicKey}` : "";
+        throw new Error(`Cryptographic proof could not be created. Please retry before sending.${funding}`);
+      }
+      const anchored = await anchorResponse.json() as { reportHash: string; status: string; signature: string | null; issuedAt: string };
+      if (anchored.reportHash !== reportHash || anchored.status !== "anchored" || !anchored.signature) {
+        throw new Error("Cryptographic proof could not be created. Please retry before sending.");
+      }
+      const anchoredProof: ProofStatus = {
+        reportId, reportHash, proofStatus: "anchored", signature: anchored.signature,
+        proofTimestamp: anchored.issuedAt, sentAt: null,
+      };
+      setProof(anchoredProof);
+      const sendResponse = await fetch(`/api/report-proofs/${encodeURIComponent(reportId)}/send`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ reportHash }),
+      });
+      if (!sendResponse.ok) throw new Error("Proof is anchored, but the report could not be marked ready for institution sharing. Please retry.");
+      const sent = await sendResponse.json() as { sentAt: string };
+      setProof({ ...anchoredProof, sentAt: sent.sentAt });
+      setConfirmOpen(false);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Cryptographic proof could not be created. Please retry before sending.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <section className="report-proof-panel" aria-labelledby="report-proof-title" data-testid="report-proof-panel">
       <div className="report-proof-heading">
-        <div>
-          <span className="v-report-label">Solana devnet</span>
-          <h2 id="report-proof-title">Report integrity proof</h2>
-        </div>
-        <span className={`report-proof-status ${proof?.status === "anchored" ? "is-anchored" : error ? "is-error" : ""}`} role="status">
-          {status}
+        <div><span className="v-report-label">Solana devnet</span><h2 id="report-proof-title">Report integrity proof</h2></div>
+        <span data-testid="report-proof-status" className={`report-proof-status ${proof?.proofStatus === "anchored" ? "is-anchored" : ""}`} role="status">
+          Proof status: {proof?.proofStatus === "anchored" ? "Anchored" : proof?.proofStatus === "failed" ? "Failed" : "Not created"}
         </span>
       </div>
       <dl className="report-proof-details">
         <div><dt>Report ID</dt><dd>{reportId}</dd></div>
-        <div><dt>Report hash (SHA-256)</dt><dd className="report-proof-hash">{hash || "Calculating…"}</dd></div>
-        <div>
-          <dt>Solana transaction signature</dt>
-          <dd className="report-proof-signature">
-            {proof?.signature
-              ? <a href={`https://explorer.solana.com/tx/${encodeURIComponent(proof.signature)}?cluster=devnet`} target="_blank" rel="noreferrer">{proof.signature}</a>
-              : "Not available yet"}
-          </dd>
-        </div>
+        <div><dt>Report hash</dt><dd className="report-proof-hash">{proof?.reportHash ?? "Created when you send the report"}</dd></div>
+        <div><dt>Solana transaction signature</dt><dd className="report-proof-signature">{proof?.signature ?? "Not available yet"}</dd></div>
+        <div><dt>Proof timestamp</dt><dd>{proof?.proofTimestamp ? new Date(proof.proofTimestamp).toLocaleString() : "Not created"}</dd></div>
+        <div><dt>Sent status</dt><dd data-testid="report-sent-status">{proof?.sentAt ? "Ready for institution sharing" : "Not sent"}</dd></div>
       </dl>
       {error && <p className="report-proof-error" role="alert">{error}</p>}
       <div className="report-proof-actions">
-        {error && <button type="button" className="v-report-button v-report-button-secondary" onClick={() => setRetry((value) => value + 1)}>Retry anchoring</button>}
-        <Link className="v-report-button v-report-button-primary" href={`/verify/${encodeURIComponent(reportId)}`}>Verify Report</Link>
+        {proof?.sentAt
+          ? <button type="button" className="v-report-button v-report-button-primary" disabled>Ready for institution sharing</button>
+          : <button data-testid="button-send-to-institution" type="button" className="v-report-button v-report-button-primary" onClick={() => setConfirmOpen(true)}>Send to Institution</button>}
+        {proof?.proofStatus === "anchored" && <Link className="v-report-button v-report-button-secondary" href={`/verify/${encodeURIComponent(reportId)}`}>Verify Report</Link>}
       </div>
       <p className="report-proof-retention">Report details are retained for 90 days to support verification.</p>
+      {confirmOpen && (
+        <div className="report-proof-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setConfirmOpen(false); }}>
+          <section className="report-proof-modal" role="dialog" aria-modal="true" aria-labelledby="report-proof-confirm-title" aria-describedby="report-proof-confirm-text">
+            <h2 id="report-proof-confirm-title">Send report to institution?</h2>
+            <p id="report-proof-confirm-text">Verifee will create a cryptographic proof for this exact report before sending it. After proof creation, changes to this report will create a mismatch.</p>
+            <div className="report-proof-modal-actions">
+              <button type="button" className="v-report-button v-report-button-secondary" disabled={busy} onClick={() => setConfirmOpen(false)}>Cancel</button>
+              <button type="button" className="v-report-button v-report-button-primary" disabled={busy} onClick={() => void createProofAndSend()}>{busy ? "Creating proof…" : "Create proof & send"}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 }

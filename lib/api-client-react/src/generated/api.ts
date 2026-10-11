@@ -30,6 +30,9 @@ import type {
   InstitutionStatusResult,
   ReportProofInput,
   ReportProofResponse,
+  ReportProofSendInput,
+  ReportProofSentResponse,
+  ReportProofStatus,
   ReportProofVerification,
   TranscriptExtractionProblem,
   TranscriptExtractionResult
@@ -749,4 +752,170 @@ export function useVerifyReportProof<TData = Awaited<ReturnType<typeof verifyRep
 
 
 
+
+export const getGetReportProofStatusUrl = (reportId: string,) => {
+
+
+
+
+  return `/api/report-proofs/${reportId}/status`
+}
+
+/**
+ * @summary Get report proof and sharing status without creating a proof
+ */
+export const getReportProofStatus = async (reportId: string, options?: Parameters<typeof customFetch>[1]): Promise<ReportProofStatus> => {
+
+  return customFetch<ReportProofStatus>(getGetReportProofStatusUrl(reportId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetReportProofStatusQueryKey = (reportId: string,) => {
+    return [
+    `/api/report-proofs/${reportId}/status`
+    ] as const;
+    }
+
+
+export const getGetReportProofStatusQueryOptions = <TData = Awaited<ReturnType<typeof getReportProofStatus>>, TError = ErrorType<ErrorResponse>>(reportId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportProofStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetReportProofStatusQueryKey(reportId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getReportProofStatus>>> = ({ signal }) => getReportProofStatus(reportId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: reportId !== null && reportId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getReportProofStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetReportProofStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getReportProofStatus>>>
+export type GetReportProofStatusQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get report proof and sharing status without creating a proof
+ */
+
+export function useGetReportProofStatus<TData = Awaited<ReturnType<typeof getReportProofStatus>>, TError = ErrorType<ErrorResponse>>(
+ reportId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getReportProofStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetReportProofStatusQueryOptions(reportId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getMarkReportProofSentUrl = (reportId: string,) => {
+
+
+
+
+  return `/api/report-proofs/${reportId}/send`
+}
+
+/**
+ * @summary Mark a report ready for institution sharing after proof anchoring
+ */
+export const markReportProofSent = async (reportId: string,
+    reportProofSendInput: ReportProofSendInput, options?: Parameters<typeof customFetch>[1]): Promise<ReportProofSentResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<ReportProofSentResponse>(getMarkReportProofSentUrl(reportId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(reportProofSendInput)
+  }
+);}
+
+
+
+
+
+export const getMarkReportProofSentMutationKey = () => ['markReportProofSent'] as const;
+
+export const getMarkReportProofSentMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markReportProofSent>>, TError,MarkReportProofSentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markReportProofSent>>, TError,MarkReportProofSentMutationVariables, TContext> => {
+
+const mutationKey = getMarkReportProofSentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markReportProofSent>>, MarkReportProofSentMutationVariables> = (props) => {
+          const {reportId,data} = props ?? {};
+
+          return  markReportProofSent(reportId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkReportProofSentMutationResult = NonNullable<Awaited<ReturnType<typeof markReportProofSent>>>
+    export type MarkReportProofSentMutationBody = BodyType<ReportProofSendInput>
+    export type MarkReportProofSentMutationError = ErrorType<ErrorResponse>
+    export type MarkReportProofSentMutationVariables = {reportId: string;data: BodyType<ReportProofSendInput>}
+
+    /**
+ * @summary Mark a report ready for institution sharing after proof anchoring
+ */
+export const useMarkReportProofSent = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markReportProofSent>>, TError,MarkReportProofSentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markReportProofSent>>,
+        TError,
+        MarkReportProofSentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getMarkReportProofSentMutationOptions(options));
+    }
 

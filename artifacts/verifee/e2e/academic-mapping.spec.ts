@@ -876,6 +876,16 @@ test("keeps completed requirement results visible after a stream failure and ret
 test("shows the report preview immediately and keeps its downloads, save choices, and identity", async ({
   page,
 }) => {
+  const proofRequests: string[] = [];
+  await page.route("**/api/report-proofs**", async (route) => {
+    const request = route.request();
+    const forwarded = new URL(request.url());
+    forwarded.hostname = "localhost";
+    forwarded.port = "80";
+    proofRequests.push(`${request.method()} ${forwarded.pathname}`);
+    const response = await route.fetch({ url: forwarded.toString() });
+    await route.fulfill({ response });
+  });
   await openReport(page);
   await sendStreamEvent(page, 0, "complete", result);
   await page.evaluate(() => {
@@ -931,6 +941,8 @@ test("shows the report preview immediately and keeps its downloads, save choices
   });
   expect(firstReportIdentity.reportId).toMatch(/^VF-/);
   expect(Date.parse(firstReportIdentity.generatedAt)).not.toBeNaN();
+  await expect(page.getByTestId("report-sent-status")).toHaveText("Not sent");
+  expect(proofRequests.some((request) => request.startsWith("POST "))).toBe(false);
 
   const [download] = await Promise.all([
     page.waitForEvent("download"),
@@ -972,6 +984,25 @@ test("shows the report preview immediately and keeps its downloads, save choices
     "It does not confirm receipt or acceptance by the target",
   );
   expect(receiptContents).toContain("(institution.) Tj");
+
+  expect(proofRequests.some((request) => request.startsWith("POST "))).toBe(false);
+  await page.getByTestId("button-send-to-institution").click();
+  const confirmation = page.getByRole("dialog");
+  await expect(confirmation.getByRole("heading", { name: "Send report to institution?" })).toBeVisible();
+  await expect(confirmation).toContainText("Verifee will create a cryptographic proof for this exact report before sending it. After proof creation, changes to this report will create a mismatch.");
+  await confirmation.getByRole("button", { name: "Cancel" }).click();
+  expect(proofRequests.some((request) => request.startsWith("POST "))).toBe(false);
+  await page.getByTestId("button-send-to-institution").click();
+  await page.getByRole("dialog").getByRole("button", { name: "Create proof & send" }).click();
+  await expect(page.getByTestId("report-proof-status")).toHaveText("Proof status: Anchored");
+  await expect(page.getByTestId("report-sent-status")).toHaveText("Ready for institution sharing");
+  expect(proofRequests.some((request) => request === "POST /api/report-proofs")).toBe(true);
+  expect(proofRequests.some((request) => request.endsWith("/send"))).toBe(true);
+  await page.getByRole("link", { name: "Verify Report" }).click();
+  await expect(page.getByTestId("report-proof-verification")).toContainText("Valid");
+  await page.goBack();
+  await expect(page.getByTestId("report-proof-status")).toHaveText("Proof status: Anchored");
+  await expect(page.getByTestId("report-sent-status")).toHaveText("Ready for institution sharing");
 
   await page.getByTestId("button-save-to-my-reports").click();
   await expect(page.getByTestId("status-save-to-reports")).toContainText(

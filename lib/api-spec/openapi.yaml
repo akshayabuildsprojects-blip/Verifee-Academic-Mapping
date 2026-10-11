@@ -329,6 +329,80 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /report-proofs/{reportId}/status:
+    get:
+      operationId: getReportProofStatus
+      tags: [report-proof]
+      summary: Get report proof and sharing status without creating a proof
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^VF-[A-Z0-9-]{4,16}$"
+      responses:
+        "200":
+          description: Current proof and sharing status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportProofStatus"
+        "400":
+          description: Invalid report ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Report ID not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /report-proofs/{reportId}/send:
+    post:
+      operationId: markReportProofSent
+      tags: [report-proof]
+      summary: Mark a report ready for institution sharing after proof anchoring
+      parameters:
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^VF-[A-Z0-9-]{4,16}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportProofSendInput"
+      responses:
+        "200":
+          description: Report is ready for institution sharing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportProofSentResponse"
+        "400":
+          description: Invalid report ID or report hash
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Report proof not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Report proof is missing, expired, or does not match the hash
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -830,6 +904,36 @@ components:
           type: string
           format: date-time
       required: [reportId, reportHash, status, signature, issuedAt, expiresAt]
+    ReportProofStatus:
+      type: object
+      additionalProperties: false
+      properties:
+        reportId: { type: string }
+        reportHash: { type: string }
+        proofStatus:
+          type: string
+          enum: [pending, anchoring, anchored, failed, expired]
+        signature: { type: ["string", "null"] }
+        proofTimestamp: { type: string, format: date-time }
+        sentAt: { type: ["string", "null"], format: date-time }
+      required: [reportId, reportHash, proofStatus, signature, proofTimestamp, sentAt]
+    ReportProofSendInput:
+      type: object
+      additionalProperties: false
+      properties:
+        reportHash: { type: string, pattern: "^[a-f0-9]{64}$" }
+      required: [reportHash]
+    ReportProofSentResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        reportId: { type: string }
+        reportHash: { type: string }
+        sentAt: { type: string, format: date-time }
+        sharingStatus:
+          type: string
+          enum: [ready_for_sharing]
+      required: [reportId, reportHash, sentAt, sharingStatus]
     ReportProofVerification:
       type: object
       additionalProperties: false

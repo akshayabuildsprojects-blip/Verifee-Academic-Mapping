@@ -317,3 +317,48 @@ export const VerifyReportProofResponse = zod.object({
 })
 
 
+/**
+ * @summary Get report proof and sharing status without creating a proof
+ */
+export const getReportProofStatusPathReportIdRegExp = new RegExp('^VF-[A-Z0-9-]{4,16}$');
+
+
+export const GetReportProofStatusParams = zod.object({
+  "reportId": zod.coerce.string().regex(getReportProofStatusPathReportIdRegExp)
+})
+
+export const GetReportProofStatusResponse = zod.object({
+  "reportId": zod.string(),
+  "reportHash": zod.string(),
+  "proofStatus": zod.enum(['pending', 'anchoring', 'anchored', 'failed', 'expired']),
+  "signature": zod.string().nullable(),
+  "proofTimestamp": zod.coerce.date(),
+  "sentAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Mark a report ready for institution sharing after proof anchoring
+ */
+export const markReportProofSentPathReportIdRegExp = new RegExp('^VF-[A-Z0-9-]{4,16}$');
+
+
+export const MarkReportProofSentParams = zod.object({
+  "reportId": zod.coerce.string().regex(markReportProofSentPathReportIdRegExp)
+})
+
+export const markReportProofSentBodyReportHashRegExp = new RegExp('^[a-f0-9]{64}$');
+
+
+export const MarkReportProofSentBody = zod.object({
+  "reportHash": zod.string().regex(markReportProofSentBodyReportHashRegExp)
+})
+
+export const MarkReportProofSentResponse = zod.object({
+  "reportId": zod.string(),
+  "reportHash": zod.string(),
+  "sentAt": zod.coerce.date(),
+  "sharingStatus": zod.enum(['ready_for_sharing'])
+})
+
+
