@@ -718,8 +718,11 @@ test("shows mapping progress before results, keeps evidence accessible, and pers
 
   const dashboard = page.getByTestId("mapping-dashboard");
   await expect(dashboard).toBeVisible();
-  await expect(dashboard).toContainText("Mapping in progress");
-  await expect(dashboard).toContainText("Waiting for results");
+  const stageProgress = page.getByTestId("mapping-stage-progress");
+  await expect(stageProgress).toBeVisible();
+  await expect(page.getByTestId("status-mapping-loading")).toBeVisible();
+  await expect(stageProgress).toContainText("Program requirement mapping");
+  await expect(stageProgress).toContainText("Mapped academic context");
   await expect(dashboard).toContainText("—");
   await expect(page.getByTestId("mapping-header-meta")).toContainText("Evaluation standard");
   await expect(page.getByTestId("mapping-header-meta")).toContainText("Preliminary mapping.");
@@ -1006,6 +1009,9 @@ test("shows the report preview immediately and keeps its downloads, save choices
 
   await expect(page.getByTestId("disclosure-institution-status")).not.toHaveAttribute("open", "");
   await expect(page.getByTestId("disclosure-institution-status")).toContainText("Listed");
+  await expect(page.getByTestId("disclosure-institution-status")).toContainText(
+    "Checked by Verifee using Example institution registry.",
+  );
   await expect(page.getByTestId("disclosure-academic-context").locator(".section-status-label")).toHaveText(/Preliminary context|Context unavailable/);
   await expect(page.getByTestId("disclosure-program-mapping")).toContainText("Complete");
   await page.getByTestId("disclosure-institution-status").locator(":scope > summary").click();
@@ -1025,6 +1031,13 @@ test("shows the report preview immediately and keeps its downloads, save choices
   await expect(page.getByText("Step 5 of 5", { exact: true })).toBeVisible();
   await expect(page.getByTestId("report-proof-panel")).toBeVisible();
   await expect(page.getByTestId("report-preview")).toBeVisible();
+  const feeProofGap = await page.evaluate(() => {
+    const fee = document.querySelector(".v-report-fee");
+    const proof = document.querySelector('[data-testid="report-proof-panel"]');
+    if (!fee || !proof) return 0;
+    return proof.getBoundingClientRect().top - fee.getBoundingClientRect().bottom;
+  });
+  expect(feeProofGap).toBeGreaterThanOrEqual(24);
   const proofBeforePreview = await page.evaluate(() => {
     const proof = document.querySelector('[data-testid="report-proof-panel"]');
     const preview = document.querySelector('[data-testid="report-preview"]');

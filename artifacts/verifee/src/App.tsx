@@ -1198,6 +1198,58 @@ function Report() {
   const progressPercent = program.requirements.length > 0
     ? Math.min(100, Math.round((requirements.length / program.requirements.length) * 100))
     : 0;
+  const institutionCheckSummary = institutionStatus
+    ? institutionStatus.sourceName
+      ? `Checked by Verifee using ${institutionStatus.sourceName}.`
+      : 'Checked by Verifee; no supported registry was available for this jurisdiction.'
+    : institutionStatusLoading
+      ? 'Checking the supported institution registry.'
+      : 'No institution status result is available.';
+  const mappingStages = [
+    {
+      id: 'institution',
+      title: 'Institution status',
+      detail: institutionStatusLoading ? 'Checking registry' : institutionStatus ? 'Checked by Verifee' : 'Not checked',
+      state: institutionStatusLoading ? 'active' : institutionStatus ? 'complete' : 'waiting',
+    },
+    {
+      id: 'context',
+      title: 'Mapped academic context',
+      detail: contextLoading ? 'Contextualizing record' : contextFailure ? 'Fallback context used' : academicContext ? 'Context ready' : 'Waiting',
+      state: contextLoading ? 'active' : contextFailure ? 'attention' : academicContext ? 'complete' : 'waiting',
+    },
+    {
+      id: 'requirements',
+      title: 'Program requirement mapping',
+      detail: mappingError
+        ? 'Retry needed'
+        : loading && mappingStage === 'context'
+          ? 'Waiting for context'
+          : loading
+            ? `${requirements.length} of ${program.requirements.length} assessed`
+            : allRequirementsCompleted
+              ? 'Complete'
+              : 'Waiting',
+      state: mappingError
+        ? 'attention'
+        : loading && mappingStage === 'context'
+          ? 'waiting'
+          : loading
+            ? 'active'
+            : allRequirementsCompleted
+              ? 'complete'
+              : 'waiting',
+    },
+  ];
+  const progressStatusMessage = mappingError
+    ? 'Mapping paused. Retry to continue with the saved academic record.'
+    : loading
+      ? mappingStage === 'context'
+        ? 'Preparing academic context before mapping requirements.'
+        : 'Assessing stored program requirements.'
+      : contextFailure
+        ? 'Mapping complete. Context details use available fallback information.'
+        : 'Mapping complete. All available requirement results are shown.';
 
   return <div className="shell"><Header /><main className="page-wrap report-page">
     <Stepper current={4} />
@@ -1234,15 +1286,13 @@ function Report() {
             {institutionStatusLoading ? 'Checking registry…' : institutionStatus ? institutionStatusLabel(institutionStatus.status, institutionStatus.statusLabel) : 'Unable to check'}
           </span>
           <span className="section-disclosure-brief">
-            {institutionStatusLoading
-              ? 'Checking the supported institution registry.'
-              : institutionStatus?.summary ?? 'No institution status result is available.'}
+            {institutionCheckSummary}
           </span>
           <ChevronRight className="section-disclosure-chevron" size={18} aria-hidden="true" />
         </summary>
         <div className="section-disclosure-content">
           {institutionStatus ? <>
-            <p className="verify-copy">{institutionStatus.summary}</p>
+            <p className="verify-copy">{institutionCheckSummary}</p>
             <dl className="institution-status-details">
               <div>
                 <dt>Institution</dt>
@@ -1310,25 +1360,13 @@ function Report() {
     </section>}
     <section className={`mapping-dashboard${loading ? ' is-loading' : ''}`} aria-label="Requirement mapping summary" data-testid="mapping-dashboard">
       <div className="mapping-score-panel">
-        <span className="mapping-score-label" role={loading ? 'status' : undefined} data-testid={loading ? 'status-mapping-loading' : 'status-mapping-progress'}>
-          {loading ? mappingStage === 'context' ? 'Preparing academic context' : 'Mapping in progress' : mappingError ? 'Mapping needs a retry' : 'Requirements assessed'}
-        </span>
+        <span className="mapping-score-label">Requirements assessed</span>
         <div className="mapping-score-value">{requirements.length}<span> / {program.requirements.length}</span></div>
-        <p>{loading
-          ? mappingStage === 'context'
-            ? 'Preparing the extracted record before evaluating stored requirements.'
-            : 'Comparing extracted courses with stored program requirements.'
-          : allRequirementsCompleted
+        <p>{allRequirementsCompleted
             ? 'All stored criteria evaluated'
             : mappingError
               ? 'Your saved record is ready to retry'
               : 'Stored criteria evaluated so far'}</p>
-        <div className="mapping-progress-meter">
-          <div className="mapping-progress-bar" role="progressbar" aria-label="Requirements assessed" aria-valuemin={0} aria-valuemax={program.requirements.length} aria-valuenow={requirements.length} aria-valuetext={`${requirements.length} of ${program.requirements.length} requirements mapped, ${progressPercent}%`} data-testid="mapping-progress-bar">
-            <span className="mapping-progress-fill" style={{ width: `${progressPercent}%` }} />
-          </div>
-          <span className="mapping-progress-percent">{progressPercent}%</span>
-        </div>
       </div>
       <div className="mapping-breakdown-panel">
         <div className="mapping-breakdown-heading"><h2>Requirement results</h2><span>{requirements.length > 0 ? `${requirements.length} evaluated` : loading ? 'Waiting for results' : 'No results yet'}</span></div>
@@ -1342,7 +1380,7 @@ function Report() {
       </div>
     </section>
     <div className="report-sections">
-      <section className="panel section-card section-disclosure academic-context-card" aria-live="polite" aria-busy={contextLoading} data-testid="card-academic-context">
+      <section className="panel section-card section-disclosure academic-context-card" aria-live="polite" aria-busy={contextLoading || loading} data-testid="card-academic-context">
         <details data-testid="disclosure-academic-context">
           <summary className="section-disclosure-summary">
             <span className="section-disclosure-heading"><BookOpen size={19} /><span role="heading" aria-level={2}>Mapped academic context</span></span>
@@ -1352,6 +1390,32 @@ function Report() {
                 ? 'Contextualizing the extracted academic record.'
                 : `${academicContext?.institution.value ?? 'Institution context unavailable'} · ${requirements.length}/${program.requirements.length} requirements mapped.`}
             </span>
+            <div className="mapping-stage-progress" role="group" aria-label="Academic mapping progress" data-testid="mapping-stage-progress" aria-busy={loading}>
+              <div className="mapping-stage-progress-header">
+                <strong>{loading ? mappingStage === 'context' ? 'Preparing academic mapping' : 'Mapping in progress' : mappingError ? 'Mapping needs attention' : 'Mapping complete'}</strong>
+                <span>{requirements.length} of {program.requirements.length} requirements assessed</span>
+              </div>
+              <p role={loading || mappingError ? 'status' : undefined} data-testid={loading ? 'status-mapping-loading' : mappingError ? 'status-mapping-error-copy' : 'status-mapping-progress'}>
+                {progressStatusMessage}
+              </p>
+              <div className="mapping-stage-list">
+                {mappingStages.map((stage, index) => <div
+                  key={stage.id}
+                  className={`mapping-stage-item is-${stage.state}`}
+                  data-testid={`mapping-stage-${stage.id}`}
+                  aria-current={stage.state === 'active' ? 'step' : undefined}
+                >
+                  <span className="mapping-stage-marker">{stage.state === 'complete' ? '✓' : index + 1}</span>
+                  <span><strong>{stage.title}</strong><small>{stage.detail}</small></span>
+                </div>)}
+              </div>
+              <div className="mapping-progress-meter">
+                <div className="mapping-progress-bar" role="progressbar" aria-label="Requirements assessed" aria-valuemin={0} aria-valuemax={program.requirements.length} aria-valuenow={requirements.length} aria-valuetext={`${requirements.length} of ${program.requirements.length} requirements mapped, ${progressPercent}%`} data-testid="mapping-progress-bar">
+                  <span className="mapping-progress-fill" style={{ width: `${progressPercent}%` }} />
+                </div>
+                <span className="mapping-progress-percent">{progressPercent}%</span>
+              </div>
+            </div>
             <ChevronRight className="section-disclosure-chevron" size={18} aria-hidden="true" />
           </summary>
           <div className="section-disclosure-content">
