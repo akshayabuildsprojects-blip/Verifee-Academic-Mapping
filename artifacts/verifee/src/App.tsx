@@ -610,49 +610,67 @@ function Landing() {
             <p className="landing-lede">Verifee interprets international academic records, verifies supported digital credential formats where possible, and maps prior coursework against target university requirements.</p>
             <div className="hero-actions">
               <Link href="/login" className="landing-primary" data-testid="link-try-verifee-hero">Try Verifee <ArrowRight size={16} /></Link>
-              <a href="#how-it-works" className="landing-text-link" data-testid="link-see-how-it-works">See how it works <ArrowDown size={14} /></a>
+              <Link href="/sample-report" className="landing-sample-link" data-testid="link-view-sample-report">View sample report <ArrowUpRight size={15} /></Link>
             </div>
+            <p className="hero-sample-note">The sample uses fictional coursework and is not an official evaluation.</p>
             <div className="hero-assurance"><span className="assurance-mark"><Check size={13} /></span> A clearer first look before formal review</div>
           </div>
-          <div className="hero-document" aria-label="Illustrative academic record interpretation preview">
-            <div className="document-topline"><span>RECORD OVERVIEW</span><span className="document-ref">VF—0248</span></div>
-            <div className="document-rule" />
-            <div className="document-institution"><span className="institution-seal"><Landmark size={19} /></span><div><span className="doc-label">ISSUING INSTITUTION</span><strong>University of Cape Coast</strong><small>Ghana · 4-year bachelor’s degree</small></div></div>
-            <div className="document-field-grid"><div><span className="doc-label">QUALIFICATION</span><strong>BSc, Computer Science</strong></div><div><span className="doc-label">RECORD TYPE</span><strong>Academic transcript</strong></div></div>
-            <div className="document-course-head"><span>COURSEWORK</span><span>INTERPRETATION</span></div>
-            <div className="document-course"><span>Calculus II</span><span className="document-status"><i /> Identified</span></div>
-            <div className="document-course"><span>Data Structures</span><span className="document-status"><i /> Identified</span></div>
-            <div className="document-course"><span>Probability &amp; Statistics</span><span className="document-status"><i /> Identified</span></div>
-            <div className="document-foot"><span><ScanText size={14} /> Academic interpretation</span><span>Preliminary</span></div>
-            <div className="document-caption"><span className="caption-line" />A record, with context.</div>
+          <div className="hero-document landing-review-preview" aria-label="Step 2 of 5: sample Verify and Review screen">
+            <div className="review-stage-label"><span className="review-stage-dot" /> STEP 2 OF 5 · VERIFY &amp; REVIEW</div>
+            <div className="review-dossier" data-testid="landing-record-overview">
+              <div className="review-dossier-heading">
+                <span className="review-dossier-icon"><GraduationCap size={18} /></span>
+                <div><span className="review-overline">Academic record summary</span><h2>{sampleCredential.institution}</h2></div>
+                <span className="review-record-badge is-sample">Sample record</span>
+              </div>
+              <div className="review-credential-grid">
+                <div className="review-credential-tile"><span className="review-overline">Degree / qualification</span><span className="review-credential-value">{sampleCredential.qualification}</span></div>
+                <div className="review-credential-tile"><span className="review-overline">Field of study</span><span className="review-credential-value">{sampleCredential.major}</span></div>
+                <div className="review-credential-tile"><span className="review-overline">Country</span><span className="review-credential-value">{sampleCredential.country}</span></div>
+                <div className="review-credential-tile"><span className="review-overline">Graduation date</span><span className="review-credential-value">{sampleCredential.graduationDate}</span></div>
+              </div>
+            </div>
+            <div className="landing-preview-ledger">
+              <div><strong>Course ledger</strong><span>{sampleCourses.length} sample entries</span></div>
+              {sampleCourses.slice(0, 3).map((course) => <div className="landing-preview-course" key={course.code}><span><b>{course.code}</b> {course.title}</span><span>{course.grade}</span></div>)}
+              <small>Fictional sample record · not extracted from an uploaded file</small>
+            </div>
           </div>
         </div>
         <div className="hero-bottomline"><span>FOR STUDENTS &amp; UNIVERSITY TEAMS</span><span>Clarity across education systems <span className="bottomline-dot">·</span> Careful by design</span></div>
+        <div className="landing-principles" aria-label="Verifee principles">
+          <div className="landing-principles-heading">PRELIMINARY REVIEW PRINCIPLES</div>
+          <div className="landing-principles-grid">
+            <article><span><Check size={15} /></span><div><strong>Human review preserved</strong><small>Institutions retain final decisions</small></div></article>
+            <article><span><BookOpen size={15} /></span><div><strong>Evidence-linked records</strong><small>Sources shown where available</small></div></article>
+            <article><span><ShieldAlert size={15} /></span><div><strong>Cryptographic proof</strong><small>Anchored when a report is sent</small></div></article>
+          </div>
+        </div>
       </section>
       <section className="landing-capabilities" id="how-it-works" aria-labelledby="capabilities-heading">
         <div className="section-intro">
-          <div className="landing-eyebrow"><span className="eyebrow-rule" /> A thoughtful first pass</div>
-          <h2 id="capabilities-heading">From records to <em>understanding.</em></h2>
-          <p>Academic systems differ. The questions students and reviewers need answered are often the same.</p>
+          <div className="landing-eyebrow"><span className="eyebrow-rule" /> Precision engineering for higher education</div>
+          <h2 id="capabilities-heading">How Verifee reconciles ambiguity.</h2>
+          <p>From different grading scales to degree names, Verifee brings academic records into context before formal review.</p>
         </div>
-        <div className="capability-list">
+        <div className="capability-list capability-cards">
           <article className="capability-item">
-            <div className="capability-index">01</div><div className="capability-icon"><ShieldAlert size={19} /></div>
-            <div className="capability-copy"><h3>Verify where possible</h3><p>Check supported digital credentials such as OpenCerts and European Digital Credentials.</p></div><span className="capability-note">SUPPORTED FORMATS</span>
+            <div className="capability-icon"><ScanText size={19} /></div>
+            <div className="capability-copy"><span className="capability-module">MODULE 01 · INGESTION</span><h3>Direct ingestion &amp; record interpretation</h3><p>Extracts grades, credits, course details, and education-system context from academic records.</p></div>
           </article>
           <article className="capability-item">
-            <div className="capability-index">02</div><div className="capability-icon"><ScanText size={19} /></div>
-            <div className="capability-copy"><h3>Interpret academic records</h3><p>Normalize degrees, courses, credits, grades, and education-system information.</p></div><span className="capability-note">RECORD CONTEXT</span>
+            <div className="capability-icon"><GraduationCap size={20} /></div>
+            <div className="capability-copy"><span className="capability-module">MODULE 02 · SYNTHESIS</span><h3>Preliminary target mapping</h3><p>Compares prior coursework with a selected program’s published background requirements.</p></div>
           </article>
           <article className="capability-item">
-            <div className="capability-index">03</div><div className="capability-icon"><GraduationCap size={20} /></div>
-            <div className="capability-copy"><h3>Map academic preparation</h3><p>Compare prior coursework against a target graduate program and identify covered areas, partial matches, potential gaps, and insufficient evidence.</p></div><span className="capability-note">PROGRAM ALIGNMENT</span>
+            <div className="capability-icon"><ShieldAlert size={19} /></div>
+            <div className="capability-copy"><span className="capability-module">MODULE 03 · PROOF</span><h3>Tamper-evident report proof</h3><p>When a report is sent, its hash can be anchored to Solana devnet for later verification.</p></div>
           </article>
         </div>
       </section>
       <section className="landing-positioning">
         <div className="positioning-label"><span className="positioning-emblem"><BookOpen size={17} /></span><span>THE ROLE OF VERIFEE</span></div>
-        <div className="positioning-content"><h2>Built for preliminary academic review</h2><p>Verifee helps students and university teams understand academic preparation before formal credential evaluation or final admissions review.</p><div className="positioning-boundary"><span className="boundary-mark">i</span><span>Verifee does not replace official credential evaluators or university admissions decisions.</span></div></div>
+        <div className="positioning-content"><h2>Built for preliminary academic review</h2><p>Verifee helps students and university teams understand academic preparation before formal credential evaluation or final admissions review.</p><div className="positioning-boundary"><span className="boundary-mark">i</span><span>Verifee does not replace university admissions decisions.</span></div></div>
         <div className="positioning-side-note">CONTEXT BEFORE<br />CONCLUSIONS</div>
       </section>
       <section className="landing-bottom-cta">
@@ -1779,6 +1797,28 @@ function SavedReportRoute() {
   </RequireDemoSession>;
 }
 
+function SampleReportRoute() {
+  const [, setLocation] = useLocation();
+  const report = useMemo(() => createSeededDemoReport(), []);
+  return <div className="shell">
+    <Header />
+    <div className="sample-report-notice" role="note">
+      <strong>Fictional sample report</strong>
+      <span>All student and course details are invented for demonstration. No proof is created or sent.</span>
+    </div>
+    <VerifeeReportView
+      data={report.data}
+      generatedReport={report.metadata}
+      samplePreview
+      showDemoPricingNotice
+      onDownload={() => downloadVerifeeReportPdf(report.data, report.metadata)}
+      onDownloadReceipt={() => downloadVerifeeSubmissionReceiptPdf(report.metadata)}
+      onBackToMapping={() => setLocation('/')}
+      onStartNewAnalysis={() => setLocation('/login')}
+    />
+  </div>;
+}
+
 function VerifyReportProofRoute() {
   const [, params] = useRoute<{ report_id: string }>('/verify/:report_id');
   if (!params?.report_id) return null;
@@ -1798,6 +1838,7 @@ function Router() {
       <Route path="/dashboard" component={DemoDashboardRoute} />
       <Route path="/my-reports" component={DemoReportsRoute} />
       <Route path="/saved-report/:reportId" component={SavedReportRoute} />
+      <Route path="/sample-report" component={SampleReportRoute} />
       <Route path="/verify/:report_id" component={VerifyReportProofRoute} />
       <Route path="/start" component={ProtectedUploadStep} />
       <Route path="/analysis" component={ProtectedReview} />

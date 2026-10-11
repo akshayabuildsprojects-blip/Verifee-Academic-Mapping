@@ -30,6 +30,7 @@ export interface VerifeeReportViewProps {
   onSaveToMyReports?(): void;
   isSavedToMyReports?: boolean;
   showDemoPricingNotice?: boolean;
+  samplePreview?: boolean;
 }
 
 const statusLabels: Record<string, string> = {
@@ -207,6 +208,7 @@ export function VerifeeReportView({
   onSaveToMyReports,
   isSavedToMyReports,
   showDemoPricingNotice = false,
+  samplePreview = false,
 }: VerifeeReportViewProps) {
   const counts = [
     { label: 'Covered', count: data.counts.covered, tone: 'covered' },
@@ -225,10 +227,10 @@ export function VerifeeReportView({
         </header>
         <div className="v-report-post-actions v-report-post-actions-top">
           <button className="v-report-button v-report-button-secondary" type="button" onClick={onBackToMapping} data-testid="button-back-to-mapping">
-            <ArrowLeft size={15} aria-hidden="true" /> Back to Academic Mapping
+            <ArrowLeft size={15} aria-hidden="true" /> {samplePreview ? 'Back to Verifee' : 'Back to Academic Mapping'}
           </button>
           <button className="v-report-button v-report-button-text" type="button" onClick={onStartNewAnalysis} data-testid="button-start-new-analysis">
-            Start New Analysis <ArrowRight size={15} aria-hidden="true" />
+            {samplePreview ? 'Try Verifee' : 'Start New Analysis'} <ArrowRight size={15} aria-hidden="true" />
           </button>
         </div>
 
@@ -245,7 +247,7 @@ export function VerifeeReportView({
               </div>
             </section>
         )}
-        <ReportProofPanel
+        {!samplePreview && <ReportProofPanel
           reportId={generatedReport.reportId}
           targetInstitution={data.targetInstitution}
           payload={data}
@@ -258,7 +260,7 @@ export function VerifeeReportView({
             <button className="v-report-button v-report-button-secondary" type="button" onClick={onDownloadReceipt} data-testid="button-download-submission-receipt"><FileText size={15} aria-hidden="true" /> Download Receipt</button>
             <button className="v-report-button v-report-button-secondary" type="button" onClick={onDownload} aria-label="Download report as PDF" data-testid="button-download-report"><ArrowDownToLine size={16} aria-hidden="true" /> Download PDF</button>
           </>}
-        />
+        />}
 
         <section className="v-report-preview" aria-labelledby="v-report-preview-title" data-testid="report-preview">
               <div className="v-report-preview-toolbar">
