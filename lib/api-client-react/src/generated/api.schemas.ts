@@ -392,7 +392,7 @@ export interface ReportProofSendInput {
   reportHash: string;
   /**
      * @minLength 1
-     * @maxLength 10000000
+     * @maxLength 5500000
      * @pattern ^[A-Za-z0-9+/]+={0,2}$
      */
   pdfBase64: string;

@@ -2,9 +2,9 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import bs58 from "bs58";
 import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction, sendAndConfirmTransaction } from "@solana/web3.js";
 import { and, eq, gt, lte, or } from "drizzle-orm";
-import { ReplitConnectors } from "@replit/connectors-sdk";
 import { db, reportProofsTable } from "@workspace/db";
 import { hashReportPayload as reportHash } from "../lib/report-proof-canonical";
+import { sendAgentMailReportEmail } from "../lib/report-email-agentmail";
 import {
   CreateReportProofBody,
   CreateReportProofResponse,
@@ -265,43 +265,30 @@ router.post("/report-proofs/:reportId/send", async (req, res): Promise<void> => 
     res.status(409).json({ error: "A confirmed Solana proof is required before sharing." });
     return;
   }
-  const sender = process.env.VERIFEE_EMAIL_FROM;
-  if (!sender) {
-    res.status(503).json({ error: "Email delivery is not configured. Set a verified Resend sender address before retrying." });
+  const agentMailKey = process.env.AGENTMAIL_KEY;
+  if (!agentMailKey) {
+    res.status(503).json({ error: "Email delivery is not configured. Add the AgentMail API key in Replit Secrets before retrying." });
     return;
   }
   try {
     const pdfBytes = Buffer.from(body.data.pdfBase64, "base64");
-    if (pdfBytes.length === 0 || pdfBytes.length > 7_500_000) {
-      res.status(413).json({ error: "The report PDF is too large to email. Download it and contact the institution directly." });
+    if (pdfBytes.length === 0 || body.data.pdfBase64.length > 5_500_000) {
+      res.status(413).json({ error: "The report PDF is too large for AgentMail's message limit. Download it and contact the institution directly." });
       return;
     }
-    const connectors = new ReplitConnectors();
-    const emailResponse = await connectors.proxy("resend", "/emails", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "Idempotency-Key": `verifee-report-${row.reportId}`,
-      },
-      body: JSON.stringify({
-        from: sender,
-        to: ["akumar3134@gatech.edu"],
-        subject: `Verifee report ${row.reportId}`,
-        text: `A preliminary Verifee academic mapping report is attached.\n\nReport ID: ${row.reportId}\nReport hash: ${row.reportHash}\nSolana transaction: ${row.solanaSignature}\n\nUse the Verify Report page in Verifee to check this report's proof.`,
-        attachments: [{
-          filename: `Verifee_Report_${row.reportId}.pdf`,
-          content: body.data.pdfBase64,
-          content_type: "application/pdf",
-        }],
-      }),
+    await sendAgentMailReportEmail({
+      apiKey: agentMailKey,
+      inboxId: "akshaya-1346@agentmail.to",
+      reportId: row.reportId,
+      reportHash: row.reportHash,
+      signature: row.solanaSignature,
+      pdfBase64: body.data.pdfBase64,
     });
-    if (!emailResponse.ok) {
-      req.log.warn({ reportId: row.reportId, statusCode: emailResponse.status }, "Resend rejected the report email.");
-      res.status(503).json({ error: "The report email could not be sent. Please retry." });
-      return;
-    }
   } catch (error) {
-    req.log.error({ reportId: row.reportId, message: error instanceof Error ? error.message : "unknown" }, "Report email delivery failed.");
+    req.log.warn({
+      reportId: row.reportId,
+      statusCode: typeof error === "object" && error !== null && "statusCode" in error ? error.statusCode : undefined,
+    }, "AgentMail rejected or could not send the report email.");
     res.status(503).json({ error: "The report email could not be sent. Please retry." });
     return;
   }

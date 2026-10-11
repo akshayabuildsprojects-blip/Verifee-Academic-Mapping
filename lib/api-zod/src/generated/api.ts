@@ -348,7 +348,7 @@ export const MarkReportProofSentParams = zod.object({
 })
 
 export const markReportProofSentBodyReportHashRegExp = new RegExp('^[a-f0-9]{64}$');
-export const markReportProofSentBodyPdfBase64Max = 10000000;
+export const markReportProofSentBodyPdfBase64Max = 5500000;
 
 
 export const markReportProofSentBodyPdfBase64RegExp = new RegExp('^[A-Za-z0-9+/]+={0,2}$');

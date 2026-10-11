@@ -922,7 +922,7 @@ components:
       additionalProperties: false
       properties:
         reportHash: { type: string, pattern: "^[a-f0-9]{64}$" }
-        pdfBase64: { type: string, minLength: 1, maxLength: 10000000, pattern: "^[A-Za-z0-9+/]+={0,2}$" }
+        pdfBase64: { type: string, minLength: 1, maxLength: 5500000, pattern: "^[A-Za-z0-9+/]+={0,2}$" }
       required: [reportHash, pdfBase64]
     ReportProofSentResponse:
       type: object
